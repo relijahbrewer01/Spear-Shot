@@ -31,13 +31,18 @@ def main() -> int:
     require('Current milestone: `Spear Shot v0.3.4 - Phase 1 Final`' in readme_text, "README baseline milestone is updated to v0.3.4", failures)
     require("signal dodge_started" in player_script and "signal dodge_ended" in player_script and "signal dodge_ready" in player_script, "Player exposes dodge start/end/ready hooks", failures)
     require("enum ActionState" in player_script and "DODGING" in player_script, "Player defines an explicit dodge state", failures)
-    require("dodge_duration := 0.18" in player_script, "Player dodge duration matches the starting tuning", failures)
-    require("dodge_distance := 28.0" in player_script, "Player dodge distance matches the starting tuning", failures)
+    require("dodge_duration := 0.20" in player_script, "Player dodge duration matches the utility tuning", failures)
+    require("dodge_distance := 36.0" in player_script, "Player dodge distance matches the utility tuning", failures)
     require("dodge_cooldown := 1.1" in player_script, "Player dodge cooldown matches the starting tuning", failures)
     require("dodge_cooldown_left = dodge_cooldown" in player_script, "Shift and Space share the same cooldown timer", failures)
     require("The shared dodge cooldown starts when the dodge begins" in readme_text, "README documents when dodge cooldown timing begins", failures)
     require("action_state == ActionState.NORMAL and dodge_cooldown_left == 0.0" in player_script, "Dodge cannot start while already dodging or cooling down", failures)
-    require("is_damage_invulnerable" in player_script and "invulnerability_left > 0.0 or is_dodging()" in player_script, "Dodge invulnerability is unified with normal hurt invulnerability", failures)
+    require(
+        "is_damage_invulnerable" in player_script
+        and "invulnerability_left > 0.0 or is_dodging() or dodge_exit_invulnerability_left > 0.0" in player_script,
+        "Dodge, exit grace, and normal hurt invulnerability use one damage check",
+        failures,
+    )
     require("func _process_dodge_motion(delta: float) -> void:" in player_script and "_clamp_position_to_arena" in player_script, "Dodge movement is clamped inside the arena deterministically", failures)
     require("dodge_cooldown_left = 0.0" in player_script and "dodge_time_left = 0.0" in player_script, "Restart/reset clears active dodge and cooldown state", failures)
     require("pickup_area" in spear_script and "_on_pickup_body_entered" in spear_script, "Landed spear pickup remains body-based and available during dodge", failures)

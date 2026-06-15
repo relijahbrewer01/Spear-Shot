@@ -3,6 +3,12 @@ class_name Player
 
 const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
 const BODY_VISUAL_Z_INDEX := 10
+const MOVEMENT_ACTIONS: Array[StringName] = [
+	&"move_up",
+	&"move_left",
+	&"move_down",
+	&"move_right",
+]
 
 enum ActionState {
 	NORMAL,
@@ -23,9 +29,10 @@ signal dodge_ready
 @export var destination_reach_distance := 4.0
 @export var body_radius := 8.0
 @export var damage_hit_radius := 7.0
-@export var dodge_duration := 0.18
-@export var dodge_distance := 28.0
+@export var dodge_duration := 0.20
+@export var dodge_distance := 36.0
 @export var dodge_cooldown := 1.1
+@export var dodge_exit_invulnerability_duration := 0.10
 @export var dodge_spin_turns := 1.0
 @export_range(0.0, 1.0, 0.01) var horizontal_facing_dead_zone := 0.12
 @export_range(1, 8, 1) var dodge_trail_afterimage_count := 4
@@ -47,9 +54,11 @@ var action_state: ActionState = ActionState.NORMAL
 var dodge_direction := Vector2.RIGHT
 var dodge_time_left := 0.0
 var dodge_cooldown_left := 0.0
+var dodge_exit_invulnerability_left := 0.0
 var dodge_spin_direction := 1.0
 var last_valid_aim_direction := Vector2.RIGHT
 var facing_direction := 1
+var suppressed_movement_actions: Dictionary = {}
 
 @onready var body_visual: Node2D = $BodyVisual
 @onready var body_sprite: Sprite2D = $BodyVisual/Sprite2D
@@ -98,9 +107,11 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 	dodge_direction = Vector2.RIGHT
 	dodge_time_left = 0.0
 	dodge_cooldown_left = 0.0
+	dodge_exit_invulnerability_left = 0.0
 	dodge_spin_direction = 1.0
 	last_valid_aim_direction = Vector2.RIGHT
 	global_position = _clamp_position_to_arena(start_position)
+	suppressed_movement_actions.clear()
 	_update_health_pips()
 	_update_health_pips_transform()
 	_clear_dodge_visuals()
@@ -115,6 +126,8 @@ func set_active(is_active: bool) -> void:
 		action_state = ActionState.DISABLED
 		velocity = Vector2.ZERO
 		clear_move_destination()
+		dodge_exit_invulnerability_left = 0.0
+		suppressed_movement_actions.clear()
 		_clear_dodge_visuals()
 	elif health > 0:
 		action_state = ActionState.NORMAL
@@ -133,7 +146,7 @@ func can_start_dodge() -> bool:
 
 
 func is_damage_invulnerable() -> bool:
-	return invulnerability_left > 0.0 or is_dodging()
+	return invulnerability_left > 0.0 or is_dodging() or dodge_exit_invulnerability_left > 0.0
 
 
 func can_take_damage() -> bool:
@@ -141,7 +154,11 @@ func can_take_damage() -> bool:
 
 
 func get_manual_input_direction() -> Vector2:
-	return Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	var movement_input := Vector2(
+		_get_available_movement_strength(&"move_right") - _get_available_movement_strength(&"move_left"),
+		_get_available_movement_strength(&"move_down") - _get_available_movement_strength(&"move_up")
+	)
+	return movement_input.limit_length(1.0)
 
 
 func has_active_move_destination() -> bool:
@@ -166,7 +183,15 @@ func get_facing_direction() -> int:
 	return facing_direction
 
 
-func try_start_dodge(direction: Vector2) -> bool:
+func try_start_aim_dodge(direction: Vector2) -> bool:
+	return try_start_dodge(direction, true)
+
+
+func try_start_movement_dodge(direction: Vector2) -> bool:
+	return try_start_dodge(direction, false)
+
+
+func try_start_dodge(direction: Vector2, suppress_held_movement := false) -> bool:
 	if not can_start_dodge():
 		return false
 
@@ -180,7 +205,11 @@ func try_start_dodge(direction: Vector2) -> bool:
 	dodge_spin_direction = _get_dodge_spin_direction(dodge_direction)
 	dodge_time_left = dodge_duration
 	dodge_cooldown_left = dodge_cooldown
+	dodge_exit_invulnerability_left = 0.0
 	velocity = Vector2.ZERO
+	if suppress_held_movement:
+		clear_move_destination()
+		_suppress_current_movement_actions()
 	if dodge_trail != null:
 		dodge_trail.begin_dodge()
 	dodge_started.emit(dodge_direction)
@@ -213,13 +242,16 @@ func take_damage(_source_position: Vector2) -> void:
 		active = false
 		action_state = ActionState.DISABLED
 		dodge_time_left = 0.0
+		dodge_exit_invulnerability_left = 0.0
 		velocity = Vector2.ZERO
+		suppressed_movement_actions.clear()
 		_clear_dodge_visuals()
 		died.emit()
 
 
 func _physics_process(delta: float) -> void:
 	_update_timers(delta)
+	_release_suppressed_movement_actions()
 
 	if invulnerability_left > 0.0:
 		invulnerability_left = max(invulnerability_left - delta, 0.0)
@@ -236,7 +268,7 @@ func _physics_process(delta: float) -> void:
 				move_and_slide()
 				_clamp_inside_arena()
 			ActionState.DODGING:
-				_process_dodge_motion(delta)
+				_process_dodge_motion(minf(delta, dodge_time_left))
 			ActionState.DISABLED:
 				velocity = Vector2.ZERO
 
@@ -245,6 +277,7 @@ func _physics_process(delta: float) -> void:
 	_update_body_visuals(delta)
 	_update_dodge_trail(delta)
 	_update_health_pips_transform()
+	_advance_dodge_timer(delta)
 	queue_redraw()
 
 
@@ -283,6 +316,24 @@ func _update_horizontal_facing(move_input: Vector2) -> void:
 		facing_direction = 1
 	elif move_input.x <= -horizontal_facing_dead_zone:
 		facing_direction = -1
+
+
+func _get_available_movement_strength(action: StringName) -> float:
+	if suppressed_movement_actions.has(action):
+		return 0.0
+	return Input.get_action_strength(action)
+
+
+func _suppress_current_movement_actions() -> void:
+	for action in MOVEMENT_ACTIONS:
+		if Input.is_action_pressed(action):
+			suppressed_movement_actions[action] = true
+
+
+func _release_suppressed_movement_actions() -> void:
+	for action in MOVEMENT_ACTIONS:
+		if suppressed_movement_actions.has(action) and not Input.is_action_pressed(action):
+			suppressed_movement_actions.erase(action)
 
 
 func _clamp_position_to_arena(target_position: Vector2) -> Vector2:
@@ -396,6 +447,11 @@ func _update_timers(delta: float) -> void:
 		if previous_cooldown_left > 0.0 and dodge_cooldown_left == 0.0:
 			dodge_ready.emit()
 
+	if dodge_exit_invulnerability_left > 0.0:
+		dodge_exit_invulnerability_left = max(dodge_exit_invulnerability_left - delta, 0.0)
+
+
+func _advance_dodge_timer(delta: float) -> void:
 	if not is_dodging():
 		return
 
@@ -437,6 +493,7 @@ func _finish_dodge() -> void:
 
 	action_state = ActionState.NORMAL if active and is_alive() else ActionState.DISABLED
 	dodge_time_left = 0.0
+	dodge_exit_invulnerability_left = dodge_exit_invulnerability_duration
 	velocity = Vector2.ZERO
 	_reset_body_visual_roll()
 	dodge_ended.emit()
@@ -448,6 +505,7 @@ func _cancel_dodge() -> void:
 		dodge_ended.emit()
 
 	dodge_time_left = 0.0
+	dodge_exit_invulnerability_left = 0.0
 	velocity = Vector2.ZERO
 	dodge_spin_direction = 1.0
 	if active and is_alive():

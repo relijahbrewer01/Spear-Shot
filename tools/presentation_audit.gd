@@ -10,6 +10,7 @@ const TEXTURE_PATHS := [
 
 const AUDIO_PATHS := [
 	"res://music/quiet_hunter_loop.wav",
+	"res://audio/dodge.wav",
 ]
 
 const SCENE_SPRITES := {
@@ -129,6 +130,7 @@ func _audit_main_scene_audio(report_lines: Array[String]) -> int:
 		"AudioPlayers/PickupPlayer",
 		"AudioPlayers/PlayerHurtPlayer",
 		"AudioPlayers/GameOverPlayer",
+		"AudioPlayers/DodgePlayer",
 	]:
 		var player := main.get_node_or_null(player_path) as AudioStreamPlayer
 		if player == null:

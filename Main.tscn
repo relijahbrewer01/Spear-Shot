@@ -13,6 +13,7 @@
 [ext_resource type="AudioStream" uid="uid://2qtec5epgxjy" path="res://audio/game_over.wav" id="11"]
 [ext_resource type="AudioStream" uid="uid://duhbd165otiqh" path="res://music/quiet_hunter_loop.wav" id="12"]
 [ext_resource type="Script" uid="uid://c6060nsi3i51r" path="res://scripts/destination_marker.gd" id="13"]
+[ext_resource type="AudioStream" path="res://audio/dodge.wav" id="14"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -65,6 +66,11 @@ bus = &"SFX"
 
 [node name="GameOverPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1056116958]
 stream = ExtResource("11")
+bus = &"SFX"
+
+[node name="DodgePlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+stream = ExtResource("14")
+volume_db = -7.0
 bus = &"SFX"
 
 [node name="SpawnTimer" type="Timer" parent="." unique_id=1065658465]

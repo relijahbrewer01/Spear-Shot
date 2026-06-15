@@ -27,8 +27,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Right mouse button: move to the clicked destination and show a brief trap-style ground marker
 - Mouse: aim
 - Left mouse button or `Q`: throw spear
-- `Shift`: dodge toward the current aim direction
-- `Spacebar`: dodge using movement direction first, then click-move direction, then aim fallback
+- `Shift`: dodge toward aim, cancel prior movement intent, and require previously held movement keys to be released before they move again
+- `Spacebar`: dodge using movement direction first, then click-move direction, then aim fallback while preserving movement continuity
 - `Escape` or `P`: pause, or begin the faster `3 2 1` resume countdown
 - Left or right mouse button while paused: begin the faster `3 2 1` resume countdown and consume that click
 - `R`: restart after death
@@ -52,6 +52,11 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Akedra's contact-damage footprint is slightly smaller than his movement/body footprint so near misses feel a bit fairer
 - Akedra now stays upright during normal movement and faces left/right through horizontal sprite flipping instead of rotating upside down
 - Dodges now read through a full body roll and a short fading afterimage trail, keeping the spear aim independent from the body animation
+- Dodge movement lasts `0.20` seconds, travels `36` pixels, and keeps the existing `1.10` second shared cooldown
+- A separate `0.10` second damage-immunity grace window begins when dodge movement ends, allowing Akedra to emerge cleanly before normal contact damage resumes
+- `Shift` dodges toward aim, clears click-to-move, and suppresses only the WASD keys already held until each is released
+- `Spacebar` dodges along current movement and preserves held WASD or click-to-move continuity afterward
+- A light locally generated air-and-cloth swoosh plays once when a valid dodge begins
 - The shared dodge cooldown starts when the dodge begins, not when it ends
 
 ## Asset generation
@@ -108,6 +113,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `dodge_duration`
   - `dodge_distance`
   - `dodge_cooldown`
+  - `dodge_exit_invulnerability_duration`
   - `dodge_spin_turns`
   - `horizontal_facing_dead_zone`
   - `dodge_trail_afterimage_count`

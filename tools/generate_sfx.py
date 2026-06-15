@@ -136,6 +136,27 @@ def generate_game_over() -> list[float]:
     return samples
 
 
+def generate_dodge() -> list[float]:
+    length = int(SAMPLE_RATE * 0.17)
+    samples: list[float] = []
+    filtered_noise = 0.0
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        high_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        filtered_noise = filtered_noise * 0.72 + high_noise * 0.28
+        airy_curve = math.sin(progress * math.pi)
+        cloth_tone = math.sin(2.0 * math.pi * (260.0 + progress * 90.0) * index / SAMPLE_RATE)
+        samples.append(
+            (filtered_noise * 0.66 + cloth_tone * 0.08)
+            * airy_curve
+            * envelope(progress, 0.03, 0.62)
+        )
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -145,6 +166,7 @@ def main() -> None:
         "pickup.wav": generate_pickup(),
         "player_hurt.wav": generate_hurt(),
         "game_over.wav": generate_game_over(),
+        "dodge.wav": generate_dodge(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

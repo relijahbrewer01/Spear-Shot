@@ -57,6 +57,7 @@ var rng := RandomNumberGenerator.new()
 @onready var pickup_player: AudioStreamPlayer = $AudioPlayers/PickupPlayer
 @onready var player_hurt_player: AudioStreamPlayer = $AudioPlayers/PlayerHurtPlayer
 @onready var game_over_player: AudioStreamPlayer = $AudioPlayers/GameOverPlayer
+@onready var dodge_player: AudioStreamPlayer = $AudioPlayers/DodgePlayer
 
 
 func _ready() -> void:
@@ -142,10 +143,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed("dodge_aim"):
-		player.try_start_dodge(_get_shift_dodge_direction())
+		if player.try_start_aim_dodge(_get_shift_dodge_direction()):
+			destination_marker.clear_marker()
+			_play_sfx(dodge_player)
 		return
 	elif event.is_action_pressed("dodge_move"):
-		player.try_start_dodge(_get_space_dodge_direction())
+		if player.try_start_movement_dodge(_get_space_dodge_direction()):
+			_play_sfx(dodge_player)
 		return
 
 	if player.is_dodging():
@@ -329,6 +333,7 @@ func _stop_all_audio() -> void:
 		pickup_player,
 		player_hurt_player,
 		game_over_player,
+		dodge_player,
 	]:
 		if audio_player == null:
 			continue
@@ -343,6 +348,7 @@ func _stop_gameplay_sfx() -> void:
 		pickup_player,
 		player_hurt_player,
 		game_over_player,
+		dodge_player,
 	]:
 		if audio_player == null:
 			continue

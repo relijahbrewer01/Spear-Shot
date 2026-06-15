@@ -70,7 +70,7 @@ bus = &"SFX"
 
 [node name="DodgePlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
 stream = ExtResource("14")
-volume_db = -7.0
+volume_db = -5.0
 bus = &"SFX"
 
 [node name="SpawnTimer" type="Timer" parent="." unique_id=1065658465]

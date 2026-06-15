@@ -281,7 +281,11 @@ def main() -> int:
     )
 
     require('window/stretch/mode="viewport"' in project_text, "Project uses viewport stretch mode", failures)
-    require('window/stretch/aspect="keep"' in project_text, "Project preserves 16:9 aspect ratio", failures)
+    aspect_setting_is_keep = (
+        'window/stretch/aspect="keep"' in project_text
+        or "window/stretch/aspect=" not in project_text
+    )
+    require(aspect_setting_is_keep, "Project preserves 16:9 aspect ratio", failures)
     require('window/stretch/scale_mode="integer"' in project_text, "Project uses integer scaling for crisp pixels", failures)
     require(
         'textures/canvas_textures/default_texture_filter=0' in project_text,

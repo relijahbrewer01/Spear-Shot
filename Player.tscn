@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1"]
 [ext_resource type="Texture2D" path="res://art/sprites/player_hunter.png" id="2"]
 [ext_resource type="Script" path="res://scripts/player_health_pips.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/player_dodge_trail.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/player_dodge_cooldown_indicator.gd" id="5"]
 
 [sub_resource type="CircleShape2D" id="1"]
 radius = 8.0
@@ -21,6 +22,9 @@ texture = ExtResource("2")
 
 [node name="DodgeTrail" type="Node2D" parent="."]
 script = ExtResource("4")
+
+[node name="CooldownIndicator" type="Node2D" parent="."]
+script = ExtResource("5")
 
 [node name="HealthPips" type="Node2D" parent="."]
 script = ExtResource("3")

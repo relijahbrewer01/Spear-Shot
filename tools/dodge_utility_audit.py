@@ -32,7 +32,7 @@ def main() -> int:
 
     require("dodge_duration := 0.20" in player_script, "Dodge duration is 0.20 seconds", failures)
     require("dodge_distance := 36.0" in player_script, "Dodge distance is 36 pixels", failures)
-    require("dodge_cooldown := 1.1" in player_script, "Shared dodge cooldown remains 1.10 seconds", failures)
+    require("dodge_cooldown := 2.0" in player_script, "Shared dodge cooldown is 2.00 seconds", failures)
     require(
         "dodge_exit_invulnerability_duration := 0.10" in player_script
         and "dodge_exit_invulnerability_left" in player_script,
@@ -91,7 +91,7 @@ def main() -> int:
     require(
         'path="res://audio/dodge.wav"' in main_scene
         and '[node name="DodgePlayer" type="AudioStreamPlayer"' in main_scene
-        and 'volume_db = -7.0' in main_scene
+        and 'volume_db = -5.0' in main_scene
         and main_scene.count('bus = &"SFX"') == 7,
         "Dodge sound is assigned modestly to the existing SFX bus",
         failures,
@@ -110,7 +110,7 @@ def main() -> int:
             require(dodge_wav.getnchannels() == 1, "Dodge sound is mono", failures)
             require(dodge_wav.getsampwidth() == 2, "Dodge sound is 16-bit PCM", failures)
             require(dodge_wav.getframerate() == 44100, "Dodge sound uses 44.1 kHz", failures)
-            require(0.12 <= duration <= 0.22, "Dodge sound duration is within the requested range", failures)
+            require(0.17 <= duration <= 0.24, "Dodge sound duration is within the requested range", failures)
             require(any(sample != 0 for sample in samples), "Dodge sound contains non-silent PCM samples", failures)
     else:
         require(False, "Dodge sound file exists", failures)

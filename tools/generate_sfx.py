@@ -137,22 +137,32 @@ def generate_game_over() -> list[float]:
 
 
 def generate_dodge() -> list[float]:
-    length = int(SAMPLE_RATE * 0.17)
+    length = int(SAMPLE_RATE * 0.20)
     samples: list[float] = []
-    filtered_noise = 0.0
-    previous_noise = 0.0
+    low_noise = 0.0
+    previous_raw_noise = 0.0
     for index in range(length):
         progress = index / max(length - 1, 1)
         raw_noise = random.random() * 2.0 - 1.0
-        high_noise = raw_noise - previous_noise
-        previous_noise = raw_noise
-        filtered_noise = filtered_noise * 0.72 + high_noise * 0.28
-        airy_curve = math.sin(progress * math.pi)
-        cloth_tone = math.sin(2.0 * math.pi * (260.0 + progress * 90.0) * index / SAMPLE_RATE)
+        low_noise = low_noise * 0.88 + raw_noise * 0.12
+        cloth_noise = raw_noise - low_noise
+        air_noise = raw_noise - previous_raw_noise
+        previous_raw_noise = raw_noise
+
+        body_frequency = 205.0 - progress * 45.0
+        body_tone = math.sin(2.0 * math.pi * body_frequency * index / SAMPLE_RATE)
+        foot_scuff = math.sin(2.0 * math.pi * 118.0 * index / SAMPLE_RATE)
+        air_curve = math.sin(progress * math.pi)
+        scuff_curve = math.exp(-((progress - 0.28) / 0.18) ** 2)
         samples.append(
-            (filtered_noise * 0.66 + cloth_tone * 0.08)
-            * airy_curve
-            * envelope(progress, 0.03, 0.62)
+            (
+                cloth_noise * 0.48
+                + air_noise * 0.20
+                + body_tone * 0.22 * (1.0 - progress)
+                + foot_scuff * 0.14 * scuff_curve
+            )
+            * air_curve
+            * envelope(progress, 0.02, 0.58)
         )
     return samples
 

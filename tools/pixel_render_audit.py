@@ -48,7 +48,11 @@ def main() -> int:
     generator_script = read_text("tools/generate_phase1_assets.py")
 
     require('window/stretch/mode="viewport"' in project_text, "Project uses viewport stretch mode", failures)
-    require('window/stretch/aspect="keep"' in project_text, "Project keeps 16:9 aspect", failures)
+    aspect_setting_is_keep = (
+        'window/stretch/aspect="keep"' in project_text
+        or "window/stretch/aspect=" not in project_text
+    )
+    require(aspect_setting_is_keep, "Project keeps 16:9 aspect", failures)
     require('window/stretch/scale_mode="integer"' in project_text, "Project uses integer scaling", failures)
     require(
         'textures/canvas_textures/default_texture_filter=0' in project_text,

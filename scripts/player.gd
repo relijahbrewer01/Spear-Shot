@@ -31,7 +31,7 @@ signal dodge_ready
 @export var damage_hit_radius := 7.0
 @export var dodge_duration := 0.20
 @export var dodge_distance := 36.0
-@export var dodge_cooldown := 1.1
+@export var dodge_cooldown := 2.0
 @export var dodge_exit_invulnerability_duration := 0.10
 @export var dodge_spin_turns := 1.0
 @export_range(0.0, 1.0, 0.01) var horizontal_facing_dead_zone := 0.12
@@ -59,10 +59,13 @@ var dodge_spin_direction := 1.0
 var last_valid_aim_direction := Vector2.RIGHT
 var facing_direction := 1
 var suppressed_movement_actions: Dictionary = {}
+var has_pending_post_dodge_destination := false
+var pending_post_dodge_destination := Vector2.ZERO
 
 @onready var body_visual: Node2D = $BodyVisual
 @onready var body_sprite: Sprite2D = $BodyVisual/Sprite2D
 @onready var dodge_trail: PlayerDodgeTrail = $DodgeTrail
+@onready var cooldown_indicator: PlayerDodgeCooldownIndicator = $CooldownIndicator
 @onready var health_pips: PlayerHealthPips = $HealthPips
 
 
@@ -112,8 +115,10 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 	last_valid_aim_direction = Vector2.RIGHT
 	global_position = _clamp_position_to_arena(start_position)
 	suppressed_movement_actions.clear()
+	_clear_pending_post_dodge_destination()
 	_update_health_pips()
 	_update_health_pips_transform()
+	_clear_cooldown_indicator()
 	_clear_dodge_visuals()
 	_update_body_visuals(0.0)
 	queue_redraw()
@@ -128,6 +133,8 @@ func set_active(is_active: bool) -> void:
 		clear_move_destination()
 		dodge_exit_invulnerability_left = 0.0
 		suppressed_movement_actions.clear()
+		_clear_pending_post_dodge_destination()
+		_clear_cooldown_indicator()
 		_clear_dodge_visuals()
 	elif health > 0:
 		action_state = ActionState.NORMAL
@@ -207,11 +214,14 @@ func try_start_dodge(direction: Vector2, suppress_held_movement := false) -> boo
 	dodge_cooldown_left = dodge_cooldown
 	dodge_exit_invulnerability_left = 0.0
 	velocity = Vector2.ZERO
+	_clear_pending_post_dodge_destination()
 	if suppress_held_movement:
 		clear_move_destination()
 		_suppress_current_movement_actions()
 	if dodge_trail != null:
 		dodge_trail.begin_dodge()
+	if cooldown_indicator != null:
+		cooldown_indicator.begin_cooldown()
 	dodge_started.emit(dodge_direction)
 	queue_redraw()
 	return true
@@ -220,6 +230,12 @@ func try_start_dodge(direction: Vector2, suppress_held_movement := false) -> boo
 func set_move_destination(target_position: Vector2) -> void:
 	move_destination = _clamp_position_to_arena(target_position)
 	has_move_destination = true
+	_clear_pending_post_dodge_destination()
+
+
+func buffer_post_dodge_destination(target_position: Vector2) -> void:
+	pending_post_dodge_destination = _clamp_position_to_arena(target_position)
+	has_pending_post_dodge_destination = true
 
 
 func clear_move_destination() -> void:
@@ -245,6 +261,8 @@ func take_damage(_source_position: Vector2) -> void:
 		dodge_exit_invulnerability_left = 0.0
 		velocity = Vector2.ZERO
 		suppressed_movement_actions.clear()
+		_clear_pending_post_dodge_destination()
+		_clear_cooldown_indicator()
 		_clear_dodge_visuals()
 		died.emit()
 
@@ -276,6 +294,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_body_visuals(delta)
 	_update_dodge_trail(delta)
+	_update_cooldown_indicator(delta)
 	_update_health_pips_transform()
 	_advance_dodge_timer(delta)
 	queue_redraw()
@@ -423,6 +442,19 @@ func _update_health_pips_transform() -> void:
 	health_pips.sync_to_player(self)
 
 
+func _update_cooldown_indicator(delta: float) -> void:
+	if cooldown_indicator == null:
+		return
+
+	cooldown_indicator.sync_to_player(
+		global_position,
+		dodge_cooldown_left,
+		dodge_cooldown,
+		active and is_alive(),
+		delta
+	)
+
+
 func _update_dodge_trail(delta: float) -> void:
 	if dodge_trail == null or body_visual == null or body_sprite == null:
 		return
@@ -446,6 +478,8 @@ func _update_timers(delta: float) -> void:
 		dodge_cooldown_left = max(dodge_cooldown_left - delta, 0.0)
 		if previous_cooldown_left > 0.0 and dodge_cooldown_left == 0.0:
 			dodge_ready.emit()
+			if cooldown_indicator != null:
+				cooldown_indicator.show_ready_glint()
 
 	if dodge_exit_invulnerability_left > 0.0:
 		dodge_exit_invulnerability_left = max(dodge_exit_invulnerability_left - delta, 0.0)
@@ -496,6 +530,7 @@ func _finish_dodge() -> void:
 	dodge_exit_invulnerability_left = dodge_exit_invulnerability_duration
 	velocity = Vector2.ZERO
 	_reset_body_visual_roll()
+	_apply_pending_post_dodge_destination()
 	dodge_ended.emit()
 	queue_redraw()
 
@@ -508,6 +543,7 @@ func _cancel_dodge() -> void:
 	dodge_exit_invulnerability_left = 0.0
 	velocity = Vector2.ZERO
 	dodge_spin_direction = 1.0
+	_clear_pending_post_dodge_destination()
 	if active and is_alive():
 		action_state = ActionState.NORMAL
 	_clear_dodge_visuals()
@@ -523,3 +559,22 @@ func _clear_dodge_visuals() -> void:
 	_reset_body_visual_roll()
 	if dodge_trail != null:
 		dodge_trail.clear_trail()
+
+
+func _apply_pending_post_dodge_destination() -> void:
+	if not has_pending_post_dodge_destination:
+		return
+
+	var buffered_destination := pending_post_dodge_destination
+	_clear_pending_post_dodge_destination()
+	set_move_destination(buffered_destination)
+
+
+func _clear_pending_post_dodge_destination() -> void:
+	has_pending_post_dodge_destination = false
+	pending_post_dodge_destination = Vector2.ZERO
+
+
+func _clear_cooldown_indicator() -> void:
+	if cooldown_indicator != null:
+		cooldown_indicator.clear_indicator()

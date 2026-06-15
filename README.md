@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.3.4 - Phase 1 Final`
+Current milestone: `Spear Shot v0.4.0 - Dodge Foundation`
 
 ## Game concept
 
@@ -52,11 +52,13 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Akedra's contact-damage footprint is slightly smaller than his movement/body footprint so near misses feel a bit fairer
 - Akedra now stays upright during normal movement and faces left/right through horizontal sprite flipping instead of rotating upside down
 - Dodges now read through a full body roll and a short fading afterimage trail, keeping the spear aim independent from the body animation
-- Dodge movement lasts `0.20` seconds, travels `36` pixels, and keeps the existing `1.10` second shared cooldown
+- Dodge movement lasts `0.20` seconds, travels `36` pixels, and uses a `2.00` second shared cooldown
 - A separate `0.10` second damage-immunity grace window begins when dodge movement ends, allowing Akedra to emerge cleanly before normal contact damage resumes
 - `Shift` dodges toward aim, clears click-to-move, and suppresses only the WASD keys already held until each is released
 - `Spacebar` dodges along current movement and preserves held WASD or click-to-move continuity afterward
-- A light locally generated air-and-cloth swoosh plays once when a valid dodge begins
+- A new right-click issued during either active dodge is buffered, replaces any earlier buffered click, and begins moving Akedra on the first normal frame after the roll
+- A tiny world-space exertion wisp beside Akedra shrinks with the real cooldown and gives one restrained glint when dodge becomes ready
+- A locally generated physical swoosh blends displaced air, cloth movement, body weight, and a small foot scuff once per valid dodge
 - The shared dodge cooldown starts when the dodge begins, not when it ends
 
 ## Asset generation
@@ -77,6 +79,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Arena.tscn` and `scripts/arena.gd`: arena visuals, play bounds, and enemy edge spawn positions
 - `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, upright facing, and dodge readability visuals
 - `scripts/player_dodge_trail.gd`: fixed-pool dodge afterimages sampled from Akedra's body visual
+- `scripts/player_dodge_cooldown_indicator.gd`: world-space exertion wisp and brief ready glint driven by the shared dodge cooldown
 - `Spear.tscn` and `scripts/spear.gd`: the single spear state loop (`HELD`, `FLYING`, `LANDED`)
 - `scripts/spear_trail.gd`: non-rotating deterministic spear trail renderer
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
@@ -119,6 +122,12 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `dodge_trail_afterimage_count`
   - `dodge_trail_sample_interval`
   - `dodge_trail_lifetime`
+- `scripts/player_dodge_cooldown_indicator.gd`
+  - `enabled`
+  - `world_offset`
+  - `wisp_color`
+  - `ready_glint_color`
+  - `ready_glint_duration`
 - `scripts/spear.gd`
   - `spear_speed`
   - `max_range`

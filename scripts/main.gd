@@ -152,15 +152,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			_play_sfx(dodge_player)
 		return
 
+	if event.is_action_pressed("move_to_cursor"):
+		var move_target := arena.clamp_to_play_rect(get_global_mouse_position(), player.body_radius)
+		if player.is_dodging():
+			player.buffer_post_dodge_destination(move_target)
+		else:
+			player.set_move_destination(move_target)
+		destination_marker.show_marker(move_target)
+		return
+
 	if player.is_dodging():
 		return
 
 	if event.is_action_pressed("throw_spear"):
 		spear.try_throw(get_global_mouse_position())
-	elif event.is_action_pressed("move_to_cursor"):
-		var move_target := arena.clamp_to_play_rect(get_global_mouse_position(), player.body_radius)
-		player.set_move_destination(move_target)
-		destination_marker.show_marker(move_target)
 
 
 func _spawn_enemy() -> void:

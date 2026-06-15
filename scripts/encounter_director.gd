@@ -42,7 +42,9 @@ const INVALID_WAVE_ID := -1
 @export var first_wave_time_max := 34.0
 @export var inter_wave_interval_min := 18.0
 @export var inter_wave_interval_max := 24.0
-@export var wave_start_population_threshold := 5
+@export var rush_start_population_threshold := 5
+@export var pincer_start_population_threshold := 3
+@export var charger_hunt_start_population_threshold := 4
 @export var total_hostile_cap := 10
 @export var normal_hostile_cap := 9
 @export var charger_hostile_cap := 2
@@ -69,6 +71,7 @@ class WaveDefinition:
 	var earliest_time: float
 	var telegraph_duration: float
 	var recovery_duration: float
+	var start_population_threshold: int
 	var uses_opposite_edge: bool
 	var steps: Array[SpawnStep]
 
@@ -77,6 +80,7 @@ class WaveDefinition:
 		new_earliest_time: float,
 		new_telegraph_duration: float,
 		new_recovery_duration: float,
+		new_start_population_threshold: int,
 		new_uses_opposite_edge: bool,
 		new_steps: Array[SpawnStep]
 	) -> void:
@@ -84,6 +88,7 @@ class WaveDefinition:
 		earliest_time = new_earliest_time
 		telegraph_duration = new_telegraph_duration
 		recovery_duration = new_recovery_duration
+		start_population_threshold = new_start_population_threshold
 		uses_opposite_edge = new_uses_opposite_edge
 		steps = new_steps
 
@@ -248,8 +253,6 @@ func get_charger_hostile_count() -> int:
 func _advance_ambient(survival_time: float) -> void:
 	if survival_time < _next_wave_eligible_time:
 		return
-	if get_total_hostile_count() > wave_start_population_threshold:
-		return
 
 	var next_wave := _choose_next_wave(survival_time)
 	if next_wave == null:
@@ -348,6 +351,7 @@ func _choose_next_wave(survival_time: float) -> WaveDefinition:
 	if _wave_definitions.is_empty():
 		return null
 
+	var living_hostiles := get_total_hostile_count()
 	var preferred_name := WAVE_RUSH
 	match _completed_wave_count % 3:
 		1:
@@ -356,11 +360,15 @@ func _choose_next_wave(survival_time: float) -> WaveDefinition:
 			preferred_name = WAVE_CHARGER_HUNT
 
 	for wave in _wave_definitions:
-		if wave.wave_name == preferred_name and survival_time >= wave.earliest_time:
+		if (
+			wave.wave_name == preferred_name
+			and survival_time >= wave.earliest_time
+			and living_hostiles <= wave.start_population_threshold
+		):
 			return wave
 
 	for wave in _wave_definitions:
-		if survival_time >= wave.earliest_time:
+		if survival_time >= wave.earliest_time and living_hostiles <= wave.start_population_threshold:
 			return wave
 
 	return null
@@ -429,7 +437,17 @@ func _build_wave_definitions() -> Array[WaveDefinition]:
 		SpawnStep.new(0.8, EnemyKind.NORMAL, EdgeRole.PRIMARY),
 		SpawnStep.new(1.2, EnemyKind.NORMAL, EdgeRole.PRIMARY),
 	]
-	definitions.append(WaveDefinition.new(WAVE_RUSH, 28.0, 1.75, 3.0, false, rush_steps))
+	definitions.append(
+		WaveDefinition.new(
+			WAVE_RUSH,
+			28.0,
+			1.75,
+			3.0,
+			rush_start_population_threshold,
+			false,
+			rush_steps
+		)
+	)
 
 	var pincer_steps: Array[SpawnStep] = [
 		SpawnStep.new(0.0, EnemyKind.NORMAL, EdgeRole.PRIMARY),
@@ -439,7 +457,17 @@ func _build_wave_definitions() -> Array[WaveDefinition]:
 		SpawnStep.new(1.8, EnemyKind.NORMAL, EdgeRole.PRIMARY),
 		SpawnStep.new(2.25, EnemyKind.NORMAL, EdgeRole.OPPOSITE),
 	]
-	definitions.append(WaveDefinition.new(WAVE_PINCER, 28.0, 1.75, 3.0, true, pincer_steps))
+	definitions.append(
+		WaveDefinition.new(
+			WAVE_PINCER,
+			28.0,
+			1.75,
+			3.0,
+			pincer_start_population_threshold,
+			true,
+			pincer_steps
+		)
+	)
 
 	var charger_hunt_steps: Array[SpawnStep] = [
 		SpawnStep.new(0.0, EnemyKind.NORMAL, EdgeRole.PRIMARY),
@@ -447,7 +475,15 @@ func _build_wave_definitions() -> Array[WaveDefinition]:
 		SpawnStep.new(1.2, EnemyKind.CHARGER, EdgeRole.PRIMARY),
 	]
 	definitions.append(
-		WaveDefinition.new(WAVE_CHARGER_HUNT, 48.0, 1.75, 3.0, false, charger_hunt_steps)
+		WaveDefinition.new(
+			WAVE_CHARGER_HUNT,
+			48.0,
+			1.75,
+			3.0,
+			charger_hunt_start_population_threshold,
+			false,
+			charger_hunt_steps
+		)
 	)
 
 	return definitions

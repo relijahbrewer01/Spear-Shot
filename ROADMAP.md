@@ -5,7 +5,7 @@
 - Authored `Rush`, `Pincer`, and `Charger Hunt` waves are layered over the existing ambient survival curve.
 - Encounter flow now has anticipation, active pressure, recovery, and fresh ambient return states.
 - Wave telegraphs use readable world-space edge markers plus one restrained locally generated warning cue.
-- Wave ownership uses strict death/tree-exit cleanup, tunable population caps, and safe spawn deferral.
+- Wave ownership uses strict death/tree-exit cleanup, tunable population caps, wave-specific start thresholds, and safe spawn deferral.
 - Ring formations remain deferred until the first three patterns have been tuned through live play.
 - A future Heart Runner belongs to a separate opportunity system and should not consume hostile population slots.
 

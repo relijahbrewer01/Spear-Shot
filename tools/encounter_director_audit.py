@@ -71,8 +71,24 @@ def main() -> int:
     require('WAVE_RING' not in director, "Ring wave remains deferred", failures)
 
     require(
-        "wave_start_population_threshold := 5" in director,
-        "Wave start threshold is five hostiles",
+        "rush_start_population_threshold := 5" in director,
+        "Rush can start at five or fewer hostiles",
+        failures,
+    )
+    require(
+        "pincer_start_population_threshold := 3" in director,
+        "Pincer can start at three or fewer hostiles",
+        failures,
+    )
+    require(
+        "charger_hunt_start_population_threshold := 4" in director,
+        "Charger Hunt can start at four or fewer hostiles",
+        failures,
+    )
+    require(
+        "start_population_threshold" in director
+        and "living_hostiles <= wave.start_population_threshold" in director,
+        "Wave selection uses each wave's own pressure budget",
         failures,
     )
     require("total_hostile_cap := 10" in director, "Total hostile cap is tunable from ten", failures)

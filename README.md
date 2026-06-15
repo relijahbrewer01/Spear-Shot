@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.4.0 - Dodge Foundation`
+Current milestone: `Spear Shot v0.5.0 - Encounter Director`
 
 ## Game concept
 
@@ -113,7 +113,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Rush` sends four Normals from one announced edge
 - `Pincer` alternates six Normals between two opposite announced edges
 - `Charger Hunt` sends two Normals followed by one Charger from one announced edge
-- Waves wait until no more than five hostiles are alive before starting
+- Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
 - Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
@@ -192,7 +192,9 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `first_wave_time_max`
   - `inter_wave_interval_min`
   - `inter_wave_interval_max`
-  - `wave_start_population_threshold`
+  - `rush_start_population_threshold`
+  - `pincer_start_population_threshold`
+  - `charger_hunt_start_population_threshold`
   - `total_hostile_cap`
   - `normal_hostile_cap`
   - `charger_hostile_cap`

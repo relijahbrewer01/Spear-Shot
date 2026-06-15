@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.3.3 - Phase 1 Complete`
+Current milestone: `Spear Shot v0.3.4 - Phase 1 Final`
 
 ## Game concept
 
@@ -27,6 +27,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Right mouse button: move to the clicked destination and show a brief trap-style ground marker
 - Mouse: aim
 - Left mouse button or `Q`: throw spear
+- `Shift`: dodge toward the current aim direction
+- `Spacebar`: dodge using movement direction first, then click-move direction, then aim fallback
 - `Escape` or `P`: pause, or begin the faster `3 2 1` resume countdown
 - Left or right mouse button while paused: begin the faster `3 2 1` resume countdown and consume that click
 - `R`: restart after death
@@ -48,6 +50,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 - Extremely close spear hits trigger a tiny hit stop to punctuate desperate point-blank throws without affecting the normal pause state
 - Akedra's contact-damage footprint is slightly smaller than his movement/body footprint so near misses feel a bit fairer
+- Dodges use a brief removable sprite modulation change during the active invulnerable movement window instead of adding new Phase 2 effects
+- The shared dodge cooldown starts when the dodge begins, not when it ends
 
 ## Asset generation
 
@@ -99,6 +103,9 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `destination_reach_distance`
   - `invulnerability_duration`
   - `damage_hit_radius`
+  - `dodge_duration`
+  - `dodge_distance`
+  - `dodge_cooldown`
 - `scripts/spear.gd`
   - `spear_speed`
   - `max_range`

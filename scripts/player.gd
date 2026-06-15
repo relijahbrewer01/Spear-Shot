@@ -3,9 +3,18 @@ class_name Player
 
 const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
 
+enum ActionState {
+	NORMAL,
+	DODGING,
+	DISABLED,
+}
+
 signal health_changed(new_health: int)
 signal damaged(new_health: int)
 signal died
+signal dodge_started(direction: Vector2)
+signal dodge_ended
+signal dodge_ready
 
 @export var move_speed := 115.0
 @export var max_health := 3
@@ -13,6 +22,10 @@ signal died
 @export var destination_reach_distance := 4.0
 @export var body_radius := 8.0
 @export var damage_hit_radius := 7.0
+@export var dodge_duration := 0.18
+@export var dodge_distance := 28.0
+@export var dodge_cooldown := 1.1
+@export var dodge_visual_modulate := Color(0.92, 0.98, 0.96, 0.82)
 @export var body_color := Color8(111, 182, 255)
 @export var hurt_color := Color8(255, 244, 180)
 
@@ -24,6 +37,11 @@ var hurt_flash_left := 0.0
 var has_move_destination := false
 var move_destination := Vector2.ZERO
 var walk_cycle_time := 0.0
+var action_state: ActionState = ActionState.NORMAL
+var dodge_direction := Vector2.RIGHT
+var dodge_time_left := 0.0
+var dodge_cooldown_left := 0.0
+var last_valid_aim_direction := Vector2.RIGHT
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var health_pips: PlayerHealthPips = $HealthPips
@@ -54,6 +72,11 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 	walk_cycle_time = 0.0
 	velocity = Vector2.ZERO
 	rotation = 0.0
+	action_state = ActionState.NORMAL
+	dodge_direction = Vector2.RIGHT
+	dodge_time_left = 0.0
+	dodge_cooldown_left = 0.0
+	last_valid_aim_direction = Vector2.RIGHT
 	global_position = _clamp_position_to_arena(start_position)
 	_update_health_pips()
 	_update_health_pips_transform()
@@ -64,12 +87,73 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 func set_active(is_active: bool) -> void:
 	active = is_active
 	if not active:
+		_cancel_dodge()
+		action_state = ActionState.DISABLED
 		velocity = Vector2.ZERO
 		clear_move_destination()
+	elif health > 0:
+		action_state = ActionState.NORMAL
 
 
 func is_alive() -> bool:
 	return health > 0
+
+
+func is_dodging() -> bool:
+	return action_state == ActionState.DODGING
+
+
+func can_start_dodge() -> bool:
+	return active and is_alive() and action_state == ActionState.NORMAL and dodge_cooldown_left == 0.0
+
+
+func is_damage_invulnerable() -> bool:
+	return invulnerability_left > 0.0 or is_dodging()
+
+
+func can_take_damage() -> bool:
+	return is_alive() and not is_damage_invulnerable()
+
+
+func get_manual_input_direction() -> Vector2:
+	return Input.get_vector("move_left", "move_right", "move_up", "move_down")
+
+
+func has_active_move_destination() -> bool:
+	if not has_move_destination:
+		return false
+
+	return move_destination.distance_to(global_position) > destination_reach_distance
+
+
+func get_move_destination_direction() -> Vector2:
+	if not has_active_move_destination():
+		return Vector2.ZERO
+
+	return (move_destination - global_position).normalized()
+
+
+func get_last_valid_aim_direction() -> Vector2:
+	return last_valid_aim_direction
+
+
+func try_start_dodge(direction: Vector2) -> bool:
+	if not can_start_dodge():
+		return false
+
+	if direction.length_squared() <= 0.001:
+		direction = last_valid_aim_direction
+	if direction.length_squared() <= 0.001:
+		direction = Vector2.RIGHT
+
+	action_state = ActionState.DODGING
+	dodge_direction = direction.normalized()
+	dodge_time_left = dodge_duration
+	dodge_cooldown_left = dodge_cooldown
+	velocity = Vector2.ZERO
+	dodge_started.emit(dodge_direction)
+	queue_redraw()
+	return true
 
 
 func set_move_destination(target_position: Vector2) -> void:
@@ -82,7 +166,7 @@ func clear_move_destination() -> void:
 
 
 func take_damage(_source_position: Vector2) -> void:
-	if invulnerability_left > 0.0 or not is_alive():
+	if not can_take_damage():
 		return
 
 	health -= 1
@@ -95,11 +179,15 @@ func take_damage(_source_position: Vector2) -> void:
 
 	if health <= 0:
 		active = false
+		action_state = ActionState.DISABLED
+		dodge_time_left = 0.0
 		velocity = Vector2.ZERO
 		died.emit()
 
 
 func _physics_process(delta: float) -> void:
+	_update_timers(delta)
+
 	if invulnerability_left > 0.0:
 		invulnerability_left = max(invulnerability_left - delta, 0.0)
 
@@ -107,10 +195,17 @@ func _physics_process(delta: float) -> void:
 		hurt_flash_left = max(hurt_flash_left - delta, 0.0)
 
 	if active:
-		var move_input := _get_move_input()
-		velocity = move_input * move_speed
-		move_and_slide()
-		_clamp_inside_arena()
+		match action_state:
+			ActionState.NORMAL:
+				var move_input := _get_move_input()
+				velocity = move_input * move_speed
+				move_and_slide()
+				_clamp_inside_arena()
+			ActionState.DODGING:
+				_process_dodge_motion(delta)
+			ActionState.DISABLED:
+				velocity = Vector2.ZERO
+
 		_update_aim()
 
 	_update_sprite_visuals(delta)
@@ -128,11 +223,12 @@ func _clamp_inside_arena() -> void:
 func _update_aim() -> void:
 	var aim_vector := get_global_mouse_position() - global_position
 	if aim_vector.length_squared() > 0.001:
-		rotation = aim_vector.angle()
+		last_valid_aim_direction = aim_vector.normalized()
+		rotation = last_valid_aim_direction.angle()
 
 
 func _get_move_input() -> Vector2:
-	var manual_input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	var manual_input := get_manual_input_direction()
 	if manual_input.length_squared() > 0.0:
 		clear_move_destination()
 		return manual_input
@@ -202,6 +298,8 @@ func _update_sprite_visuals(delta: float) -> void:
 func _get_sprite_modulate() -> Color:
 	if health <= 0:
 		return Color(0.58, 0.58, 0.6, 1.0)
+	if is_dodging():
+		return dodge_visual_modulate
 	if hurt_flash_left > 0.0:
 		return hurt_color.lerp(Color.WHITE, 0.55)
 	if invulnerability_left > 0.0 and int(invulnerability_left * 18.0) % 2 == 0:
@@ -221,3 +319,57 @@ func _update_health_pips_transform() -> void:
 		return
 
 	health_pips.sync_to_player(self)
+
+
+func _update_timers(delta: float) -> void:
+	if dodge_cooldown_left > 0.0:
+		var previous_cooldown_left := dodge_cooldown_left
+		dodge_cooldown_left = max(dodge_cooldown_left - delta, 0.0)
+		if previous_cooldown_left > 0.0 and dodge_cooldown_left == 0.0:
+			dodge_ready.emit()
+
+	if not is_dodging():
+		return
+
+	dodge_time_left = max(dodge_time_left - delta, 0.0)
+	if dodge_time_left == 0.0:
+		_finish_dodge()
+
+
+func _process_dodge_motion(delta: float) -> void:
+	var dodge_speed := _get_dodge_speed()
+	var target_position := _clamp_position_to_arena(global_position + dodge_direction * dodge_speed * delta)
+	var actual_movement := target_position - global_position
+	global_position = target_position
+
+	if delta > 0.0:
+		velocity = actual_movement / delta
+	else:
+		velocity = Vector2.ZERO
+
+
+func _get_dodge_speed() -> float:
+	if dodge_duration <= 0.0:
+		return 0.0
+
+	return dodge_distance / dodge_duration
+
+
+func _finish_dodge() -> void:
+	if not is_dodging():
+		return
+
+	action_state = ActionState.NORMAL if active and is_alive() else ActionState.DISABLED
+	dodge_time_left = 0.0
+	velocity = Vector2.ZERO
+	dodge_ended.emit()
+
+
+func _cancel_dodge() -> void:
+	if is_dodging():
+		dodge_ended.emit()
+
+	dodge_time_left = 0.0
+	velocity = Vector2.ZERO
+	if active and is_alive():
+		action_state = ActionState.NORMAL

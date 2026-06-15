@@ -141,6 +141,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if run_state != RunState.RUNNING:
 		return
 
+	if event.is_action_pressed("dodge_aim"):
+		player.try_start_dodge(_get_shift_dodge_direction())
+		return
+	elif event.is_action_pressed("dodge_move"):
+		player.try_start_dodge(_get_space_dodge_direction())
+		return
+
+	if player.is_dodging():
+		return
+
 	if event.is_action_pressed("throw_spear"):
 		spear.try_throw(get_global_mouse_position())
 	elif event.is_action_pressed("move_to_cursor"):
@@ -439,6 +449,8 @@ func _ensure_input_actions() -> void:
 	_add_key_action("move_down", KEY_S)
 	_add_key_action("move_right", KEY_D)
 	_add_key_action("throw_spear", KEY_Q)
+	_add_key_action("dodge_aim", KEY_SHIFT)
+	_add_key_action("dodge_move", KEY_SPACE)
 	_remove_mouse_button_action("throw_spear", MOUSE_BUTTON_RIGHT)
 	_add_mouse_button_action("throw_spear", MOUSE_BUTTON_LEFT)
 	_add_mouse_button_action("move_to_cursor", MOUSE_BUTTON_RIGHT)
@@ -481,3 +493,23 @@ func _remove_mouse_button_action(action_name: StringName, mouse_button: MouseBut
 	for event in InputMap.action_get_events(action_name):
 		if event is InputEventMouseButton and event.button_index == mouse_button:
 			InputMap.action_erase_event(action_name, event)
+
+
+func _get_shift_dodge_direction() -> Vector2:
+	var aim_direction := get_global_mouse_position() - player.global_position
+	if aim_direction.length_squared() > 0.001:
+		return aim_direction.normalized()
+
+	return player.get_last_valid_aim_direction()
+
+
+func _get_space_dodge_direction() -> Vector2:
+	var manual_direction := player.get_manual_input_direction()
+	if manual_direction.length_squared() > 0.0:
+		return manual_direction.normalized()
+
+	var move_destination_direction := player.get_move_destination_direction()
+	if move_destination_direction.length_squared() > 0.0:
+		return move_destination_direction
+
+	return player.get_last_valid_aim_direction()

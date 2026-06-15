@@ -18,6 +18,8 @@ enum RunState {
 @export var enemy_speed_bonus_per_second := 0.11
 @export var maximum_enemy_speed_bonus := 20.0
 @export var spawn_safe_radius := 72.0
+@export var landed_spear_spawn_safe_radius := 36.0
+@export var blocked_spawn_retry_interval := 0.5
 @export var damage_shake_duration := 0.1
 @export var damage_shake_strength := 2.4
 @export var close_hit_stop_distance := 8.0
@@ -46,6 +48,8 @@ var rng := RandomNumberGenerator.new()
 @onready var player: Player = $Player
 @onready var spear: Spear = $Spear
 @onready var destination_marker: DestinationMarker = $DestinationMarker
+@onready var encounter_telegraph: EncounterTelegraph = $EncounterTelegraph
+@onready var encounter_director: EncounterDirector = $EncounterDirector
 @onready var enemy_container: Node2D = $EnemyContainer
 @onready var spawn_timer: Timer = $SpawnTimer
 @onready var camera: Camera2D = $Camera2D
@@ -58,6 +62,7 @@ var rng := RandomNumberGenerator.new()
 @onready var player_hurt_player: AudioStreamPlayer = $AudioPlayers/PlayerHurtPlayer
 @onready var game_over_player: AudioStreamPlayer = $AudioPlayers/GameOverPlayer
 @onready var dodge_player: AudioStreamPlayer = $AudioPlayers/DodgePlayer
+@onready var wave_warning_player: AudioStreamPlayer = $AudioPlayers/WaveWarningPlayer
 
 
 func _ready() -> void:
@@ -74,6 +79,7 @@ func _ready() -> void:
 	player.global_position = play_rect.get_center()
 	spear.setup(player, play_rect)
 	camera.position = arena.arena_size * 0.5
+	encounter_telegraph.setup(play_rect)
 
 	player.damaged.connect(_on_player_damaged)
 	player.died.connect(_on_player_died)
@@ -81,6 +87,12 @@ func _ready() -> void:
 	spear.picked_up.connect(_on_spear_picked_up)
 	spear.thrown.connect(_on_spear_thrown)
 	spawn_timer.timeout.connect(_on_spawn_timer_timeout)
+	encounter_director.spawn_requested.connect(_on_director_spawn_requested)
+	encounter_director.telegraph_started.connect(_on_wave_telegraph_started)
+	encounter_director.telegraph_finished.connect(_on_wave_telegraph_finished)
+	encounter_director.ambient_spawn_policy_changed.connect(
+		_on_ambient_spawn_policy_changed
+	)
 	hud.pause_toggle_requested.connect(_on_hud_pause_toggle_requested)
 	hud.pause_resume_click_requested.connect(_on_hud_pause_resume_click_requested)
 	hud.resume_countdown_finished.connect(_on_resume_countdown_finished)
@@ -114,6 +126,8 @@ func _reset_runtime_state() -> void:
 	for child in enemy_container.get_children():
 		child.queue_free()
 
+	encounter_director.reset_for_new_run()
+	encounter_telegraph.clear_warning()
 	player.reset_for_new_run(play_rect.get_center(), play_rect)
 	spear.reset_for_new_run(player, play_rect)
 	spawn_timer.wait_time = base_spawn_interval
@@ -129,6 +143,7 @@ func _reset_runtime_state() -> void:
 func _process(delta: float) -> void:
 	if run_state == RunState.RUNNING:
 		survival_time += delta
+		encounter_director.advance(delta, survival_time)
 
 	_update_screen_shake(delta)
 
@@ -168,16 +183,55 @@ func _unhandled_input(event: InputEvent) -> void:
 		spear.try_throw(get_global_mouse_position())
 
 
-func _spawn_enemy() -> void:
-	var enemy_scene: PackedScene = _pick_enemy_scene()
+func _spawn_enemy() -> bool:
+	var enemy_kind := _pick_ambient_enemy_kind()
+	var spawn_edge := arena.get_random_spawn_edge()
+	return _try_spawn_enemy(
+		enemy_kind,
+		spawn_edge,
+		EncounterDirector.INVALID_WAVE_ID
+	)
+
+
+func _try_spawn_enemy(enemy_kind: int, spawn_edge: int, wave_id: int) -> bool:
+	if not encounter_director.can_spawn_enemy(enemy_kind, survival_time):
+		return false
+
+	var spawn_position := _find_safe_spawn_position(spawn_edge)
+	if not spawn_position.is_finite():
+		return false
+
+	var enemy_scene := _get_enemy_scene(enemy_kind)
 	var enemy := enemy_scene.instantiate() as Enemy
 	if enemy == null:
-		return
+		return false
 
 	enemy.setup(player, arena.get_play_rect(), _get_current_enemy_speed())
-	enemy.global_position = arena.get_random_spawn_position(player.global_position, spawn_safe_radius)
-	enemy.killed.connect(_on_enemy_killed)
+	enemy.global_position = spawn_position
+
+	var enemy_id := enemy.get_instance_id()
+	var run_generation := encounter_director.get_run_generation()
+	enemy.killed.connect(_on_enemy_killed.bind(enemy_id, run_generation))
+	enemy.tree_exited.connect(_on_enemy_tree_exited.bind(enemy_id, run_generation))
 	enemy_container.add_child(enemy)
+	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
+	return true
+
+
+func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
+	var avoid_positions: Array[Vector2] = [player.global_position]
+	var avoid_radii: Array[float] = [spawn_safe_radius]
+	if spear.is_landed():
+		avoid_positions.append(spear.global_position)
+		avoid_radii.append(landed_spear_spawn_safe_radius)
+
+	return arena.find_safe_spawn_position(spawn_edge, avoid_positions, avoid_radii)
+
+
+func _get_enemy_scene(enemy_kind: int) -> PackedScene:
+	if enemy_kind == EncounterDirector.EnemyKind.CHARGER:
+		return ChargerScene
+	return EnemyScene
 
 
 func _get_current_enemy_speed() -> float:
@@ -188,32 +242,59 @@ func _get_next_spawn_interval() -> float:
 	return max(minimum_spawn_interval, base_spawn_interval - survival_time * spawn_interval_drop_per_second)
 
 
-func _pick_enemy_scene() -> PackedScene:
+func _pick_ambient_enemy_kind() -> int:
 	if survival_time < charger_unlock_time:
-		return EnemyScene
+		return EncounterDirector.EnemyKind.NORMAL
 
 	var charger_spawn_chance := charger_spawn_chance_at_unlock + (
 		(survival_time - charger_unlock_time) * charger_spawn_chance_growth_per_second
 	)
 	charger_spawn_chance = min(charger_spawn_chance, maximum_charger_spawn_chance)
 	if rng.randf() < charger_spawn_chance:
-		return ChargerScene
-	return EnemyScene
+		return EncounterDirector.EnemyKind.CHARGER
+	return EncounterDirector.EnemyKind.NORMAL
 
 
 func _on_spawn_timer_timeout() -> void:
 	if run_state != RunState.RUNNING:
 		return
+	if not encounter_director.is_ambient_spawning_allowed():
+		return
 
-	_spawn_enemy()
-	spawn_timer.wait_time = _get_next_spawn_interval()
+	var spawned := _spawn_enemy()
+	if spawned:
+		spawn_timer.wait_time = _get_next_spawn_interval()
+	else:
+		spawn_timer.wait_time = blocked_spawn_retry_interval
 	spawn_timer.start()
 
 
-func _on_enemy_killed(_enemy_position: Vector2, score_value: int) -> void:
+func _on_director_spawn_requested(
+	request_id: int,
+	enemy_kind: int,
+	spawn_edge: int,
+	wave_id: int
+) -> void:
+	var spawned := _try_spawn_enemy(enemy_kind, spawn_edge, wave_id)
+	encounter_director.report_spawn_result(request_id, spawned)
+
+
+func _on_enemy_killed(
+	_enemy_position: Vector2,
+	score_value: int,
+	enemy_id: int,
+	run_generation: int
+) -> void:
+	if not encounter_director.notify_enemy_removed(enemy_id, run_generation):
+		return
+
 	score += score_value
 	hud.set_score(score)
 	_play_sfx(enemy_death_player)
+
+
+func _on_enemy_tree_exited(enemy_id: int, run_generation: int) -> void:
+	encounter_director.notify_enemy_removed(enemy_id, run_generation)
 
 
 func _on_player_damaged(_new_health: int) -> void:
@@ -228,6 +309,7 @@ func _on_player_died() -> void:
 	_cancel_hit_stop()
 	run_state = RunState.GAME_OVER
 	spawn_timer.stop()
+	encounter_director.stop_for_game_over()
 	player.set_active(false)
 	spear.set_active(false)
 
@@ -257,6 +339,30 @@ func _on_spear_enemy_hit(_hit_position: Vector2) -> void:
 
 func _on_spear_picked_up() -> void:
 	_play_sfx(pickup_player)
+
+
+func _on_wave_telegraph_started(
+	_wave_name: StringName,
+	edges: Array[int],
+	duration: float
+) -> void:
+	encounter_telegraph.show_warning(edges, duration)
+	_play_sfx(wave_warning_player)
+
+
+func _on_wave_telegraph_finished() -> void:
+	encounter_telegraph.clear_warning()
+
+
+func _on_ambient_spawn_policy_changed(allowed: bool) -> void:
+	if not allowed:
+		spawn_timer.stop()
+		return
+	if run_state != RunState.RUNNING:
+		return
+
+	spawn_timer.wait_time = _get_next_spawn_interval()
+	spawn_timer.start()
 
 
 func _on_hud_pause_toggle_requested() -> void:
@@ -339,6 +445,7 @@ func _stop_all_audio() -> void:
 		player_hurt_player,
 		game_over_player,
 		dodge_player,
+		wave_warning_player,
 	]:
 		if audio_player == null:
 			continue
@@ -354,6 +461,7 @@ func _stop_gameplay_sfx() -> void:
 		player_hurt_player,
 		game_over_player,
 		dodge_player,
+		wave_warning_player,
 	]:
 		if audio_player == null:
 			continue

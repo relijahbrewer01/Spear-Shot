@@ -182,7 +182,25 @@ def main() -> int:
     require(buses.get("SFX", {}).get("volume_db") == "-4.0", "SFX bus volume is -4 dB", failures)
 
     require('bus = &"Music"' in main_scene, "MusicPlayer uses Music bus", failures)
-    require(main_scene.count('bus = &"SFX"') == 7, "Seven gameplay SFX players use the SFX bus", failures)
+    sfx_player_names = [
+        "ThrowPlayer",
+        "EnemyHitPlayer",
+        "EnemyDeathPlayer",
+        "PickupPlayer",
+        "PlayerHurtPlayer",
+        "GameOverPlayer",
+        "DodgePlayer",
+        "WaveWarningPlayer",
+    ]
+    require(
+        all(
+            player_name in main_nodes
+            and block_has_line(main_nodes[player_name], 'bus = &"SFX"')
+            for player_name in sfx_player_names
+        ),
+        "Every gameplay SFX player uses the SFX bus",
+        failures,
+    )
     require('process_mode = Node.PROCESS_MODE_PAUSABLE' in main_script, "Main script is pausable for real SceneTree pause", failures)
     require('hud.process_mode = Node.PROCESS_MODE_ALWAYS' in main_script, "HUD stays responsive while paused", failures)
     require('music_player.process_mode = Node.PROCESS_MODE_ALWAYS' in main_script, "Music player keeps processing while paused", failures)

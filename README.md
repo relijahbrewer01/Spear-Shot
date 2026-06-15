@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.4.0 - Dodge Foundation`
+Current milestone: `Spear Shot v0.5.0 - Encounter Director`
 
 ## Game concept
 
@@ -69,6 +69,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `art/sprites/charger_beast.png`: Charger sprite
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
+- `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
@@ -87,16 +88,37 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
 - `scripts/destination_marker.gd`: brief right-click destination feedback marker
+- `scripts/encounter_director.gd`: authored wave scheduling, population caps, state transitions, and strict cleanup
+- `scripts/encounter_telegraph.gd`: readable world-space edge warning renderer
 - `scripts/high_score_store.gd`: local high-score loading and saving
 - `tools/generate_sfx.py`: local retro-style placeholder sound generation
 - `tools/generate_phase1_assets.py`: local pixel-art-style sprite and arena generation
 - `tools/generate_music.py`: local background music generation
 - `tools/bugfix_audit.py`: lightweight static audit for Phase 1 spawn wiring, scaling, minimal HUD, pause support, and audio bus setup
+- `tools/encounter_director_audit.py`: static Phase 3 encounter, safety, and warning-audio audit
+- `tools/EncounterDirectorRuntimeAudit.tscn`: focused runtime audit for Rush, Pincer, and Charger Hunt
+- `tools/EncounterIntegrationAudit.tscn`: Main-scene telegraph, SFX, spawn, cleanup, recovery, and restart audit
 
 ## Enemy behavior
 
 - Normal enemy: slow direct pursuit, worth `1` point
 - Charger: unlocks later, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
+
+## Encounter director
+
+- Ambient survival spawning now gives way to temporary authored events after roughly `28-34` seconds
+- A bright world-space edge bracket and one restrained warning sound announce each wave for `1.75` seconds
+- Ambient spawning pauses during the telegraph, active wave, and `3.0` second recovery window
+- Ambient resumes afterward with a fresh interval calculated from the current survival-time difficulty
+- `Rush` sends four Normals from one announced edge
+- `Pincer` alternates six Normals between two opposite announced edges
+- `Charger Hunt` sends two Normals followed by one Charger from one announced edge
+- Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
+- Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
+- The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
+- Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
+- If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback
+- A wave completes only after all scheduled spawns occurred and every enemy tagged to that wave died or exited the tree
 
 ## Scoring and high score
 
@@ -162,7 +184,22 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `charger_spawn_chance_at_unlock`
   - `charger_spawn_chance_growth_per_second`
   - `maximum_charger_spawn_chance`
+  - `landed_spear_spawn_safe_radius`
+  - `blocked_spawn_retry_interval`
   - `default_window_scale`
+- `scripts/encounter_director.gd`
+  - `first_wave_time_min`
+  - `first_wave_time_max`
+  - `inter_wave_interval_min`
+  - `inter_wave_interval_max`
+  - `rush_start_population_threshold`
+  - `pincer_start_population_threshold`
+  - `charger_hunt_start_population_threshold`
+  - `total_hostile_cap`
+  - `normal_hostile_cap`
+  - `charger_hostile_cap`
+  - `first_minute_charger_cap`
+  - `spawn_retry_interval`
 - `scripts/player_health_pips.gd`
   - `max_supported_pips`
   - `vertical_offset`
@@ -188,6 +225,9 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 ## Features intentionally left for later
 
 - More enemy types
+- Ring encounter formations
+- Opportunity encounters such as a Heart Runner, kept separate from hostile population slots
+- Wave reward selection driven by encounter completion signals
 - Upgrades or progression systems
 - Menus outside the in-game restart flow
 - Additional arenas or level structure

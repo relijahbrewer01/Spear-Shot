@@ -167,6 +167,29 @@ def generate_dodge() -> list[float]:
     return samples
 
 
+def generate_wave_warning() -> list[float]:
+    length = int(SAMPLE_RATE * 0.34)
+    samples: list[float] = []
+    resonant_body = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        resonant_body = resonant_body * 0.91 + raw_noise * 0.09
+        knock = math.sin(2.0 * math.pi * (112.0 - progress * 18.0) * index / SAMPLE_RATE)
+        horn_breath = math.sin(2.0 * math.pi * 168.0 * index / SAMPLE_RATE)
+        knock_decay = math.exp(-progress * 9.0)
+        breath_curve = math.sin(progress * math.pi) ** 1.5
+        samples.append(
+            (
+                knock * 0.62 * knock_decay
+                + resonant_body * 0.34 * knock_decay
+                + horn_breath * 0.12 * breath_curve
+            )
+            * envelope(progress, 0.015, 0.48)
+        )
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -177,6 +200,7 @@ def main() -> None:
         "player_hurt.wav": generate_hurt(),
         "game_over.wav": generate_game_over(),
         "dodge.wav": generate_dodge(),
+        "wave_warning.wav": generate_wave_warning(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

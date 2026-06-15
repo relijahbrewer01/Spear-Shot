@@ -100,6 +100,10 @@ func is_held() -> bool:
 	return state == State.HELD
 
 
+func is_landed() -> bool:
+	return state == State.LANDED
+
+
 func get_status_text() -> String:
 	match state:
 		State.HELD:

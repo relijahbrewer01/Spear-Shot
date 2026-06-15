@@ -46,6 +46,7 @@ def main() -> int:
     enemy_script = read_text("scripts/enemy.gd")
     spear_script = read_text("scripts/spear.gd")
     generator_script = read_text("tools/generate_phase1_assets.py")
+    phase4_generator_script = read_text("tools/generate_phase4_assets.py")
 
     require('window/stretch/mode="viewport"' in project_text, "Project uses viewport stretch mode", failures)
     aspect_setting_is_keep = (
@@ -86,13 +87,18 @@ def main() -> int:
         "Spear sprite uses snapped top-level rendering without fractional scale",
         failures,
     )
-    require(".resize(" not in generator_script, "Asset generator does not resize images with filtered sampling", failures)
+    require(
+        ".resize(" not in generator_script and ".resize(" not in phase4_generator_script,
+        "Asset generators do not resize images with filtered sampling",
+        failures,
+    )
 
     for import_path in [
         "art/arena/arena_floor.png.import",
         "art/sprites/player_hunter.png.import",
         "art/sprites/enemy_creature.png.import",
         "art/sprites/charger_beast.png.import",
+        "art/sprites/shielded_enemy.png.import",
         "art/sprites/spear_hunter.png.import",
     ]:
         import_text = read_text(import_path)
@@ -103,6 +109,7 @@ def main() -> int:
         "art/sprites/player_hunter.png",
         "art/sprites/enemy_creature.png",
         "art/sprites/charger_beast.png",
+        "art/sprites/shielded_enemy.png",
         "art/sprites/spear_hunter.png",
     ]:
         audit_png(png_path, failures)

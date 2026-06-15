@@ -9,6 +9,13 @@
 - Ring formations remain deferred until the first three patterns have been tuned through live play.
 - A future Heart Runner belongs to a separate opportunity system and should not consume hostile population slots.
 
+## Phase 4 Enemy Expansion
+
+- Phase 4.1 adds the ambient-only Shielded enemy as the first narrow enemy expansion on top of the Encounter Director.
+- Shielded enemies require two committed spear interactions: the first thrown-spear hit breaks the shield and stops the spear for no score, and the second hit kills for `2` points through the existing death/scoring signal.
+- Shielded enemies count toward total hostile pressure and wave-start population thresholds, but not toward Normal or Charger caps.
+- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, combo scoring, and broader combat frameworks are deferred.
+
 ## Future Polish
 
 - Footprints remain planned for a later movement-polish pass, likely alongside or shortly after the dodge system.

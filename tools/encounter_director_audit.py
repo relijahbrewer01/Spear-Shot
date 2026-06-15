@@ -94,9 +94,20 @@ def main() -> int:
     require("total_hostile_cap := 10" in director, "Total hostile cap is tunable from ten", failures)
     require("normal_hostile_cap := 9" in director, "Normal cap is tunable from nine", failures)
     require("charger_hostile_cap := 2" in director, "Charger safety cap is tunable from two", failures)
+    require("shielded_hostile_cap := 1" in director, "Shielded safety cap is tunable from one", failures)
     require(
         "first_minute_charger_cap := 1" in director,
         "First-minute Charger production is limited to one",
+        failures,
+    )
+    require(
+        "get_shielded_hostile_count() < shielded_hostile_cap" in director,
+        "Shielded enemies use their own cap while still counting in total hostile cap",
+        failures,
+    )
+    require(
+        "SpawnStep.new" in director and "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1],
+        "Authored waves contain no Shielded spawn steps",
         failures,
     )
 
@@ -134,6 +145,14 @@ def main() -> int:
         "spawn_timer.wait_time = _get_next_spawn_interval()" in main_script
         and "_on_ambient_spawn_policy_changed" in main_script,
         "Ambient resumes with a fresh current-difficulty interval",
+        failures,
+    )
+    require(
+        "shielded_unlock_time := 55.0" in main_script
+        and "shielded_spawn_chance_at_unlock := 0.08" in main_script
+        and "shielded_spawn_chance_growth_per_second := 0.0008" in main_script
+        and "maximum_shielded_spawn_chance := 0.16" in main_script,
+        "Shielded ambient tuning matches the Phase 4.1 plan",
         failures,
     )
 

@@ -30,6 +30,7 @@ enum State {
 @export var launch_sweep_start_offset := 0.0
 @export var launch_sweep_end_offset := 18.0
 @export var launch_sweep_width := 4.0
+@export var stopped_hit_landing_clearance := 8.0
 
 var state: State = State.HELD
 var owner_player: Player
@@ -345,27 +346,135 @@ func _hit_enemies_in_launch_sweep() -> void:
 	debug_launch_sweep_left = 0.15
 
 	var results: Array[Dictionary] = get_world_2d().direct_space_state.intersect_shape(query, 16)
+	var candidates := _collect_sorted_launch_sweep_candidates(results)
+	for candidate in candidates:
+		if state != State.FLYING:
+			return
+
+		var enemy_body := candidate.get("enemy") as Node
+		var hit_response := _hit_enemy_if_needed(enemy_body)
+		if hit_response == Enemy.HitResponse.STOPPED:
+			return
+
+
+func _collect_sorted_launch_sweep_candidates(results: Array[Dictionary]) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	var collected_enemy_ids: Dictionary = {}
 	for result in results:
 		var collider_variant: Variant = result.get("collider")
 		if not (collider_variant is Node):
 			continue
 
 		var collider := collider_variant as Node
-		if collider != null and collider.is_in_group("enemy"):
-			_hit_enemy_if_needed(collider)
+		if collider == null or not collider.is_in_group("enemy"):
+			continue
+
+		var enemy_id := collider.get_instance_id()
+		if collected_enemy_ids.has(enemy_id):
+			continue
+
+		var enemy_node := collider as Node2D
+		if enemy_node == null:
+			continue
+
+		collected_enemy_ids[enemy_id] = true
+		var projected_distance := (enemy_node.global_position - owner_player.global_position).dot(
+			throw_direction
+		)
+		candidates.append({
+			"enemy": collider,
+			"distance": projected_distance,
+		})
+
+	candidates.sort_custom(_sort_launch_sweep_candidates)
+	return candidates
 
 
-func _hit_enemy_if_needed(enemy_body: Node) -> void:
+func _sort_launch_sweep_candidates(left: Dictionary, right: Dictionary) -> bool:
+	return float(left.get("distance", 0.0)) < float(right.get("distance", 0.0))
+
+
+func _hit_enemy_if_needed(enemy_body: Node) -> int:
+	if state != State.FLYING:
+		return Enemy.HitResponse.IGNORED
+	if enemy_body == null:
+		return Enemy.HitResponse.IGNORED
+
 	var enemy_id := enemy_body.get_instance_id()
 	if hit_enemy_ids.has(enemy_id):
-		return
+		return Enemy.HitResponse.IGNORED
 
 	hit_enemy_ids[enemy_id] = true
-	if enemy_body.has_method("take_spear_hit"):
+	var hit_position := _get_enemy_near_side_hit_position(enemy_body)
+	var stopped_landing_position := _get_stopped_hit_landing_position(enemy_body)
+	var hit_response := Enemy.HitResponse.IGNORED
+
+	if enemy_body.has_method("receive_combat_hit"):
+		hit_response = int(enemy_body.receive_combat_hit(
+			Enemy.HIT_SOURCE_SPEAR,
+			hit_position,
+			throw_direction
+		))
+	elif enemy_body.has_method("take_spear_hit"):
 		enemy_body.take_spear_hit()
-		if enemy_body is Node2D:
-			var enemy_node := enemy_body as Node2D
-			enemy_hit.emit(enemy_node.global_position)
+		hit_response = Enemy.HitResponse.DAMAGED
+
+	if hit_response != Enemy.HitResponse.IGNORED and enemy_body is Node2D:
+		var enemy_node := enemy_body as Node2D
+		enemy_hit.emit(enemy_node.global_position)
+
+	if hit_response == Enemy.HitResponse.STOPPED:
+		_land(stopped_landing_position)
+
+	return hit_response
+
+
+func _get_enemy_near_side_hit_position(enemy_body: Node) -> Vector2:
+	var enemy_node := enemy_body as Node2D
+	if enemy_node == null:
+		return global_position
+
+	var body_radius := _get_enemy_body_radius(enemy_body)
+	return _clamp_to_arena(enemy_node.global_position - throw_direction * body_radius)
+
+
+func _get_stopped_hit_landing_position(enemy_body: Node) -> Vector2:
+	var enemy_node := enemy_body as Node2D
+	if enemy_node == null:
+		return _clamp_to_arena(global_position)
+
+	var body_radius := _get_enemy_body_radius(enemy_body)
+	var desired_distance := body_radius + stopped_hit_landing_clearance
+	var minimum_clear_distance := body_radius + 2.0
+	var incoming_side := -throw_direction
+	var tangent := Vector2(-throw_direction.y, throw_direction.x)
+	var raw_candidates: Array[Vector2] = [
+		enemy_node.global_position + incoming_side * desired_distance,
+		enemy_node.global_position + incoming_side * minimum_clear_distance,
+		enemy_node.global_position + incoming_side * body_radius + tangent * minimum_clear_distance,
+		enemy_node.global_position + incoming_side * body_radius - tangent * minimum_clear_distance,
+	]
+
+	var best_position := _clamp_to_arena(raw_candidates[0])
+	var best_distance := best_position.distance_to(enemy_node.global_position)
+	for raw_candidate in raw_candidates:
+		var candidate := _clamp_to_arena(raw_candidate)
+		var distance := candidate.distance_to(enemy_node.global_position)
+		if distance >= minimum_clear_distance:
+			return candidate
+		if distance > best_distance:
+			best_position = candidate
+			best_distance = distance
+
+	return best_position
+
+
+func _get_enemy_body_radius(enemy_body: Node) -> float:
+	if enemy_body is Enemy:
+		var enemy := enemy_body as Enemy
+		return enemy.body_radius
+
+	return 8.0
 
 
 func _apply_collision_activity() -> void:

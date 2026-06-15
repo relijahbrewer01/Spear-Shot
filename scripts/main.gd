@@ -2,7 +2,9 @@ extends Node2D
 
 const EnemyScene := preload("res://Enemy.tscn")
 const ChargerScene := preload("res://Charger.tscn")
+const ShieldedScene := preload("res://ShieldedEnemy.tscn")
 const HighScoreStore := preload("res://scripts/high_score_store.gd")
+const NO_AMBIENT_ENEMY_KIND := -1
 
 enum RunState {
 	RUNNING,
@@ -30,6 +32,10 @@ enum RunState {
 @export var charger_spawn_chance_at_unlock := 0.12
 @export var charger_spawn_chance_growth_per_second := 0.0015
 @export var maximum_charger_spawn_chance := 0.28
+@export var shielded_unlock_time := 55.0
+@export var shielded_spawn_chance_at_unlock := 0.08
+@export var shielded_spawn_chance_growth_per_second := 0.0008
+@export var maximum_shielded_spawn_chance := 0.16
 
 var score := 0
 var high_score := 0
@@ -63,6 +69,7 @@ var rng := RandomNumberGenerator.new()
 @onready var game_over_player: AudioStreamPlayer = $AudioPlayers/GameOverPlayer
 @onready var dodge_player: AudioStreamPlayer = $AudioPlayers/DodgePlayer
 @onready var wave_warning_player: AudioStreamPlayer = $AudioPlayers/WaveWarningPlayer
+@onready var shield_break_player: AudioStreamPlayer = $AudioPlayers/ShieldBreakPlayer
 
 
 func _ready() -> void:
@@ -185,6 +192,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _spawn_enemy() -> bool:
 	var enemy_kind := _pick_ambient_enemy_kind()
+	if enemy_kind == NO_AMBIENT_ENEMY_KIND:
+		return false
+
 	var spawn_edge := arena.get_random_spawn_edge()
 	return _try_spawn_enemy(
 		enemy_kind,
@@ -213,6 +223,8 @@ func _try_spawn_enemy(enemy_kind: int, spawn_edge: int, wave_id: int) -> bool:
 	var run_generation := encounter_director.get_run_generation()
 	enemy.killed.connect(_on_enemy_killed.bind(enemy_id, run_generation))
 	enemy.tree_exited.connect(_on_enemy_tree_exited.bind(enemy_id, run_generation))
+	if enemy.has_signal("shield_broken"):
+		enemy.connect(&"shield_broken", _on_shielded_enemy_shield_broken)
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
 	return true
@@ -231,6 +243,8 @@ func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
 func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 	if enemy_kind == EncounterDirector.EnemyKind.CHARGER:
 		return ChargerScene
+	if enemy_kind == EncounterDirector.EnemyKind.SHIELDED:
+		return ShieldedScene
 	return EnemyScene
 
 
@@ -243,16 +257,59 @@ func _get_next_spawn_interval() -> float:
 
 
 func _pick_ambient_enemy_kind() -> int:
-	if survival_time < charger_unlock_time:
-		return EncounterDirector.EnemyKind.NORMAL
+	var normal_available := encounter_director.can_spawn_enemy(
+		EncounterDirector.EnemyKind.NORMAL,
+		survival_time
+	)
+	var charger_available := (
+		survival_time >= charger_unlock_time
+		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.CHARGER, survival_time)
+	)
+	var shielded_available := (
+		survival_time >= shielded_unlock_time
+		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED, survival_time)
+	)
 
+	if not normal_available and not charger_available and not shielded_available:
+		return NO_AMBIENT_ENEMY_KIND
+
+	var shielded_spawn_chance := 0.0
+	if shielded_available:
+		shielded_spawn_chance = _get_current_shielded_spawn_chance()
+
+	var roll := rng.randf()
+	if shielded_available and roll < shielded_spawn_chance:
+		return EncounterDirector.EnemyKind.SHIELDED
+
+	var non_shield_roll := roll
+	if shielded_available and shielded_spawn_chance < 1.0:
+		non_shield_roll = (roll - shielded_spawn_chance) / (1.0 - shielded_spawn_chance)
+
+	var charger_spawn_chance := 0.0
+	if charger_available:
+		charger_spawn_chance = _get_current_charger_spawn_chance()
+
+	if charger_available and non_shield_roll < charger_spawn_chance:
+		return EncounterDirector.EnemyKind.CHARGER
+	if normal_available:
+		return EncounterDirector.EnemyKind.NORMAL
+	if charger_available:
+		return EncounterDirector.EnemyKind.CHARGER
+	return EncounterDirector.EnemyKind.SHIELDED
+
+
+func _get_current_charger_spawn_chance() -> float:
 	var charger_spawn_chance := charger_spawn_chance_at_unlock + (
 		(survival_time - charger_unlock_time) * charger_spawn_chance_growth_per_second
 	)
-	charger_spawn_chance = min(charger_spawn_chance, maximum_charger_spawn_chance)
-	if rng.randf() < charger_spawn_chance:
-		return EncounterDirector.EnemyKind.CHARGER
-	return EncounterDirector.EnemyKind.NORMAL
+	return min(charger_spawn_chance, maximum_charger_spawn_chance)
+
+
+func _get_current_shielded_spawn_chance() -> float:
+	var shielded_spawn_chance := shielded_spawn_chance_at_unlock + (
+		(survival_time - shielded_unlock_time) * shielded_spawn_chance_growth_per_second
+	)
+	return min(shielded_spawn_chance, maximum_shielded_spawn_chance)
 
 
 func _on_spawn_timer_timeout() -> void:
@@ -335,6 +392,10 @@ func _on_spear_thrown() -> void:
 func _on_spear_enemy_hit(_hit_position: Vector2) -> void:
 	_play_sfx(enemy_hit_player)
 	_try_start_close_hit_stop(_hit_position)
+
+
+func _on_shielded_enemy_shield_broken(_hit_position: Vector2) -> void:
+	_play_sfx(shield_break_player)
 
 
 func _on_spear_picked_up() -> void:
@@ -446,6 +507,7 @@ func _stop_all_audio() -> void:
 		game_over_player,
 		dodge_player,
 		wave_warning_player,
+		shield_break_player,
 	]:
 		if audio_player == null:
 			continue
@@ -462,6 +524,7 @@ func _stop_gameplay_sfx() -> void:
 		game_over_player,
 		dodge_player,
 		wave_warning_player,
+		shield_break_player,
 	]:
 		if audio_player == null:
 			continue

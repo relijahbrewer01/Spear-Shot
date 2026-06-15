@@ -1,0 +1,26 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/shielded_enemy.gd" id="1"]
+[ext_resource type="Texture2D" path="res://art/sprites/shielded_enemy.png" id="2"]
+
+[sub_resource type="CircleShape2D" id="1"]
+radius = 11.0
+
+[node name="ShieldedEnemy" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 12
+script = ExtResource("1")
+score_value = 2
+body_radius = 11.0
+separation_distance = 22.0
+separation_strength = 62.0
+body_color = Color(0.615686, 0.541176, 0.466667, 1)
+hit_flash_color = Color(1, 0.933333, 0.776471, 1)
+death_particle_color = Color(0.862745, 0.764706, 0.572549, 1)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 1
+texture = ExtResource("2")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1")

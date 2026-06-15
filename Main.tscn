@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://scripts/encounter_director.gd" id="15"]
 [ext_resource type="Script" path="res://scripts/encounter_telegraph.gd" id="16"]
 [ext_resource type="AudioStream" path="res://audio/wave_warning.wav" id="17"]
+[ext_resource type="AudioStream" path="res://audio/shield_break.wav" id="18"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -86,6 +87,12 @@ bus = &"SFX"
 [node name="WaveWarningPlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
 stream = ExtResource("17")
 volume_db = -8.0
+bus = &"SFX"
+
+[node name="ShieldBreakPlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+stream = ExtResource("18")
+volume_db = -3.0
+max_polyphony = 4
 bus = &"SFX"
 
 [node name="SpawnTimer" type="Timer" parent="." unique_id=1065658465]

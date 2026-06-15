@@ -2,8 +2,16 @@ extends CharacterBody2D
 class_name Enemy
 
 const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
+const HIT_SOURCE_SPEAR := &"spear"
+const HIT_SOURCE_EXPLOSION := &"explosion"
 
 signal killed(enemy_position: Vector2, score_value: int)
+
+enum HitResponse {
+	IGNORED,
+	DAMAGED,
+	STOPPED,
+}
 
 @export var move_speed := 42.0
 @export var score_value := 1
@@ -58,6 +66,20 @@ func take_spear_hit() -> void:
 	collision_mask = 0
 	killed.emit(global_position, score_value)
 	queue_redraw()
+
+
+func receive_combat_hit(
+	hit_source: StringName,
+	_hit_position: Vector2,
+	_hit_direction: Vector2
+) -> HitResponse:
+	if hit_source != HIT_SOURCE_SPEAR:
+		return HitResponse.IGNORED
+	if is_dying:
+		return HitResponse.IGNORED
+
+	take_spear_hit()
+	return HitResponse.DAMAGED
 
 
 func _physics_process(delta: float) -> void:

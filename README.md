@@ -43,6 +43,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 - The visual pass keeps the arena readable first: muted daylight tones, clear silhouettes, and bright Charger telegraphs over a medium-value floor instead of a dark moody backdrop
 - The player, enemies, Charger, and spear now use small locally generated pixel sprites with lightweight bob/pulse animation instead of pure debug shapes
+- Shielded enemies use a broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -67,10 +68,13 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `art/sprites/player_hunter.png`: hunter/player sprite
 - `art/sprites/enemy_creature.png`: base enemy sprite
 - `art/sprites/charger_beast.png`: Charger sprite
+- `art/sprites/shielded_enemy.png`: broad Shielded enemy body sprite
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
+- `audio/shield_break.wav`: local physical crack/thud cue for Shielded shield break
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
+- `tools/generate_phase4_assets.py`: reproduces the Shielded enemy body sprite locally
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -85,6 +89,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `scripts/spear_trail.gd`: non-rotating deterministic spear trail renderer
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
+- `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
 - `scripts/destination_marker.gd`: brief right-click destination feedback marker
@@ -98,11 +103,14 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `tools/encounter_director_audit.py`: static Phase 3 encounter, safety, and warning-audio audit
 - `tools/EncounterDirectorRuntimeAudit.tscn`: focused runtime audit for Rush, Pincer, and Charger Hunt
 - `tools/EncounterIntegrationAudit.tscn`: Main-scene telegraph, SFX, spawn, cleanup, recovery, and restart audit
+- `tools/shielded_enemy_audit.py`: static Phase 4.1 Shielded enemy contract audit
+- `tools/ShieldedEnemyRuntimeAudit.tscn`: runtime audit for Shielded hit ordering, STOPPED spear behavior, score, stagger, and ambient cap removal
 
 ## Enemy behavior
 
 - Normal enemy: slow direct pursuit, worth `1` point
 - Charger: unlocks later, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
+- Shielded: ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 
 ## Encounter director
 
@@ -115,6 +123,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Charger Hunt` sends two Normals followed by one Charger from one announced edge
 - Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
+- Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
+- Shielded ambient spawns unlock around `55` seconds with a small capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
 - Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
 - If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback
@@ -154,6 +164,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `spear_speed`
   - `max_range`
   - `held_distance`
+  - `stopped_hit_landing_clearance`
   - `landed_marker_radius`
   - `landed_marker_pulse_speed`
 - `scripts/enemy.gd`
@@ -170,6 +181,12 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `recover_duration`
   - `telegraph_line_length`
   - `telegraph_shake_strength`
+- `scripts/shielded_enemy.gd`
+  - `movement_speed_scale`
+  - `stagger_duration`
+  - `knockback_distance`
+  - `knockback_duration`
+  - `shield_break_effect_duration`
 - `scripts/main.gd`
   - `base_spawn_interval`
   - `minimum_spawn_interval`
@@ -184,6 +201,10 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `charger_spawn_chance_at_unlock`
   - `charger_spawn_chance_growth_per_second`
   - `maximum_charger_spawn_chance`
+  - `shielded_unlock_time`
+  - `shielded_spawn_chance_at_unlock`
+  - `shielded_spawn_chance_growth_per_second`
+  - `maximum_shielded_spawn_chance`
   - `landed_spear_spawn_safe_radius`
   - `blocked_spawn_retry_interval`
   - `default_window_scale`
@@ -198,6 +219,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `total_hostile_cap`
   - `normal_hostile_cap`
   - `charger_hostile_cap`
+  - `shielded_hostile_cap`
   - `first_minute_charger_cap`
   - `spawn_retry_interval`
 - `scripts/player_health_pips.gd`
@@ -218,7 +240,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 ## Known limitations
 
-- There are currently two enemy types, both using simple direct movement logic
+- There are currently three enemy types, all using intentionally simple movement logic
 - Art and music are intentionally simple local placeholder assets rather than a full content pipeline
 - Enemy avoidance is intentionally lightweight and not full pathfinding
 

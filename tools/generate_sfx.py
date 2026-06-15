@@ -190,6 +190,35 @@ def generate_wave_warning() -> list[float]:
     return samples
 
 
+def generate_shield_break() -> list[float]:
+    length = int(SAMPLE_RATE * 0.24)
+    samples: list[float] = []
+    wood_body = 0.0
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        wood_body = wood_body * 0.84 + raw_noise * 0.16
+        crack_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+
+        low_thud = math.sin(2.0 * math.pi * (92.0 - progress * 18.0) * index / SAMPLE_RATE)
+        snap = math.sin(2.0 * math.pi * (620.0 + progress * 180.0) * index / SAMPLE_RATE)
+        first_crack = math.exp(-((progress - 0.08) / 0.035) ** 2)
+        second_crack = math.exp(-((progress - 0.23) / 0.055) ** 2)
+        rattle_decay = math.exp(-progress * 7.0)
+        samples.append(
+            (
+                low_thud * 0.55 * rattle_decay
+                + wood_body * 0.42 * rattle_decay
+                + crack_noise * 0.32 * (first_crack + second_crack)
+                + snap * 0.22 * first_crack
+            )
+            * envelope(progress, 0.008, 0.48)
+        )
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -201,6 +230,7 @@ def main() -> None:
         "game_over.wav": generate_game_over(),
         "dodge.wav": generate_dodge(),
         "wave_warning.wav": generate_wave_warning(),
+        "shield_break.wav": generate_shield_break(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

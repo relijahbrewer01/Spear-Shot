@@ -120,6 +120,11 @@ def main() -> int:
         "Main script preloads Charger scene",
         failures,
     )
+    require(
+        'const ShieldedScene := preload("res://ShieldedEnemy.tscn")' in main_script,
+        "Main script preloads Shielded scene",
+        failures,
+    )
 
     require("Sprite2D" in enemy_nodes, "Enemy scene has Sprite2D node", failures)
     require("Sprite2D" in charger_nodes, "Charger scene has Sprite2D node", failures)
@@ -191,6 +196,7 @@ def main() -> int:
         "GameOverPlayer",
         "DodgePlayer",
         "WaveWarningPlayer",
+        "ShieldBreakPlayer",
     ]
     require(
         all(

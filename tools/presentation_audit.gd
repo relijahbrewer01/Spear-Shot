@@ -5,6 +5,7 @@ const TEXTURE_PATHS := [
 	"res://art/sprites/player_hunter.png",
 	"res://art/sprites/enemy_creature.png",
 	"res://art/sprites/charger_beast.png",
+	"res://art/sprites/shielded_enemy.png",
 	"res://art/sprites/spear_hunter.png",
 ]
 
@@ -12,12 +13,14 @@ const AUDIO_PATHS := [
 	"res://music/quiet_hunter_loop.wav",
 	"res://audio/dodge.wav",
 	"res://audio/wave_warning.wav",
+	"res://audio/shield_break.wav",
 ]
 
 const SCENE_SPRITES := {
 	"res://Player.tscn": "BodyVisual/Sprite2D",
 	"res://Enemy.tscn": "Sprite2D",
 	"res://Charger.tscn": "Sprite2D",
+	"res://ShieldedEnemy.tscn": "Sprite2D",
 	"res://Spear.tscn": "Sprite2D",
 }
 
@@ -133,6 +136,7 @@ func _audit_main_scene_audio(report_lines: Array[String]) -> int:
 		"AudioPlayers/GameOverPlayer",
 		"AudioPlayers/DodgePlayer",
 		"AudioPlayers/WaveWarningPlayer",
+		"AudioPlayers/ShieldBreakPlayer",
 	]:
 		var player := main.get_node_or_null(player_path) as AudioStreamPlayer
 		if player == null:

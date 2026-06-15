@@ -227,10 +227,12 @@ def main() -> int:
         failures,
     )
     require(
-        'sprite.top_level = true' in player_script
+        'body_visual.top_level = true' in player_script
+        and 'body_visual.global_position' in player_script
+        and 'body_visual.scale = Vector2.ONE' in player_script
         and 'sprite.top_level = true' in enemy_script
         and 'sprite.top_level = true' in spear_script,
-        "Key gameplay sprites use snapped top-level rendering",
+        "Key gameplay visuals use snapped top-level rendering",
         failures,
     )
     require(

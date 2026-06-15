@@ -157,7 +157,9 @@ func _move_to_held_position() -> void:
 
 	held_direction = _get_direction_to(get_global_mouse_position())
 	if held_direction == Vector2.ZERO:
-		held_direction = Vector2.RIGHT.rotated(owner_player.rotation)
+		held_direction = owner_player.get_last_valid_aim_direction()
+	if held_direction == Vector2.ZERO:
+		held_direction = Vector2.RIGHT
 
 	global_position = _clamp_to_arena(owner_player.global_position + held_direction * held_distance)
 	_set_rotation_from_direction(held_direction)

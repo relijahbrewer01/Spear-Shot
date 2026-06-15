@@ -2,6 +2,7 @@ extends CharacterBody2D
 class_name Player
 
 const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
+const BODY_VISUAL_Z_INDEX := 10
 
 enum ActionState {
 	NORMAL,
@@ -25,7 +26,12 @@ signal dodge_ready
 @export var dodge_duration := 0.18
 @export var dodge_distance := 28.0
 @export var dodge_cooldown := 1.1
-@export var dodge_visual_modulate := Color(0.92, 0.98, 0.96, 0.82)
+@export var dodge_spin_turns := 1.0
+@export_range(0.0, 1.0, 0.01) var horizontal_facing_dead_zone := 0.12
+@export_range(1, 8, 1) var dodge_trail_afterimage_count := 4
+@export var dodge_trail_sample_interval := 0.045
+@export var dodge_trail_lifetime := 0.22
+@export var dodge_trail_color := Color8(176, 212, 255, 92)
 @export var body_color := Color8(111, 182, 255)
 @export var hurt_color := Color8(255, 244, 180)
 
@@ -41,19 +47,34 @@ var action_state: ActionState = ActionState.NORMAL
 var dodge_direction := Vector2.RIGHT
 var dodge_time_left := 0.0
 var dodge_cooldown_left := 0.0
+var dodge_spin_direction := 1.0
 var last_valid_aim_direction := Vector2.RIGHT
+var facing_direction := 1
 
-@onready var sprite: Sprite2D = $Sprite2D
+@onready var body_visual: Node2D = $BodyVisual
+@onready var body_sprite: Sprite2D = $BodyVisual/Sprite2D
+@onready var dodge_trail: PlayerDodgeTrail = $DodgeTrail
 @onready var health_pips: PlayerHealthPips = $HealthPips
 
 
 func _ready() -> void:
 	health = max_health
 	add_to_group("player")
-	if sprite != null:
-		sprite.top_level = true
+	rotation = 0.0
+	if body_visual != null:
+		body_visual.top_level = true
+		body_visual.z_index = BODY_VISUAL_Z_INDEX
+	if dodge_trail != null and body_sprite != null:
+		dodge_trail.setup_from_sprite(
+			body_sprite,
+			dodge_trail_afterimage_count,
+			dodge_trail_sample_interval,
+			dodge_trail_lifetime,
+			dodge_trail_color
+		)
 	_update_health_pips()
-	_update_sprite_visuals(0.0)
+	_clear_dodge_visuals()
+	_update_body_visuals(0.0)
 	queue_redraw()
 
 
@@ -72,15 +93,18 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 	walk_cycle_time = 0.0
 	velocity = Vector2.ZERO
 	rotation = 0.0
+	facing_direction = 1
 	action_state = ActionState.NORMAL
 	dodge_direction = Vector2.RIGHT
 	dodge_time_left = 0.0
 	dodge_cooldown_left = 0.0
+	dodge_spin_direction = 1.0
 	last_valid_aim_direction = Vector2.RIGHT
 	global_position = _clamp_position_to_arena(start_position)
 	_update_health_pips()
 	_update_health_pips_transform()
-	_update_sprite_visuals(0.0)
+	_clear_dodge_visuals()
+	_update_body_visuals(0.0)
 	queue_redraw()
 
 
@@ -91,6 +115,7 @@ func set_active(is_active: bool) -> void:
 		action_state = ActionState.DISABLED
 		velocity = Vector2.ZERO
 		clear_move_destination()
+		_clear_dodge_visuals()
 	elif health > 0:
 		action_state = ActionState.NORMAL
 
@@ -137,6 +162,10 @@ func get_last_valid_aim_direction() -> Vector2:
 	return last_valid_aim_direction
 
 
+func get_facing_direction() -> int:
+	return facing_direction
+
+
 func try_start_dodge(direction: Vector2) -> bool:
 	if not can_start_dodge():
 		return false
@@ -148,9 +177,12 @@ func try_start_dodge(direction: Vector2) -> bool:
 
 	action_state = ActionState.DODGING
 	dodge_direction = direction.normalized()
+	dodge_spin_direction = _get_dodge_spin_direction(dodge_direction)
 	dodge_time_left = dodge_duration
 	dodge_cooldown_left = dodge_cooldown
 	velocity = Vector2.ZERO
+	if dodge_trail != null:
+		dodge_trail.begin_dodge()
 	dodge_started.emit(dodge_direction)
 	queue_redraw()
 	return true
@@ -182,6 +214,7 @@ func take_damage(_source_position: Vector2) -> void:
 		action_state = ActionState.DISABLED
 		dodge_time_left = 0.0
 		velocity = Vector2.ZERO
+		_clear_dodge_visuals()
 		died.emit()
 
 
@@ -198,6 +231,7 @@ func _physics_process(delta: float) -> void:
 		match action_state:
 			ActionState.NORMAL:
 				var move_input := _get_move_input()
+				_update_horizontal_facing(move_input)
 				velocity = move_input * move_speed
 				move_and_slide()
 				_clamp_inside_arena()
@@ -208,7 +242,8 @@ func _physics_process(delta: float) -> void:
 
 		_update_aim()
 
-	_update_sprite_visuals(delta)
+	_update_body_visuals(delta)
+	_update_dodge_trail(delta)
 	_update_health_pips_transform()
 	queue_redraw()
 
@@ -224,7 +259,6 @@ func _update_aim() -> void:
 	var aim_vector := get_global_mouse_position() - global_position
 	if aim_vector.length_squared() > 0.001:
 		last_valid_aim_direction = aim_vector.normalized()
-		rotation = last_valid_aim_direction.angle()
 
 
 func _get_move_input() -> Vector2:
@@ -242,6 +276,13 @@ func _get_move_input() -> Vector2:
 		return Vector2.ZERO
 
 	return to_destination.normalized()
+
+
+func _update_horizontal_facing(move_input: Vector2) -> void:
+	if move_input.x >= horizontal_facing_dead_zone:
+		facing_direction = 1
+	elif move_input.x <= -horizontal_facing_dead_zone:
+		facing_direction = -1
 
 
 func _clamp_position_to_arena(target_position: Vector2) -> Vector2:
@@ -272,8 +313,8 @@ func _draw() -> void:
 	draw_circle(Vector2(0.0, 6.0), body_radius - 2.0, shadow_color)
 
 
-func _update_sprite_visuals(delta: float) -> void:
-	if sprite == null:
+func _update_body_visuals(delta: float) -> void:
+	if body_visual == null or body_sprite == null:
 		return
 
 	if active and velocity.length_squared() > 1.0:
@@ -288,18 +329,28 @@ func _update_sprite_visuals(delta: float) -> void:
 	var bob_strength := lerpf(0.0, 1.0, speed_ratio)
 	var bob_offset := roundf(sin(walk_cycle_time) * bob_strength)
 
-	var local_offset := SPRITE_BASE_OFFSET + Vector2(0.0, bob_offset)
-	sprite.global_position = (global_position + local_offset.rotated(rotation)).round()
-	sprite.global_rotation = rotation
-	sprite.scale = Vector2.ONE
-	sprite.modulate = _get_sprite_modulate()
+	body_visual.global_position = (global_position + SPRITE_BASE_OFFSET + Vector2(0.0, bob_offset)).round()
+	body_visual.rotation = _get_body_visual_rotation()
+	body_visual.scale = Vector2.ONE
+
+	body_sprite.position = Vector2.ZERO
+	body_sprite.rotation = 0.0
+	body_sprite.scale = Vector2.ONE
+	body_sprite.flip_h = facing_direction < 0
+	body_sprite.modulate = _get_body_sprite_modulate()
 
 
-func _get_sprite_modulate() -> Color:
+func _get_body_visual_rotation() -> float:
+	if not is_dodging() or dodge_duration <= 0.0:
+		return 0.0
+
+	var dodge_progress := clampf(1.0 - (dodge_time_left / dodge_duration), 0.0, 1.0)
+	return dodge_spin_direction * dodge_progress * TAU * dodge_spin_turns
+
+
+func _get_body_sprite_modulate() -> Color:
 	if health <= 0:
 		return Color(0.58, 0.58, 0.6, 1.0)
-	if is_dodging():
-		return dodge_visual_modulate
 	if hurt_flash_left > 0.0:
 		return hurt_color.lerp(Color.WHITE, 0.55)
 	if invulnerability_left > 0.0 and int(invulnerability_left * 18.0) % 2 == 0:
@@ -319,6 +370,23 @@ func _update_health_pips_transform() -> void:
 		return
 
 	health_pips.sync_to_player(self)
+
+
+func _update_dodge_trail(delta: float) -> void:
+	if dodge_trail == null or body_visual == null or body_sprite == null:
+		return
+
+	if not active or not is_alive():
+		dodge_trail.clear_trail()
+		return
+
+	dodge_trail.advance_trail(
+		delta,
+		is_dodging(),
+		body_visual.global_position,
+		body_visual.global_rotation,
+		body_sprite.flip_h
+	)
 
 
 func _update_timers(delta: float) -> void:
@@ -355,6 +423,14 @@ func _get_dodge_speed() -> float:
 	return dodge_distance / dodge_duration
 
 
+func _get_dodge_spin_direction(direction: Vector2) -> float:
+	if direction.x >= horizontal_facing_dead_zone:
+		return 1.0
+	if direction.x <= -horizontal_facing_dead_zone:
+		return -1.0
+	return float(facing_direction)
+
+
 func _finish_dodge() -> void:
 	if not is_dodging():
 		return
@@ -362,7 +438,9 @@ func _finish_dodge() -> void:
 	action_state = ActionState.NORMAL if active and is_alive() else ActionState.DISABLED
 	dodge_time_left = 0.0
 	velocity = Vector2.ZERO
+	_reset_body_visual_roll()
 	dodge_ended.emit()
+	queue_redraw()
 
 
 func _cancel_dodge() -> void:
@@ -371,5 +449,19 @@ func _cancel_dodge() -> void:
 
 	dodge_time_left = 0.0
 	velocity = Vector2.ZERO
+	dodge_spin_direction = 1.0
 	if active and is_alive():
 		action_state = ActionState.NORMAL
+	_clear_dodge_visuals()
+	queue_redraw()
+
+
+func _reset_body_visual_roll() -> void:
+	if body_visual != null:
+		body_visual.rotation = 0.0
+
+
+func _clear_dodge_visuals() -> void:
+	_reset_body_visual_roll()
+	if dodge_trail != null:
+		dodge_trail.clear_trail()

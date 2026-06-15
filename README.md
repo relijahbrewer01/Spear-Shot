@@ -50,7 +50,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 - Extremely close spear hits trigger a tiny hit stop to punctuate desperate point-blank throws without affecting the normal pause state
 - Akedra's contact-damage footprint is slightly smaller than his movement/body footprint so near misses feel a bit fairer
-- Dodges use a brief removable sprite modulation change during the active invulnerable movement window instead of adding new Phase 2 effects
+- Akedra now stays upright during normal movement and faces left/right through horizontal sprite flipping instead of rotating upside down
+- Dodges now read through a full body roll and a short fading afterimage trail, keeping the spear aim independent from the body animation
 - The shared dodge cooldown starts when the dodge begins, not when it ends
 
 ## Asset generation
@@ -69,7 +70,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Main.tscn` and `scripts/main.gd`: overall game flow, spawning, scoring, timer, restart, and screen shake
 - Run restarts reset gameplay state in place so window size, position, and maximized state are preserved
 - `Arena.tscn` and `scripts/arena.gd`: arena visuals, play bounds, and enemy edge spawn positions
-- `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, and hurt feedback
+- `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, upright facing, and dodge readability visuals
+- `scripts/player_dodge_trail.gd`: fixed-pool dodge afterimages sampled from Akedra's body visual
 - `Spear.tscn` and `scripts/spear.gd`: the single spear state loop (`HELD`, `FLYING`, `LANDED`)
 - `scripts/spear_trail.gd`: non-rotating deterministic spear trail renderer
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
@@ -106,6 +108,11 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `dodge_duration`
   - `dodge_distance`
   - `dodge_cooldown`
+  - `dodge_spin_turns`
+  - `horizontal_facing_dead_zone`
+  - `dodge_trail_afterimage_count`
+  - `dodge_trail_sample_interval`
+  - `dodge_trail_lifetime`
 - `scripts/spear.gd`
   - `spear_speed`
   - `max_range`

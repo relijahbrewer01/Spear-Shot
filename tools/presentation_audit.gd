@@ -13,7 +13,7 @@ const AUDIO_PATHS := [
 ]
 
 const SCENE_SPRITES := {
-	"res://Player.tscn": "Sprite2D",
+	"res://Player.tscn": "BodyVisual/Sprite2D",
 	"res://Enemy.tscn": "Sprite2D",
 	"res://Charger.tscn": "Sprite2D",
 	"res://Spear.tscn": "Sprite2D",

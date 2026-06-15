@@ -61,10 +61,11 @@ def main() -> int:
         failures,
     )
     require(
-        "sprite.top_level = true" in player_script
-        and "sprite.global_position" in player_script
-        and "sprite.scale = Vector2.ONE" in player_script,
-        "Player sprite uses snapped top-level rendering without fractional scale",
+        "body_visual.top_level = true" in player_script
+        and "body_visual.global_position" in player_script
+        and "body_visual.scale = Vector2.ONE" in player_script
+        and "body_sprite.scale = Vector2.ONE" in player_script,
+        "Player visual uses snapped top-level rendering without fractional scale",
         failures,
     )
     require(

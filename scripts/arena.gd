@@ -2,6 +2,14 @@ extends Node2D
 class_name Arena
 
 const FLOOR_TEXTURE := preload("res://art/arena/arena_floor.png")
+const INVALID_SPAWN_POSITION := Vector2(INF, INF)
+
+enum SpawnEdge {
+	TOP,
+	BOTTOM,
+	LEFT,
+	RIGHT,
+}
 
 @export var arena_size := Vector2(384.0, 216.0)
 @export var play_margin := 16.0
@@ -32,29 +40,65 @@ func clamp_to_play_rect(target_position: Vector2, padding: float = 0.0) -> Vecto
 	)
 
 
+func get_random_spawn_edge() -> int:
+	return rng.randi_range(SpawnEdge.TOP, SpawnEdge.RIGHT)
+
+
+static func get_opposite_spawn_edge(spawn_edge: int) -> int:
+	match spawn_edge:
+		SpawnEdge.TOP:
+			return SpawnEdge.BOTTOM
+		SpawnEdge.BOTTOM:
+			return SpawnEdge.TOP
+		SpawnEdge.LEFT:
+			return SpawnEdge.RIGHT
+		_:
+			return SpawnEdge.LEFT
+
+
 func get_random_spawn_position(avoid_position: Vector2, avoid_radius: float) -> Vector2:
+	var avoid_positions: Array[Vector2] = [avoid_position]
+	var avoid_radii: Array[float] = [avoid_radius]
+	return find_safe_spawn_position(
+		get_random_spawn_edge(),
+		avoid_positions,
+		avoid_radii
+	)
+
+
+func find_safe_spawn_position(
+	spawn_edge: int,
+	avoid_positions: Array[Vector2],
+	avoid_radii: Array[float],
+	attempts: int = 24
+) -> Vector2:
+	if avoid_positions.size() != avoid_radii.size():
+		push_warning("Spawn avoidance positions and radii must have matching sizes.")
+		return INVALID_SPAWN_POSITION
+
 	var play_rect := get_play_rect()
-	for _attempt in 16:
-		var spawn_position := _pick_edge_position(play_rect)
-		if spawn_position.distance_to(avoid_position) >= avoid_radius:
+	for _attempt in maxi(attempts, 1):
+		var spawn_position := _pick_position_for_edge(play_rect, spawn_edge)
+		if _is_spawn_position_safe(spawn_position, avoid_positions, avoid_radii):
 			return spawn_position
-	return _pick_edge_position(play_rect)
+
+	return INVALID_SPAWN_POSITION
 
 
-func _pick_edge_position(play_rect: Rect2) -> Vector2:
+func _pick_position_for_edge(play_rect: Rect2, spawn_edge: int) -> Vector2:
 	var edge_padding := 8.0
-	match rng.randi_range(0, 3):
-		0:
+	match spawn_edge:
+		SpawnEdge.TOP:
 			return Vector2(
 				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
 				play_rect.position.y + edge_padding
 			)
-		1:
+		SpawnEdge.BOTTOM:
 			return Vector2(
 				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
 				play_rect.end.y - edge_padding
 			)
-		2:
+		SpawnEdge.LEFT:
 			return Vector2(
 				play_rect.position.x + edge_padding,
 				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
@@ -64,6 +108,17 @@ func _pick_edge_position(play_rect: Rect2) -> Vector2:
 				play_rect.end.x - edge_padding,
 				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
 			)
+
+
+func _is_spawn_position_safe(
+	spawn_position: Vector2,
+	avoid_positions: Array[Vector2],
+	avoid_radii: Array[float]
+) -> bool:
+	for index in avoid_positions.size():
+		if spawn_position.distance_to(avoid_positions[index]) < avoid_radii[index]:
+			return false
+	return true
 
 
 func _draw() -> void:

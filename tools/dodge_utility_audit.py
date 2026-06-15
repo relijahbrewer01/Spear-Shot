@@ -92,7 +92,12 @@ def main() -> int:
         'path="res://audio/dodge.wav"' in main_scene
         and '[node name="DodgePlayer" type="AudioStreamPlayer"' in main_scene
         and 'volume_db = -5.0' in main_scene
-        and main_scene.count('bus = &"SFX"') == 7,
+        and (
+            '[node name="DodgePlayer" type="AudioStreamPlayer"'
+            in main_scene
+            and 'stream = ExtResource("14")\nvolume_db = -5.0\nbus = &"SFX"'
+            in main_scene
+        ),
         "Dodge sound is assigned modestly to the existing SFX bus",
         failures,
     )

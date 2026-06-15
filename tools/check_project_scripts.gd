@@ -1,5 +1,7 @@
 extends SceneTree
 
+const SELF_PATH := "res://tools/check_project_scripts.gd"
+
 
 func _initialize() -> void:
 	var script_paths := _find_script_paths("res://")
@@ -10,6 +12,8 @@ func _initialize() -> void:
 		var script_resource := ResourceLoader.load(script_path, "", ResourceLoader.CACHE_MODE_REPLACE) as Script
 		if script_resource == null:
 			failures.append(script_path)
+			continue
+		if script_path == SELF_PATH:
 			continue
 
 		var reload_result := script_resource.reload()

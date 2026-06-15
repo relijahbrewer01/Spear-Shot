@@ -97,13 +97,9 @@ func _audit_hud_mouse_filters(hud: Node) -> void:
 		return
 
 	for node_path in [
-		"LeftHudPanel",
-		"RightHudPanel",
 		"ScoreLabel",
-		"HealthLabel",
-		"SpearLabel",
-		"TimeLabel",
-		"HighScoreLabel",
+		"PauseBackdrop",
+		"PauseLabel",
 		"GameOverBackdrop",
 		"GameOverPanel",
 		"GameOverPanel/RestartButton",

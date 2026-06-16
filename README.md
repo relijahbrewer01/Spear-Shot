@@ -32,6 +32,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Escape` or `P`: pause, or begin the faster `3 2 1` resume countdown
 - Left or right mouse button while paused: begin the faster `3 2 1` resume countdown and consume that click
 - `R`: restart after death
+- `1`: debug-spawn a Shielded enemy immediately while the temporary `DEBUG_SHIELDED_SPAWN_ENABLED` hook is enabled
 
 ## HUD layout
 

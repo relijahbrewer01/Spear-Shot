@@ -5,6 +5,7 @@ const ChargerScene := preload("res://Charger.tscn")
 const ShieldedScene := preload("res://ShieldedEnemy.tscn")
 const HighScoreStore := preload("res://scripts/high_score_store.gd")
 const NO_AMBIENT_ENEMY_KIND := -1
+const DEBUG_SHIELDED_SPAWN_ENABLED := true
 
 enum RunState {
 	RUNNING,
@@ -164,6 +165,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if run_state != RunState.RUNNING:
 		return
 
+	if DEBUG_SHIELDED_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_shielded"):
+		_debug_spawn_shielded_enemy()
+		return
+
 	if event.is_action_pressed("dodge_aim"):
 		if player.try_start_aim_dodge(_get_shift_dodge_direction()):
 			destination_marker.clear_marker()
@@ -228,6 +233,18 @@ func _try_spawn_enemy(enemy_kind: int, spawn_edge: int, wave_id: int) -> bool:
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
 	return true
+
+
+func _debug_spawn_shielded_enemy() -> void:
+	var spawned := _try_spawn_enemy(
+		EncounterDirector.EnemyKind.SHIELDED,
+		arena.get_random_spawn_edge(),
+		EncounterDirector.INVALID_WAVE_ID
+	)
+	if spawned:
+		print("DEBUG: spawned Shielded enemy with key 1.")
+	else:
+		print("DEBUG: Shielded enemy spawn failed; cap or safe spawn search blocked it.")
 
 
 func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
@@ -633,6 +650,7 @@ func _ensure_input_actions() -> void:
 	_add_key_action("throw_spear", KEY_Q)
 	_add_key_action("dodge_aim", KEY_SHIFT)
 	_add_key_action("dodge_move", KEY_SPACE)
+	_add_key_action("debug_spawn_shielded", KEY_1)
 	_remove_mouse_button_action("throw_spear", MOUSE_BUTTON_RIGHT)
 	_add_mouse_button_action("throw_spear", MOUSE_BUTTON_LEFT)
 	_add_mouse_button_action("move_to_cursor", MOUSE_BUTTON_RIGHT)

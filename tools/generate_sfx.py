@@ -264,6 +264,34 @@ def generate_blowgun_fire() -> list[float]:
     return samples
 
 
+def generate_blowgun_shove() -> list[float]:
+    length = int(SAMPLE_RATE * 0.18)
+    samples: list[float] = []
+    previous_noise = 0.0
+    body_resonance = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        swish_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        body_resonance = body_resonance * 0.86 + raw_noise * 0.14
+
+        swish_curve = math.exp(-((progress - 0.26) / 0.17) ** 2)
+        thump_curve = math.exp(-((progress - 0.54) / 0.13) ** 2)
+        reed_tone = math.sin(2.0 * math.pi * (310.0 - progress * 90.0) * index / SAMPLE_RATE)
+        body_thump = math.sin(2.0 * math.pi * 132.0 * index / SAMPLE_RATE)
+        samples.append(
+            (
+                swish_noise * 0.24 * swish_curve
+                + reed_tone * 0.22 * swish_curve
+                + body_thump * 0.34 * thump_curve
+                + body_resonance * 0.20 * thump_curve
+            )
+            * envelope(progress, 0.01, 0.55)
+        )
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -278,6 +306,7 @@ def main() -> None:
         "shield_break.wav": generate_shield_break(),
         "blowgun_windup.wav": generate_blowgun_windup(),
         "blowgun_fire.wav": generate_blowgun_fire(),
+        "blowgun_shove.wav": generate_blowgun_shove(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

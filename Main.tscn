@@ -20,6 +20,7 @@
 [ext_resource type="AudioStream" path="res://audio/shield_break.wav" id="18"]
 [ext_resource type="AudioStream" path="res://audio/blowgun_windup.wav" id="19"]
 [ext_resource type="AudioStream" path="res://audio/blowgun_fire.wav" id="20"]
+[ext_resource type="AudioStream" path="res://audio/blowgun_shove.wav" id="21"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -109,6 +110,12 @@ bus = &"SFX"
 stream = ExtResource("20")
 volume_db = -6.0
 max_polyphony = 4
+bus = &"SFX"
+
+[node name="BlowgunShovePlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+stream = ExtResource("21")
+volume_db = -7.0
+max_polyphony = 2
 bus = &"SFX"
 
 [node name="SpawnTimer" type="Timer" parent="." unique_id=1065658465]

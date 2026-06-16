@@ -18,6 +18,7 @@ func _ready() -> void:
 
 func _run_audit() -> void:
 	await _audit_movement_ranges()
+	await _audit_cancel_reposition_and_shove()
 	await _audit_attack_state_machine()
 	await _audit_burst_pause_and_cancellation()
 	await _audit_dart_damage_and_invulnerability()
@@ -74,6 +75,126 @@ func _audit_movement_ranges() -> void:
 	_require(arc_shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Dangerously close player cancels arc reposition.")
 	_require(arc_shooter.global_position.distance_to(player.global_position) > close_arc_distance, "Retreat overrides arc movement at dangerous range.")
 
+	player.global_position = Vector2(120.0, 108.0)
+	var long_arc_shooter := _spawn_shooter(root, player, Vector2(226.0, 108.0), 46.62)
+	long_arc_shooter.shooter_state = ShooterEnemy.ShooterState.ARC_REPOSITION
+	long_arc_shooter.arc_reposition_left = long_arc_shooter.arc_reposition_duration
+	long_arc_shooter.arc_reposition_side = 1
+	var long_arc_start := long_arc_shooter.global_position
+	await _advance_physics(long_arc_shooter.arc_reposition_duration + 0.05)
+	var long_arc_distance := long_arc_shooter.global_position.distance_to(long_arc_start)
+	_require(long_arc_distance >= 56.0 and long_arc_distance <= 82.0, "Post-burst arc reposition covers a meaningful 60-ish pixel relocation in open space.")
+
+	var reversing_arc_player := _spawn_player(root, Vector2(250.0, 80.0))
+	var reversing_arc_shooter := _spawn_shooter(root, reversing_arc_player, Vector2(310.0, 22.0), 46.62)
+	reversing_arc_shooter.shooter_state = ShooterEnemy.ShooterState.ARC_REPOSITION
+	reversing_arc_shooter.arc_reposition_left = reversing_arc_shooter.arc_reposition_duration
+	reversing_arc_shooter.arc_reposition_side = -1
+	await _advance_physics(0.12)
+	var reversed_side := reversing_arc_shooter.arc_reposition_side
+	await _advance_physics(0.25)
+	_require(reversing_arc_shooter.arc_reposition_side == reversed_side, "Arc reposition reverses at most once when the first side is blocked.")
+
+	root.queue_free()
+	await get_tree().process_frame
+
+
+func _audit_cancel_reposition_and_shove() -> void:
+	var root := Node2D.new()
+	add_child(root)
+
+	var player := _spawn_player(root, Vector2(120.0, 108.0))
+	var shooter := _spawn_shooter(root, player, Vector2(220.0, 108.0), 46.62)
+	shooter.first_attack_delay_left = 0.0
+	shooter.attack_cooldown_left = 0.0
+	shooter.minimum_dart_interval_left = 0.0
+	var cancelled_darts := 0
+	shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2, _burst_id: int, _dart_index: int) -> void:
+		cancelled_darts += 1
+	)
+	await _advance_physics(0.05)
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM, "Shooter begins aiming once inside firing range.")
+	player.global_position = Vector2(40.0, 108.0)
+	var cancel_start := shooter.global_position
+	await _advance_physics(0.05)
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM_CANCEL_REPOSITION, "Too-far pre-lock movement cancels AIM into committed reposition.")
+	await _advance_physics(0.25)
+	var cancel_displacement := shooter.global_position - cancel_start
+	_require(cancelled_darts == 0, "Cancelled AIM fires zero darts.")
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM_CANCEL_REPOSITION, "Shooter cannot re-enter AIM during cancellation reposition.")
+	_require(absf(cancel_displacement.y) > 4.0 and absf(cancel_displacement.y) > absf(cancel_displacement.x), "Too-far cancellation repositions laterally instead of immediately sprinting straight back into AIM.")
+	await _advance_physics(shooter.aim_cancel_reposition_duration + 0.10)
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Cancelled AIM ends in ordinary reposition after the committed travel finishes.")
+
+	var retreat_player := _spawn_player(root, Vector2(130.0, 108.0))
+	var retreat_shooter := _spawn_shooter(root, retreat_player, Vector2(220.0, 108.0))
+	retreat_shooter.first_attack_delay_left = 0.0
+	retreat_shooter.attack_cooldown_left = 0.0
+	retreat_shooter.minimum_dart_interval_left = 0.0
+	await _advance_physics(0.05)
+	retreat_player.global_position = retreat_shooter.global_position - Vector2.RIGHT * 30.0
+	retreat_shooter.shove_cooldown_left = 1.0
+	var retreat_start_x := retreat_shooter.global_position.x
+	await _advance_physics(0.08)
+	_require(retreat_shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Too-close AIM cancellation returns to ordinary retreat when shove is unavailable.")
+	_require(retreat_shooter.global_position.x > retreat_start_x + 1.0, "Too-close AIM cancellation immediately creates space.")
+
+	var overlap_player := _spawn_player(root, Vector2(176.0, 108.0))
+	var overlap_shooter := _spawn_shooter(root, overlap_player, Vector2(178.0, 108.0))
+	overlap_shooter.first_attack_delay_left = 99.0
+	overlap_shooter.shove_cooldown_left = 99.0
+	var overlap_health := overlap_player.health
+	await _advance_physics(0.20)
+	_require(overlap_player.health == overlap_health, "Shooter body overlap no longer deals ordinary contact damage.")
+
+	var shove_player := _spawn_player(root, Vector2(250.0, 108.0))
+	var shove_shooter := _spawn_shooter(root, shove_player, Vector2(234.0, 108.0))
+	shove_shooter.first_attack_delay_left = 99.0
+	var shove_count := 0
+	shove_shooter.shove_used.connect(func() -> void:
+		shove_count += 1
+	)
+	var shove_health := shove_player.health
+	await _advance_physics(0.05)
+	_require(shove_shooter.shooter_state == ShooterEnemy.ShooterState.SHOVE_WINDUP, "Close-range Shooter starts shove windup instead of using body damage.")
+	await _advance_physics(shove_shooter.shove_windup_duration + 0.03)
+	_require(shove_count == 1, "Shooter shove fires once per close-range defense.")
+	_require(shove_player.health == shove_health, "Shooter shove deals zero health damage.")
+	_require(shove_player.is_in_forced_movement(), "Successful shove starts authored player forced movement.")
+	var shoved_start := shove_player.global_position
+	await _advance_physics(0.10)
+	_require(shove_player.global_position.distance_to(shoved_start) > 4.0, "Successful shove moves the player a meaningful distance.")
+	await _advance_physics(shove_shooter.shove_active_duration + shove_shooter.shove_recover_duration + 0.05)
+	_require(
+		shove_shooter.shooter_state == ShooterEnemy.ShooterState.ARC_REPOSITION
+		or shove_shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION,
+		"Shooter relocates after a shove instead of immediately restarting its burst."
+	)
+	_require(shove_shooter.shove_cooldown_left > 0.0, "Shooter shove cooldown is respected after use.")
+
+	var miss_player := _spawn_player(root, Vector2(300.0, 108.0))
+	var miss_shooter := _spawn_shooter(root, miss_player, Vector2(284.0, 108.0))
+	miss_shooter.first_attack_delay_left = 99.0
+	await _advance_physics(0.05)
+	miss_player.global_position = Vector2(340.0, 108.0)
+	await _advance_physics(miss_shooter.shove_windup_duration + 0.03)
+	_require(not miss_player.is_in_forced_movement(), "Missed shove causes no knockback.")
+
+	var dodge_player := _spawn_player(root, Vector2(110.0, 150.0))
+	dodge_player.try_start_dodge(Vector2.RIGHT)
+	var dodge_shooter := _spawn_shooter(root, dodge_player, Vector2(94.0, 150.0))
+	dodge_shooter.shove_direction = Vector2.RIGHT
+	dodge_shooter.call("_enter_shove_active_state")
+	_require(not dodge_player.is_in_forced_movement(), "Active dodge suppresses shove knockback.")
+	_require(dodge_player.health == dodge_player.max_health, "Shove stays non-damaging during active dodge.")
+
+	var grace_player := _spawn_player(root, Vector2(110.0, 176.0))
+	grace_player.dodge_exit_invulnerability_left = 0.10
+	var grace_shooter := _spawn_shooter(root, grace_player, Vector2(94.0, 176.0))
+	grace_shooter.shove_direction = Vector2.RIGHT
+	grace_shooter.call("_enter_shove_active_state")
+	_require(not grace_player.is_in_forced_movement(), "Dodge exit grace suppresses shove knockback.")
+
 	root.queue_free()
 	await get_tree().process_frame
 
@@ -121,13 +242,13 @@ func _audit_attack_state_machine() -> void:
 		)
 	_require(
 		shooter.shooter_state == ShooterEnemy.ShooterState.RECOVER
+		or shooter.shooter_state == ShooterEnemy.ShooterState.ARC_REPOSITION
 		or shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION,
 		"Shooter enters recovery or reposition after the burst."
 	)
 	_require(shooter.minimum_dart_interval_left > 0.0, "Shooter starts the minimum dart interval after firing.")
 	_require(fired_directions.size() <= 2, "One attack cannot produce three or more darts.")
 
-	var position_after_burst := shooter.global_position
 	await _advance_physics(shooter.recover_duration + 0.08)
 	_require(shooter.shooter_state == ShooterEnemy.ShooterState.ARC_REPOSITION, "Shooter enters ARC_REPOSITION after the short burst recovery.")
 	var arc_start := shooter.global_position
@@ -138,6 +259,7 @@ func _audit_attack_state_machine() -> void:
 	var total_motion := arc_movement.length()
 	_require(total_motion > 0.5, "Shooter starts relocating after the completed burst.")
 	_require(radial_motion < total_motion * 0.75, "Arc reposition is mostly tangential, not direct chase or retreat.")
+	_require(fired_directions.size() == 2, "Shooter does not fire additional darts during arc reposition.")
 	_require(TEST_ARENA.has_point(shooter.global_position), "Arc reposition respects arena bounds.")
 	await _advance_physics(shooter.arc_reposition_duration + 0.15)
 	_require(shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Shooter returns to REPOSITION after arc repositioning.")
@@ -409,16 +531,16 @@ func _spawn_player(parent: Node, position: Vector2) -> Player:
 	return player
 
 
-func _spawn_shooter(parent: Node, player: Player, position: Vector2) -> ShooterEnemy:
+func _spawn_shooter(parent: Node, player: Player, position: Vector2, starting_speed: float = 42.0) -> ShooterEnemy:
 	var shooter := ShooterScene.instantiate() as ShooterEnemy
-	shooter.setup(player, TEST_ARENA, 42.0)
+	shooter.setup(player, TEST_ARENA, starting_speed)
 	shooter.global_position = position
 	parent.add_child(shooter)
 	return shooter
 
 
-func _spawn_ready_shooter(parent: Node, player: Player, position: Vector2) -> ShooterEnemy:
-	var shooter := _spawn_shooter(parent, player, position)
+func _spawn_ready_shooter(parent: Node, player: Player, position: Vector2, starting_speed: float = 42.0) -> ShooterEnemy:
+	var shooter := _spawn_shooter(parent, player, position, starting_speed)
 	shooter.first_attack_delay_left = 0.0
 	shooter.attack_cooldown_left = 0.0
 	shooter.minimum_dart_interval_left = 0.0

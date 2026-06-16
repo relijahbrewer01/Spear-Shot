@@ -18,6 +18,7 @@ const MOVEMENT_ACTIONS: Array[StringName] = [
 enum ActionState {
 	NORMAL,
 	DODGING,
+	FORCED_MOVEMENT,
 	DISABLED,
 }
 
@@ -61,6 +62,11 @@ var dodge_time_left := 0.0
 var dodge_cooldown_left := 0.0
 var dodge_exit_invulnerability_left := 0.0
 var dodge_spin_direction := 1.0
+var forced_movement_direction := Vector2.ZERO
+var forced_movement_distance := 0.0
+var forced_movement_duration := 0.0
+var forced_movement_time_left := 0.0
+var forced_movement_velocity := Vector2.ZERO
 var last_valid_aim_direction := Vector2.RIGHT
 var facing_direction := 1
 var suppressed_movement_actions: Dictionary = {}
@@ -119,6 +125,7 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 	dodge_cooldown_left = 0.0
 	dodge_exit_invulnerability_left = 0.0
 	dodge_spin_direction = 1.0
+	_clear_forced_movement_state()
 	last_valid_aim_direction = Vector2.RIGHT
 	global_position = _clamp_position_to_arena(start_position)
 	suppressed_movement_actions.clear()
@@ -136,6 +143,7 @@ func set_active(is_active: bool) -> void:
 	active = is_active
 	if not active:
 		_cancel_dodge()
+		_clear_forced_movement_state()
 		action_state = ActionState.DISABLED
 		velocity = Vector2.ZERO
 		clear_move_destination()
@@ -156,8 +164,18 @@ func is_dodging() -> bool:
 	return action_state == ActionState.DODGING
 
 
+func is_in_forced_movement() -> bool:
+	return action_state == ActionState.FORCED_MOVEMENT
+
+
 func can_start_dodge() -> bool:
-	return active and is_alive() and action_state == ActionState.NORMAL and dodge_cooldown_left == 0.0
+	return (
+		active
+		and is_alive()
+		and action_state != ActionState.DODGING
+		and action_state != ActionState.DISABLED
+		and dodge_cooldown_left == 0.0
+	)
 
 
 func is_damage_invulnerable() -> bool:
@@ -213,12 +231,35 @@ func get_move_destination_direction() -> Vector2:
 	return (move_destination - global_position).normalized()
 
 
+func get_buffered_move_destination_direction() -> Vector2:
+	if not has_pending_post_dodge_destination:
+		return Vector2.ZERO
+
+	return (pending_post_dodge_destination - global_position).normalized()
+
+
 func get_last_valid_aim_direction() -> Vector2:
 	return last_valid_aim_direction
 
 
 func get_facing_direction() -> int:
 	return facing_direction
+
+
+func get_space_dodge_direction() -> Vector2:
+	var manual_direction := get_manual_input_direction()
+	if manual_direction.length_squared() > 0.0:
+		return manual_direction.normalized()
+
+	var move_destination_direction := get_move_destination_direction()
+	if move_destination_direction.length_squared() > 0.0:
+		return move_destination_direction
+
+	var buffered_destination_direction := get_buffered_move_destination_direction()
+	if buffered_destination_direction.length_squared() > 0.0:
+		return buffered_destination_direction
+
+	return last_valid_aim_direction
 
 
 func try_start_aim_dodge(direction: Vector2) -> bool:
@@ -238,6 +279,7 @@ func try_start_dodge(direction: Vector2, suppress_held_movement := false) -> boo
 	if direction.length_squared() <= 0.001:
 		direction = Vector2.RIGHT
 
+	_clear_forced_movement_state()
 	action_state = ActionState.DODGING
 	dodge_direction = direction.normalized()
 	dodge_spin_direction = _get_dodge_spin_direction(dodge_direction)
@@ -254,6 +296,28 @@ func try_start_dodge(direction: Vector2, suppress_held_movement := false) -> boo
 	if cooldown_indicator != null:
 		cooldown_indicator.begin_cooldown()
 	dodge_started.emit(dodge_direction)
+	queue_redraw()
+	return true
+
+
+func try_start_forced_movement(direction: Vector2, distance: float, duration: float) -> bool:
+	if not active or not is_alive():
+		return false
+	if is_dodging() or dodge_exit_invulnerability_left > 0.0:
+		return false
+	if direction.length_squared() <= 0.001:
+		return false
+	if distance <= 0.0 or duration <= 0.0:
+		return false
+
+	action_state = ActionState.FORCED_MOVEMENT
+	forced_movement_direction = direction.normalized()
+	forced_movement_distance = distance
+	forced_movement_duration = duration
+	forced_movement_time_left = duration
+	forced_movement_velocity = forced_movement_direction * (distance / duration)
+	velocity = forced_movement_velocity
+	_update_horizontal_facing(forced_movement_direction)
 	queue_redraw()
 	return true
 
@@ -303,6 +367,7 @@ func take_damage(
 		action_state = ActionState.DISABLED
 		dodge_time_left = 0.0
 		dodge_exit_invulnerability_left = 0.0
+		_clear_forced_movement_state()
 		velocity = Vector2.ZERO
 		suppressed_movement_actions.clear()
 		_clear_pending_post_dodge_destination()
@@ -426,6 +491,8 @@ func _physics_process(delta: float) -> void:
 				_clamp_inside_arena()
 			ActionState.DODGING:
 				_process_dodge_motion(minf(delta, dodge_time_left))
+			ActionState.FORCED_MOVEMENT:
+				_process_forced_movement(minf(delta, forced_movement_time_left))
 			ActionState.DISABLED:
 				velocity = Vector2.ZERO
 
@@ -436,6 +503,7 @@ func _physics_process(delta: float) -> void:
 	_update_cooldown_indicator(delta)
 	_update_health_pips_transform()
 	_advance_dodge_timer(delta)
+	_advance_forced_movement_timer(delta)
 	queue_redraw()
 
 
@@ -645,6 +713,20 @@ func _process_dodge_motion(delta: float) -> void:
 		velocity = Vector2.ZERO
 
 
+func _process_forced_movement(delta: float) -> void:
+	var target_position := _clamp_position_to_arena(global_position + forced_movement_velocity * delta)
+	var actual_movement := target_position - global_position
+	global_position = target_position
+
+	if delta > 0.0:
+		velocity = actual_movement / delta
+	else:
+		velocity = Vector2.ZERO
+
+	if velocity.length_squared() > 0.0:
+		_update_horizontal_facing(velocity.normalized())
+
+
 func _get_dodge_speed() -> float:
 	if dodge_duration <= 0.0:
 		return 0.0
@@ -674,6 +756,16 @@ func _finish_dodge() -> void:
 	queue_redraw()
 
 
+func _finish_forced_movement() -> void:
+	if not is_in_forced_movement():
+		return
+
+	_clear_forced_movement_state()
+	action_state = ActionState.NORMAL if active and is_alive() else ActionState.DISABLED
+	velocity = Vector2.ZERO
+	queue_redraw()
+
+
 func _cancel_dodge() -> void:
 	if is_dodging():
 		dodge_ended.emit()
@@ -687,6 +779,14 @@ func _cancel_dodge() -> void:
 		action_state = ActionState.NORMAL
 	_clear_dodge_visuals()
 	queue_redraw()
+
+
+func _clear_forced_movement_state() -> void:
+	forced_movement_direction = Vector2.ZERO
+	forced_movement_distance = 0.0
+	forced_movement_duration = 0.0
+	forced_movement_time_left = 0.0
+	forced_movement_velocity = Vector2.ZERO
 
 
 func _reset_body_visual_roll() -> void:
@@ -717,3 +817,12 @@ func _clear_pending_post_dodge_destination() -> void:
 func _clear_cooldown_indicator() -> void:
 	if cooldown_indicator != null:
 		cooldown_indicator.clear_indicator()
+
+
+func _advance_forced_movement_timer(delta: float) -> void:
+	if not is_in_forced_movement():
+		return
+
+	forced_movement_time_left = max(forced_movement_time_left - delta, 0.0)
+	if forced_movement_time_left == 0.0:
+		_finish_forced_movement()

@@ -22,6 +22,15 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, combo scoring, and broader combat frameworks are deferred.
 - Shielded dart interception is intentionally deferred to a focused Phase 4.2.1 pass: intact shields should later block darts without taking damage, breaking, or weakening.
 
+## Phase 4.6 Enemy Interaction And Formation Pass
+
+- Intact Shielded enemies should eventually intercept Shooter darts cleanly while exposed Shielded enemies stop doing so.
+- Shielded enemies should later learn clearer screening behavior near Akedra so the player can deliberately use them as mobile cover instead of treating interception as a random accident.
+- Shooters should later gain firing-lane repositioning around intact Shielded allies rather than blindly stacking behind them.
+- Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
+- Friendly shielding vs projectile conflicts should be resolved in one narrow pass so dart blocking, spear fairness, and enemy readability stay aligned.
+- Final interaction and population tuning should happen after those behaviors exist, not before.
+
 ## Future Polish
 
 - Footprints remain planned for a later movement-polish pass, likely alongside or shortly after the dodge system.

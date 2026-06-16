@@ -398,22 +398,15 @@ func _audit_director_counts_and_ambient_cap_removal() -> void:
 
 	var director := main.get_node("EncounterDirector") as EncounterDirector
 	var first_dummy_shielded := Node.new()
-	var second_dummy_shielded := Node.new()
 	main.add_child(first_dummy_shielded)
-	main.add_child(second_dummy_shielded)
 	director.register_enemy(
 		first_dummy_shielded,
 		EncounterDirector.EnemyKind.SHIELDED,
 		EncounterDirector.INVALID_WAVE_ID
 	)
-	director.register_enemy(
-		second_dummy_shielded,
-		EncounterDirector.EnemyKind.SHIELDED,
-		EncounterDirector.INVALID_WAVE_ID
-	)
 
-	_require(director.get_total_hostile_count() == 2, "Shielded counts toward total hostile population.")
-	_require(director.get_shielded_hostile_count() == 2, "Shielded counts toward its dedicated cap.")
+	_require(director.get_total_hostile_count() == 1, "Shielded counts toward total hostile population.")
+	_require(director.get_shielded_hostile_count() == 1, "Shielded counts toward its dedicated cap.")
 	_require(director.get_normal_hostile_count() == 0, "Shielded does not count as a Normal.")
 	_require(director.get_charger_hostile_count() == 0, "Shielded does not count as a Charger.")
 	_require(not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED, 60.0), "Shielded cap blocks additional Shielded spawns.")

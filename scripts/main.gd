@@ -101,6 +101,7 @@ var debug_ambient_roll_sequence: Array = []
 @onready var shield_break_player: AudioStreamPlayer = $AudioPlayers/ShieldBreakPlayer
 @onready var blowgun_windup_player: AudioStreamPlayer = $AudioPlayers/BlowgunWindupPlayer
 @onready var blowgun_fire_player: AudioStreamPlayer = $AudioPlayers/BlowgunFirePlayer
+@onready var blowgun_shove_player: AudioStreamPlayer = $AudioPlayers/BlowgunShovePlayer
 
 
 func _ready() -> void:
@@ -277,6 +278,8 @@ func _try_spawn_enemy(
 		enemy.connect(&"aim_started", _on_shooter_enemy_aim_started)
 	if enemy.has_signal("dart_requested"):
 		enemy.connect(&"dart_requested", _on_shooter_enemy_dart_requested)
+	if enemy.has_signal("shove_used"):
+		enemy.connect(&"shove_used", _on_shooter_enemy_shove_used)
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
 	_mark_intro_seen_for_spawn(enemy_kind, spawn_source)
@@ -696,6 +699,13 @@ func _on_shooter_enemy_dart_requested(
 	_play_sfx(blowgun_fire_player)
 
 
+func _on_shooter_enemy_shove_used() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(blowgun_shove_player)
+
+
 func _spawn_dart_projectile(
 	spawn_position: Vector2,
 	fire_direction: Vector2,
@@ -834,6 +844,7 @@ func _stop_all_audio() -> void:
 		shield_break_player,
 		blowgun_windup_player,
 		blowgun_fire_player,
+		blowgun_shove_player,
 	]:
 		if audio_player == null:
 			continue
@@ -853,6 +864,7 @@ func _stop_gameplay_sfx() -> void:
 		shield_break_player,
 		blowgun_windup_player,
 		blowgun_fire_player,
+		blowgun_shove_player,
 	]:
 		if audio_player == null:
 			continue
@@ -1016,12 +1028,4 @@ func _get_shift_dodge_direction() -> Vector2:
 
 
 func _get_space_dodge_direction() -> Vector2:
-	var manual_direction := player.get_manual_input_direction()
-	if manual_direction.length_squared() > 0.0:
-		return manual_direction.normalized()
-
-	var move_destination_direction := player.get_move_destination_direction()
-	if move_destination_direction.length_squared() > 0.0:
-		return move_destination_direction
-
-	return player.get_last_valid_aim_direction()
+	return player.get_space_dodge_direction()

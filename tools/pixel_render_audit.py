@@ -99,6 +99,7 @@ def main() -> int:
         "art/sprites/enemy_creature.png.import",
         "art/sprites/charger_beast.png.import",
         "art/sprites/shielded_enemy.png.import",
+        "art/sprites/shooter_enemy.png.import",
         "art/sprites/spear_hunter.png.import",
     ]:
         import_text = read_text(import_path)
@@ -110,6 +111,7 @@ def main() -> int:
         "art/sprites/enemy_creature.png",
         "art/sprites/charger_beast.png",
         "art/sprites/shielded_enemy.png",
+        "art/sprites/shooter_enemy.png",
         "art/sprites/spear_hunter.png",
     ]:
         audit_png(png_path, failures)

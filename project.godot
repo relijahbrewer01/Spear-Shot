@@ -22,6 +22,15 @@ window/size/viewport_height=216
 window/stretch/mode="viewport"
 window/stretch/scale_mode="integer"
 
+[layer_names]
+
+2d_physics/layer_1="Player"
+2d_physics/layer_2="Enemy"
+2d_physics/layer_3="ArenaWall"
+2d_physics/layer_4="SpearDamage"
+2d_physics/layer_5="SpearPickup"
+2d_physics/layer_6="EnemyProjectile"
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

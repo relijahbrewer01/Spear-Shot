@@ -27,6 +27,7 @@ enum EnemyKind {
 	NORMAL,
 	CHARGER,
 	SHIELDED,
+	SHOOTER,
 }
 
 enum EdgeRole {
@@ -50,6 +51,7 @@ const INVALID_WAVE_ID := -1
 @export var normal_hostile_cap := 9
 @export var charger_hostile_cap := 2
 @export var shielded_hostile_cap := 2
+@export var shooter_hostile_cap := 1
 @export var first_minute_charger_cap := 1
 @export var spawn_retry_interval := 0.3
 
@@ -196,6 +198,8 @@ func can_spawn_enemy(enemy_kind: int, survival_time: float) -> bool:
 			return get_charger_hostile_count() < effective_cap
 		EnemyKind.SHIELDED:
 			return get_shielded_hostile_count() < shielded_hostile_cap
+		EnemyKind.SHOOTER:
+			return get_shooter_hostile_count() < shooter_hostile_cap
 
 	return false
 
@@ -256,6 +260,10 @@ func get_charger_hostile_count() -> int:
 
 func get_shielded_hostile_count() -> int:
 	return _get_enemy_kind_count(EnemyKind.SHIELDED)
+
+
+func get_shooter_hostile_count() -> int:
+	return _get_enemy_kind_count(EnemyKind.SHOOTER)
 
 
 func _advance_ambient(survival_time: float) -> void:

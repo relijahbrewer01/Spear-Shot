@@ -14,7 +14,10 @@
 - Phase 4.1 adds the ambient-only Shielded enemy as the first narrow enemy expansion on top of the Encounter Director.
 - Shielded enemies require two committed spear interactions: the first thrown-spear hit breaks the shield and stops the spear for no score, and the second hit kills for `2` points through the existing death/scoring signal.
 - Shielded enemies count toward total hostile pressure and wave-start population thresholds, but not toward Normal or Charger caps.
-- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, combo scoring, and broader combat frameworks are deferred.
+- Phase 4.2 adds the ambient-only Blowgun Shooter as the first ranged hostile: it maintains medium-long distance, telegraphs, locks, and fires a two-dart straight player-only burst before relocating.
+- Shooters die to one valid thrown-spear hit for `2` points, count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normal, Charger, or Shielded.
+- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, combo scoring, and broader combat frameworks are deferred.
+- Shielded dart interception is intentionally deferred to a focused Phase 4.2.1 pass: intact shields should later block darts without taking damage, breaking, or weakening.
 
 ## Future Polish
 

@@ -28,7 +28,11 @@ def main() -> int:
     readme_text = read_text("README.md")
     roadmap_text = read_text("ROADMAP.md")
 
-    require('Current milestone: `Spear Shot v0.5.0 - Encounter Director`' in readme_text, "README milestone is stamped v0.5.0 Encounter Director", failures)
+    require(
+        'Current milestone: `Spear Shot v0.6.0-alpha.2 - Blowgun Shooter`' in readme_text,
+        "README milestone is stamped v0.6.0-alpha.2 Blowgun Shooter",
+        failures,
+    )
     require("signal dodge_started" in player_script and "signal dodge_ended" in player_script and "signal dodge_ready" in player_script, "Player exposes dodge start/end/ready hooks", failures)
     require("enum ActionState" in player_script and "DODGING" in player_script, "Player defines an explicit dodge state", failures)
     require("dodge_duration := 0.20" in player_script, "Player dodge duration matches the utility tuning", failures)

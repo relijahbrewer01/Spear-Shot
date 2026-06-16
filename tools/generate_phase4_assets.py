@@ -25,8 +25,32 @@ def draw_shielded_enemy(path: Path) -> None:
     image.save(path)
 
 
+def draw_shooter_enemy(path: Path) -> None:
+    image = Image.new("RGBA", (18, 20), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    # Small wary skirmisher body; the oversized blowgun is a runtime primitive
+    # so it can rotate toward the locked shot direction.
+    draw.ellipse((5, 8, 13, 19), fill=(36, 38, 26, 255))
+    draw.ellipse((4, 4, 14, 15), fill=(108, 122, 74, 255))
+    draw.polygon([(4, 8), (2, 11), (6, 10)], fill=(65, 77, 48, 255))
+    draw.polygon([(14, 8), (16, 11), (12, 10)], fill=(65, 77, 48, 255))
+    draw.ellipse((6, 1, 12, 8), fill=(139, 131, 78, 255))
+    draw.rectangle((7, 8, 11, 13), fill=(86, 70, 46, 255))
+    draw.point((6, 5), fill=(31, 28, 22, 255))
+    draw.point((11, 5), fill=(31, 28, 22, 255))
+    draw.rectangle((7, 7, 11, 8), fill=(48, 37, 28, 255))
+    draw.line((12, 11, 16, 14), fill=(190, 161, 91, 255), width=1)
+    draw.line((13, 13, 17, 16), fill=(190, 161, 91, 255), width=1)
+    draw.rectangle((3, 13, 5, 17), fill=(84, 61, 38, 255))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
 def main() -> None:
     draw_shielded_enemy(SPRITE_DIR / "shielded_enemy.png")
+    draw_shooter_enemy(SPRITE_DIR / "shooter_enemy.png")
 
 
 if __name__ == "__main__":

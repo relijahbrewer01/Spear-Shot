@@ -3,6 +3,11 @@ class_name Player
 
 const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
 const BODY_VISUAL_Z_INDEX := 10
+const DAMAGE_SOURCE_CONTACT := &"contact"
+const DAMAGE_SOURCE_DART := &"dart"
+const INVALID_DART_BURST_ID := -1
+const INVALID_DART_INDEX := -1
+const INVALID_PROJECTILE_TOKEN := -1
 const MOVEMENT_ACTIONS: Array[StringName] = [
 	&"move_up",
 	&"move_left",
@@ -61,6 +66,8 @@ var facing_direction := 1
 var suppressed_movement_actions: Dictionary = {}
 var has_pending_post_dodge_destination := false
 var pending_post_dodge_destination := Vector2.ZERO
+var damaged_dart_indices_by_burst: Dictionary = {}
+var accepted_dart_projectile_tokens: Dictionary = {}
 
 @onready var body_visual: Node2D = $BodyVisual
 @onready var body_sprite: Sprite2D = $BodyVisual/Sprite2D
@@ -116,6 +123,7 @@ func reset_for_new_run(start_position: Vector2, new_arena_rect: Rect2) -> void:
 	global_position = _clamp_position_to_arena(start_position)
 	suppressed_movement_actions.clear()
 	_clear_pending_post_dodge_destination()
+	_clear_dart_damage_contexts()
 	_update_health_pips()
 	_update_health_pips_transform()
 	_clear_cooldown_indicator()
@@ -156,8 +164,31 @@ func is_damage_invulnerable() -> bool:
 	return invulnerability_left > 0.0 or is_dodging() or dodge_exit_invulnerability_left > 0.0
 
 
-func can_take_damage() -> bool:
-	return is_alive() and not is_damage_invulnerable()
+func can_take_damage(
+	damage_source: StringName = DAMAGE_SOURCE_CONTACT,
+	dart_burst_id: int = INVALID_DART_BURST_ID,
+	dart_index: int = INVALID_DART_INDEX,
+	projectile_token: int = INVALID_PROJECTILE_TOKEN
+) -> bool:
+	if not is_alive():
+		return false
+	if is_dodging() or dodge_exit_invulnerability_left > 0.0:
+		return false
+	if _is_duplicate_dart_damage_context(
+		damage_source,
+		dart_burst_id,
+		dart_index,
+		projectile_token
+	):
+		return false
+	if invulnerability_left <= 0.0:
+		return true
+	return _can_accept_same_burst_dart_followup(
+		damage_source,
+		dart_burst_id,
+		dart_index,
+		projectile_token
+	)
 
 
 func get_manual_input_direction() -> Vector2:
@@ -242,9 +273,22 @@ func clear_move_destination() -> void:
 	has_move_destination = false
 
 
-func take_damage(_source_position: Vector2) -> void:
-	if not can_take_damage():
-		return
+func take_damage(
+	_source_position: Vector2,
+	damage_source: StringName = DAMAGE_SOURCE_CONTACT,
+	dart_burst_id: int = INVALID_DART_BURST_ID,
+	dart_index: int = INVALID_DART_INDEX,
+	projectile_token: int = INVALID_PROJECTILE_TOKEN
+) -> bool:
+	if not can_take_damage(damage_source, dart_burst_id, dart_index, projectile_token):
+		return false
+	if not _record_dart_damage_context(
+		damage_source,
+		dart_burst_id,
+		dart_index,
+		projectile_token
+	):
+		return false
 
 	health -= 1
 	hurt_flash_left = 0.16
@@ -265,6 +309,101 @@ func take_damage(_source_position: Vector2) -> void:
 		_clear_cooldown_indicator()
 		_clear_dodge_visuals()
 		died.emit()
+
+	return true
+
+
+func _can_accept_same_burst_dart_followup(
+	damage_source: StringName,
+	dart_burst_id: int,
+	dart_index: int,
+	projectile_token: int
+) -> bool:
+	if not _is_valid_dart_damage_context(
+		damage_source,
+		dart_burst_id,
+		dart_index,
+		projectile_token
+	):
+		return false
+
+	var damaged_indices: Dictionary = damaged_dart_indices_by_burst.get(dart_burst_id, {})
+	if damaged_indices.size() != 1:
+		return false
+	if damaged_indices.has(dart_index):
+		return false
+
+	return damaged_indices.has(0) or damaged_indices.has(1)
+
+
+func _record_dart_damage_context(
+	damage_source: StringName,
+	dart_burst_id: int,
+	dart_index: int,
+	projectile_token: int
+) -> bool:
+	if damage_source != DAMAGE_SOURCE_DART:
+		return true
+	if not _is_valid_dart_damage_context(
+		damage_source,
+		dart_burst_id,
+		dart_index,
+		projectile_token
+	):
+		return false
+
+	var damaged_indices: Dictionary = damaged_dart_indices_by_burst.get(dart_burst_id, {})
+	if accepted_dart_projectile_tokens.has(projectile_token):
+		return false
+	if damaged_indices.has(dart_index):
+		return false
+	if damaged_indices.size() >= 2:
+		return false
+
+	accepted_dart_projectile_tokens[projectile_token] = true
+	damaged_indices[dart_index] = true
+	damaged_dart_indices_by_burst[dart_burst_id] = damaged_indices
+	return true
+
+
+func _is_duplicate_dart_damage_context(
+	damage_source: StringName,
+	dart_burst_id: int,
+	dart_index: int,
+	projectile_token: int
+) -> bool:
+	if damage_source != DAMAGE_SOURCE_DART:
+		return false
+	if not _is_valid_dart_damage_context(
+		damage_source,
+		dart_burst_id,
+		dart_index,
+		projectile_token
+	):
+		return false
+
+	var damaged_indices: Dictionary = damaged_dart_indices_by_burst.get(dart_burst_id, {})
+	return accepted_dart_projectile_tokens.has(projectile_token) or damaged_indices.has(dart_index)
+
+
+func _is_valid_dart_damage_context(
+	damage_source: StringName,
+	dart_burst_id: int,
+	dart_index: int,
+	projectile_token: int
+) -> bool:
+	return (
+		damage_source == DAMAGE_SOURCE_DART
+		and dart_burst_id != INVALID_DART_BURST_ID
+		and dart_index >= 0
+		and dart_index <= 1
+		and projectile_token != INVALID_PROJECTILE_TOKEN
+	)
+
+
+func _clear_dart_damage_contexts() -> void:
+	damaged_dart_indices_by_burst.clear()
+	accepted_dart_projectile_tokens.clear()
 
 
 func _physics_process(delta: float) -> void:

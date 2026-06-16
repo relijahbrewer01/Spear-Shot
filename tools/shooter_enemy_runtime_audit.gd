@@ -64,6 +64,16 @@ func _audit_movement_ranges() -> void:
 	_require(TEST_ARENA.has_point(wall_shooter.global_position), "Wall fallback keeps Shooter inside the arena.")
 	_require(absf(wall_shooter.global_position.y - wall_start_y) > 0.5, "Wall fallback slides laterally instead of jittering into the wall.")
 
+	var arc_shooter := _spawn_shooter(root, player, Vector2(190.0, 108.0))
+	player.global_position = Vector2(150.0, 108.0)
+	arc_shooter.shooter_state = ShooterEnemy.ShooterState.ARC_REPOSITION
+	arc_shooter.arc_reposition_left = arc_shooter.arc_reposition_duration
+	arc_shooter.arc_reposition_side = 1
+	var close_arc_distance := arc_shooter.global_position.distance_to(player.global_position)
+	await _advance_physics(0.12)
+	_require(arc_shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Dangerously close player cancels arc reposition.")
+	_require(arc_shooter.global_position.distance_to(player.global_position) > close_arc_distance, "Retreat overrides arc movement at dangerous range.")
+
 	root.queue_free()
 	await get_tree().process_frame
 
@@ -79,25 +89,31 @@ func _audit_attack_state_machine() -> void:
 
 	var fired_directions: Array[Vector2] = []
 	var fired_frames: Array[int] = []
-	shooter.dart_requested.connect(func(_spawn_position: Vector2, fire_direction: Vector2) -> void:
+	var fired_burst_ids: Array[int] = []
+	var fired_dart_indices: Array[int] = []
+	shooter.dart_requested.connect(func(_spawn_position: Vector2, fire_direction: Vector2, burst_id: int, dart_index: int) -> void:
 		fired_directions.append(fire_direction)
 		fired_frames.append(Engine.get_physics_frames())
+		fired_burst_ids.append(burst_id)
+		fired_dart_indices.append(dart_index)
 	)
 
 	await _advance_physics(0.05)
 	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM, "Shooter starts with AIM instead of firing immediately.")
 
 	player.global_position = Vector2(104.0, 128.0)
-	await _advance_physics(0.58)
+	await _advance_physics(shooter.aim_duration + 0.05)
 	_require(shooter.shooter_state == ShooterEnemy.ShooterState.LOCKED, "Shooter enters LOCKED after the aim telegraph.")
 	var locked_direction: Vector2 = shooter.locked_direction
 	player.global_position = Vector2(104.0, 60.0)
-	await _advance_physics(0.55)
+	await _advance_physics(shooter.locked_duration + shooter.burst_interval + 0.12)
 
 	_require(fired_directions.size() == 2, "Shooter fires exactly two darts for one completed attack.")
 	if fired_directions.size() >= 2:
 		_require(fired_directions[0].distance_to(locked_direction) < 0.001, "Dart uses the locked aim direction.")
 		_require(fired_directions[1].distance_to(locked_direction) < 0.001, "Second dart uses the same locked aim direction.")
+		_require(fired_burst_ids[0] == fired_burst_ids[1], "Both darts share one burst id.")
+		_require(fired_dart_indices == [0, 1], "Burst darts use deterministic indices 0 and 1.")
 		var burst_interval := float(fired_frames[1] - fired_frames[0]) / 60.0
 		_require(
 			absf(burst_interval - shooter.burst_interval) <= 0.04,
@@ -112,9 +128,19 @@ func _audit_attack_state_machine() -> void:
 	_require(fired_directions.size() <= 2, "One attack cannot produce three or more darts.")
 
 	var position_after_burst := shooter.global_position
-	await _advance_physics(shooter.recover_duration + 0.30)
-	_require(shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Shooter returns to REPOSITION after the short burst recovery.")
-	_require(shooter.global_position.distance_to(position_after_burst) > 0.5, "Shooter starts relocating after the completed burst.")
+	await _advance_physics(shooter.recover_duration + 0.08)
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.ARC_REPOSITION, "Shooter enters ARC_REPOSITION after the short burst recovery.")
+	var arc_start := shooter.global_position
+	var arc_radial := (arc_start - player.global_position).normalized()
+	await _advance_physics(0.30)
+	var arc_movement := shooter.global_position - arc_start
+	var radial_motion := absf(arc_movement.dot(arc_radial))
+	var total_motion := arc_movement.length()
+	_require(total_motion > 0.5, "Shooter starts relocating after the completed burst.")
+	_require(radial_motion < total_motion * 0.75, "Arc reposition is mostly tangential, not direct chase or retreat.")
+	_require(TEST_ARENA.has_point(shooter.global_position), "Arc reposition respects arena bounds.")
+	await _advance_physics(shooter.arc_reposition_duration + 0.15)
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Shooter returns to REPOSITION after arc repositioning.")
 
 	root.queue_free()
 	await get_tree().process_frame
@@ -126,7 +152,7 @@ func _audit_burst_pause_and_cancellation() -> void:
 	var pause_player := _spawn_player(pause_root, Vector2(104.0, 108.0))
 	var pause_shooter := _spawn_ready_shooter(pause_root, pause_player, Vector2(200.0, 108.0))
 	var pause_fired: Array[Vector2] = []
-	pause_shooter.dart_requested.connect(func(_spawn_position: Vector2, fire_direction: Vector2) -> void:
+	pause_shooter.dart_requested.connect(func(_spawn_position: Vector2, fire_direction: Vector2, _burst_id: int, _dart_index: int) -> void:
 		pause_fired.append(fire_direction)
 	)
 
@@ -146,7 +172,7 @@ func _audit_burst_pause_and_cancellation() -> void:
 	var cancel_player := _spawn_player(cancel_root, Vector2(104.0, 108.0))
 	var cancel_shooter := _spawn_ready_shooter(cancel_root, cancel_player, Vector2(200.0, 108.0))
 	var cancel_count := 0
-	cancel_shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2) -> void:
+	cancel_shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2, _burst_id: int, _dart_index: int) -> void:
 		cancel_count += 1
 	)
 
@@ -163,7 +189,7 @@ func _audit_burst_pause_and_cancellation() -> void:
 	var death_player := _spawn_player(death_root, Vector2(104.0, 108.0))
 	var death_shooter := _spawn_ready_shooter(death_root, death_player, Vector2(200.0, 108.0))
 	var death_count := 0
-	death_shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2) -> void:
+	death_shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2, _burst_id: int, _dart_index: int) -> void:
 		death_count += 1
 	)
 
@@ -181,30 +207,61 @@ func _audit_dart_damage_and_invulnerability() -> void:
 	add_child(root)
 
 	var vulnerable_player := _spawn_player(root, Vector2(120.0, 108.0))
-	var vulnerable_dart := _spawn_dart(root, vulnerable_player, Vector2(116.0, 108.0), Vector2.RIGHT)
+	var vulnerable_dart := _spawn_dart(root, vulnerable_player, Vector2(116.0, 108.0), Vector2.RIGHT, 1001, 0)
 	vulnerable_dart.call("_on_body_entered", vulnerable_player)
 	vulnerable_dart.call("_on_body_entered", vulnerable_player)
 	_require(vulnerable_player.health == vulnerable_player.max_health - 1, "Vulnerable dart contact deals exactly one health.")
 	_require(vulnerable_dart.has_resolved_hit, "Dart resolves after hitting vulnerable player.")
 
+	var burst_player := _spawn_player(root, Vector2(136.0, 108.0))
+	var burst_dart_one := _spawn_dart(root, burst_player, Vector2(132.0, 108.0), Vector2.RIGHT, 2001, 0)
+	var burst_dart_two := _spawn_dart(root, burst_player, Vector2(132.0, 108.0), Vector2.RIGHT, 2001, 1)
+	burst_dart_one.call("_on_body_entered", burst_player)
+	burst_dart_two.call("_on_body_entered", burst_player)
+	_require(burst_player.health == burst_player.max_health - 2, "Two distinct darts from one burst can deal exactly two total damage.")
+	var burst_dart_three := _spawn_dart(root, burst_player, Vector2(132.0, 108.0), Vector2.RIGHT, 2001, 1)
+	burst_dart_three.call("_on_body_entered", burst_player)
+	_require(burst_player.health == burst_player.max_health - 2, "A third callback or duplicate dart index cannot add extra burst damage.")
+
+	var second_only_player := _spawn_player(root, Vector2(142.0, 108.0))
+	var second_only_dart := _spawn_dart(root, second_only_player, Vector2(138.0, 108.0), Vector2.RIGHT, 2002, 1)
+	second_only_dart.call("_on_body_entered", second_only_player)
+	_require(second_only_player.health == second_only_player.max_health - 1, "A missed first dart does not prevent dart two from dealing one damage.")
+
+	var first_only_player := _spawn_player(root, Vector2(148.0, 108.0))
+	var first_only_dart := _spawn_dart(root, first_only_player, Vector2(144.0, 108.0), Vector2.RIGHT, 2003, 0)
+	first_only_dart.call("_on_body_entered", first_only_player)
+	_require(first_only_player.health == first_only_player.max_health - 1, "A missed second dart leaves the first hit at one damage.")
+
+	var unrelated_player := _spawn_player(root, Vector2(154.0, 108.0))
+	unrelated_player.take_damage(Vector2.ZERO)
+	unrelated_player.take_damage(Vector2.ZERO)
+	_require(unrelated_player.health == unrelated_player.max_health - 1, "Unrelated enemy damage still respects ordinary hurt invulnerability.")
+
 	var hurt_player := _spawn_player(root, Vector2(150.0, 108.0))
 	hurt_player.invulnerability_left = 0.5
-	var hurt_dart := _spawn_dart(root, hurt_player, Vector2(146.0, 108.0), Vector2.RIGHT)
+	var hurt_dart := _spawn_dart(root, hurt_player, Vector2(146.0, 108.0), Vector2.RIGHT, 3001, 0)
 	hurt_dart.call("_on_body_entered", hurt_player)
 	_require(hurt_player.health == hurt_player.max_health, "Hurt invulnerability consumes the dart harmlessly.")
 	_require(hurt_dart.has_resolved_hit, "Dart is destroyed after hurt-invulnerable contact.")
 
 	var dodge_player := _spawn_player(root, Vector2(180.0, 108.0))
 	dodge_player.try_start_dodge(Vector2.RIGHT)
-	var dodge_dart := _spawn_dart(root, dodge_player, Vector2(176.0, 108.0), Vector2.RIGHT)
+	var dodge_dart := _spawn_dart(root, dodge_player, Vector2(176.0, 108.0), Vector2.RIGHT, 4001, 0)
 	dodge_dart.call("_on_body_entered", dodge_player)
 	_require(dodge_player.health == dodge_player.max_health, "Active dodge consumes the dart harmlessly.")
+	var dodge_dart_two := _spawn_dart(root, dodge_player, Vector2(176.0, 108.0), Vector2.RIGHT, 4001, 1)
+	dodge_dart_two.call("_on_body_entered", dodge_player)
+	_require(dodge_player.health == dodge_player.max_health, "Active dodge can negate both darts in a burst.")
 
 	var grace_player := _spawn_player(root, Vector2(210.0, 108.0))
 	grace_player.dodge_exit_invulnerability_left = 0.10
-	var grace_dart := _spawn_dart(root, grace_player, Vector2(206.0, 108.0), Vector2.RIGHT)
+	var grace_dart := _spawn_dart(root, grace_player, Vector2(206.0, 108.0), Vector2.RIGHT, 5001, 0)
 	grace_dart.call("_on_body_entered", grace_player)
 	_require(grace_player.health == grace_player.max_health, "Dodge exit grace consumes the dart harmlessly.")
+	var grace_dart_two := _spawn_dart(root, grace_player, Vector2(206.0, 108.0), Vector2.RIGHT, 5001, 1)
+	grace_dart_two.call("_on_body_entered", grace_player)
+	_require(grace_player.health == grace_player.max_health, "Dodge exit grace can negate both darts in a burst.")
 
 	root.queue_free()
 	await get_tree().process_frame
@@ -281,7 +338,24 @@ func _audit_main_spawn_intro_and_projectile_cleanup() -> void:
 	_require(director.get_shooter_hostile_count() == 1, "Director counts one active Shooter.")
 	_require(not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHOOTER, 45.0), "Shooter cap blocks a second active Shooter.")
 
-	main.call("_spawn_dart_projectile", Vector2(200.0, 108.0), Vector2.RIGHT)
+	var main_player := main.get_node("Player") as Player
+	var spawned_shooter := main.get_node("EnemyContainer").get_child(0) as ShooterEnemy
+	main_player.global_position = Vector2(104.0, 108.0)
+	spawned_shooter.global_position = Vector2(200.0, 108.0)
+	spawned_shooter.first_attack_delay_left = 0.0
+	spawned_shooter.attack_cooldown_left = 0.0
+	spawned_shooter.minimum_dart_interval_left = 0.0
+	var restart_cancel_shots := 0
+	spawned_shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2, _burst_id: int, _dart_index: int) -> void:
+		restart_cancel_shots += 1
+	)
+	await _advance_until(func() -> bool: return restart_cancel_shots >= 1, 1.2)
+	_require(restart_cancel_shots == 1, "Main-spawned Shooter emits first dart before restart cancellation.")
+	main.call("_restart_run")
+	await _advance_physics(0.35)
+	_require(restart_cancel_shots == 1, "Restart between darts cancels the pending second shot.")
+
+	main.call("_spawn_dart_projectile", Vector2(200.0, 108.0), Vector2.RIGHT, 9001, 0)
 	await get_tree().process_frame
 	_require(projectile_container.get_child_count() == 1, "Main spawns darts into ProjectileContainer.")
 
@@ -318,7 +392,7 @@ func _audit_no_shielded_interception_yet() -> void:
 	shielded.global_position = Vector2(160.0, 108.0)
 	root.add_child(shielded)
 
-	var dart := _spawn_dart(root, player, Vector2(156.0, 108.0), Vector2.RIGHT)
+	var dart := _spawn_dart(root, player, Vector2(156.0, 108.0), Vector2.RIGHT, 9101, 0)
 	dart.call("_on_body_entered", shielded)
 	_require(not dart.has_resolved_hit, "Darts do not collide with or resolve against Shielded enemies in Phase 4.2.")
 	_require(shielded.is_shield_intact(), "Darts do not break Shielded shields in Phase 4.2.")
@@ -351,11 +425,18 @@ func _spawn_ready_shooter(parent: Node, player: Player, position: Vector2) -> Sh
 	return shooter
 
 
-func _spawn_dart(parent: Node, player: Player, position: Vector2, direction: Vector2) -> DartProjectile:
+func _spawn_dart(
+	parent: Node,
+	player: Player,
+	position: Vector2,
+	direction: Vector2,
+	burst_id: int = 1,
+	dart_index: int = 0
+) -> DartProjectile:
 	var dart := DartScene.instantiate() as DartProjectile
 	parent.add_child(dart)
 	dart.global_position = position
-	dart.setup(player, TEST_ARENA, direction)
+	dart.setup(player, TEST_ARENA, direction, burst_id, dart_index)
 	return dart
 
 

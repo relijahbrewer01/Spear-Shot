@@ -19,6 +19,9 @@ var arena_rect := Rect2()
 var direction := Vector2.RIGHT
 var lifetime_left := 0.0
 var has_resolved_hit := false
+var burst_id := Player.INVALID_DART_BURST_ID
+var dart_index := Player.INVALID_DART_INDEX
+var projectile_token := Player.INVALID_PROJECTILE_TOKEN
 
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
@@ -31,13 +34,22 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func setup(player_ref: Player, new_arena_rect: Rect2, fire_direction: Vector2) -> void:
+func setup(
+	player_ref: Player,
+	new_arena_rect: Rect2,
+	fire_direction: Vector2,
+	new_burst_id: int = Player.INVALID_DART_BURST_ID,
+	new_dart_index: int = Player.INVALID_DART_INDEX
+) -> void:
 	player = player_ref
 	arena_rect = new_arena_rect
 	direction = fire_direction.normalized()
 	if direction == Vector2.ZERO:
 		direction = Vector2.RIGHT
 
+	burst_id = new_burst_id
+	dart_index = new_dart_index
+	projectile_token = int(get_instance_id())
 	lifetime_left = max_lifetime
 	has_resolved_hit = false
 	rotation = direction.angle()
@@ -85,8 +97,14 @@ func _on_body_entered(body: Node) -> void:
 	if hit_player == null:
 		hit_player = player
 
-	if hit_player != null and hit_player.can_take_damage():
-		hit_player.take_damage(global_position)
+	if hit_player != null:
+		hit_player.take_damage(
+			global_position,
+			Player.DAMAGE_SOURCE_DART,
+			burst_id,
+			dart_index,
+			projectile_token
+		)
 
 	destroy_projectile(DESTROY_REASON_PLAYER)
 

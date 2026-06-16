@@ -26,23 +26,23 @@ def draw_shielded_enemy(path: Path) -> None:
 
 
 def draw_shooter_enemy(path: Path) -> None:
-    image = Image.new("RGBA", (18, 20), (0, 0, 0, 0))
+    image = Image.new("RGBA", (16, 18), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
     # Small wary skirmisher body; the oversized blowgun is a runtime primitive
     # so it can rotate toward the locked shot direction.
-    draw.ellipse((5, 8, 13, 19), fill=(36, 38, 26, 255))
-    draw.ellipse((4, 4, 14, 15), fill=(108, 122, 74, 255))
-    draw.polygon([(4, 8), (2, 11), (6, 10)], fill=(65, 77, 48, 255))
-    draw.polygon([(14, 8), (16, 11), (12, 10)], fill=(65, 77, 48, 255))
-    draw.ellipse((6, 1, 12, 8), fill=(139, 131, 78, 255))
-    draw.rectangle((7, 8, 11, 13), fill=(86, 70, 46, 255))
+    draw.ellipse((5, 7, 11, 17), fill=(36, 38, 26, 255))
+    draw.ellipse((4, 4, 12, 14), fill=(108, 122, 74, 255))
+    draw.polygon([(4, 8), (2, 10), (6, 10)], fill=(65, 77, 48, 255))
+    draw.polygon([(12, 8), (14, 10), (10, 10)], fill=(65, 77, 48, 255))
+    draw.ellipse((5, 1, 11, 7), fill=(139, 131, 78, 255))
+    draw.rectangle((6, 8, 10, 12), fill=(86, 70, 46, 255))
     draw.point((6, 5), fill=(31, 28, 22, 255))
-    draw.point((11, 5), fill=(31, 28, 22, 255))
-    draw.rectangle((7, 7, 11, 8), fill=(48, 37, 28, 255))
-    draw.line((12, 11, 16, 14), fill=(190, 161, 91, 255), width=1)
-    draw.line((13, 13, 17, 16), fill=(190, 161, 91, 255), width=1)
-    draw.rectangle((3, 13, 5, 17), fill=(84, 61, 38, 255))
+    draw.point((10, 5), fill=(31, 28, 22, 255))
+    draw.rectangle((6, 7, 10, 8), fill=(48, 37, 28, 255))
+    draw.line((11, 10, 15, 13), fill=(190, 161, 91, 255), width=1)
+    draw.line((11, 12, 15, 15), fill=(190, 161, 91, 255), width=1)
+    draw.rectangle((3, 12, 4, 16), fill=(84, 61, 38, 255))
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)

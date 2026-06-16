@@ -683,22 +683,32 @@ func _on_shooter_enemy_aim_started() -> void:
 	_play_sfx(blowgun_windup_player)
 
 
-func _on_shooter_enemy_dart_requested(spawn_position: Vector2, fire_direction: Vector2) -> void:
+func _on_shooter_enemy_dart_requested(
+	spawn_position: Vector2,
+	fire_direction: Vector2,
+	burst_id: int,
+	dart_index: int
+) -> void:
 	if run_state != RunState.RUNNING:
 		return
 
-	_spawn_dart_projectile(spawn_position, fire_direction)
+	_spawn_dart_projectile(spawn_position, fire_direction, burst_id, dart_index)
 	_play_sfx(blowgun_fire_player)
 
 
-func _spawn_dart_projectile(spawn_position: Vector2, fire_direction: Vector2) -> void:
+func _spawn_dart_projectile(
+	spawn_position: Vector2,
+	fire_direction: Vector2,
+	burst_id: int = Player.INVALID_DART_BURST_ID,
+	dart_index: int = Player.INVALID_DART_INDEX
+) -> void:
 	var dart := DartProjectileScene.instantiate() as DartProjectile
 	if dart == null:
 		return
 
 	projectile_container.add_child(dart)
 	dart.global_position = spawn_position
-	dart.setup(player, arena.get_play_rect(), fire_direction)
+	dart.setup(player, arena.get_play_rect(), fire_direction, burst_id, dart_index)
 
 
 func _clear_projectiles() -> void:

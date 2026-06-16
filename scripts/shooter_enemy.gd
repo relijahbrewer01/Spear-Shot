@@ -2,7 +2,7 @@ extends Enemy
 class_name ShooterEnemy
 
 signal aim_started
-signal dart_requested(spawn_position: Vector2, fire_direction: Vector2)
+signal dart_requested(spawn_position: Vector2, fire_direction: Vector2, burst_id: int, dart_index: int)
 
 enum ShooterState {
 	REPOSITION,
@@ -10,9 +10,10 @@ enum ShooterState {
 	LOCKED,
 	FIRE,
 	RECOVER,
+	ARC_REPOSITION,
 }
 
-@export var movement_speed_scale := 0.82
+@export var movement_speed_scale := 0.90
 @export var approach_speed_scale := 1.0
 @export var retreat_speed_scale := 1.15
 @export var lateral_fallback_speed_scale := 0.8
@@ -26,13 +27,16 @@ enum ShooterState {
 @export var wall_fallback_commit_duration := 0.45
 @export var first_attack_delay_min := 1.0
 @export var first_attack_delay_max := 1.6
-@export var aim_duration := 0.55
-@export var locked_duration := 0.30
-@export var burst_interval := 0.18
+@export var aim_duration := 0.48
+@export var locked_duration := 0.24
+@export var burst_interval := 0.17
 @export var recover_duration := 0.16
-@export var attack_cooldown := 1.15
+@export var attack_cooldown := 0.95
 @export var minimum_dart_interval := 2.4
-@export var post_burst_reposition_duration := 0.35
+@export var arc_reposition_duration := 0.65
+@export var arc_reposition_distance_min := 24.0
+@export var arc_reposition_distance_max := 36.0
+@export var arc_radial_correction_strength := 0.35
 @export var blowgun_length := 17.0
 @export var blowgun_color := Color8(132, 101, 58)
 @export var blowgun_tip_color := Color8(220, 206, 158)
@@ -48,11 +52,15 @@ var minimum_dart_interval_left := 0.0
 var direction_change_left := 0.0
 var wall_fallback_left := 0.0
 var wall_fallback_direction := Vector2.ZERO
-var post_burst_reposition_left := 0.0
-var post_burst_reposition_direction := Vector2.ZERO
+var arc_reposition_left := 0.0
+var arc_reposition_side := 1
+var arc_reposition_reversed_for_wall := false
+var last_blocked_arc_side := 0
 var aim_direction := Vector2.RIGHT
 var locked_direction := Vector2.RIGHT
 var burst_shots_fired := 0
+var burst_sequence := 0
+var active_burst_id := 0
 var facing_direction := 1
 var is_retreating := false
 var rng := RandomNumberGenerator.new()
@@ -95,6 +103,8 @@ func _physics_process(delta: float) -> void:
 				_process_fire_state(delta)
 			ShooterState.RECOVER:
 				_process_recover_state(delta)
+			ShooterState.ARC_REPOSITION:
+				_process_arc_reposition_state(delta)
 
 		_try_contact_damage()
 	else:
@@ -110,7 +120,7 @@ func _update_shooter_timers(delta: float) -> void:
 	minimum_dart_interval_left = maxf(minimum_dart_interval_left - delta, 0.0)
 	direction_change_left = maxf(direction_change_left - delta, 0.0)
 	wall_fallback_left = maxf(wall_fallback_left - delta, 0.0)
-	post_burst_reposition_left = maxf(post_burst_reposition_left - delta, 0.0)
+	arc_reposition_left = maxf(arc_reposition_left - delta, 0.0)
 
 
 func _process_reposition_state(delta: float) -> void:
@@ -162,7 +172,21 @@ func _process_recover_state(delta: float) -> void:
 	state_time_left = maxf(state_time_left - delta, 0.0)
 	velocity = Vector2.ZERO
 	if state_time_left == 0.0:
-		_enter_reposition_state(true)
+		_enter_arc_reposition_state()
+
+
+func _process_arc_reposition_state(delta: float) -> void:
+	var distance_to_player := _get_distance_to_player()
+	if distance_to_player <= retreat_distance:
+		arc_reposition_left = 0.0
+		_enter_reposition_state(false)
+		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
+		return
+	if arc_reposition_left == 0.0:
+		_enter_reposition_state(false)
+		return
+
+	_move_with_velocity(_get_arc_reposition_velocity(delta, distance_to_player))
 
 
 func _get_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
@@ -174,10 +198,7 @@ func _get_reposition_velocity(delta: float, distance_to_player: float) -> Vector
 	var speed_scale := 0.0
 	is_retreating = false
 
-	if post_burst_reposition_left > 0.0 and post_burst_reposition_direction != Vector2.ZERO:
-		direction = post_burst_reposition_direction
-		speed_scale = lateral_fallback_speed_scale
-	elif wall_fallback_left > 0.0 and wall_fallback_direction != Vector2.ZERO:
+	if wall_fallback_left > 0.0 and wall_fallback_direction != Vector2.ZERO:
 		direction = wall_fallback_direction
 		speed_scale = lateral_fallback_speed_scale
 	elif distance_to_player <= retreat_distance:
@@ -212,6 +233,43 @@ func _get_reposition_velocity(delta: float, distance_to_player: float) -> Vector
 	return desired_velocity
 
 
+func _get_arc_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
+	if player == null:
+		return Vector2.ZERO
+
+	var from_player := global_position - player.global_position
+	if from_player.length_squared() <= 0.001:
+		from_player = Vector2.RIGHT
+
+	var radial_direction := from_player.normalized()
+	var tangent_direction := Vector2(-radial_direction.y, radial_direction.x).normalized() * float(arc_reposition_side)
+	var radial_correction := Vector2.ZERO
+	if distance_to_player < preferred_distance_min:
+		radial_correction = radial_direction * arc_radial_correction_strength
+	elif distance_to_player > preferred_distance_max:
+		radial_correction = -radial_direction * arc_radial_correction_strength
+
+	var desired_direction := (tangent_direction + radial_correction).normalized()
+	var desired_velocity := desired_direction * move_speed * approach_speed_scale
+	if _motion_would_leave_arena(desired_velocity, delta) and not arc_reposition_reversed_for_wall:
+		last_blocked_arc_side = arc_reposition_side
+		arc_reposition_side *= -1
+		arc_reposition_reversed_for_wall = true
+		tangent_direction = -tangent_direction
+		desired_direction = (tangent_direction + radial_correction).normalized()
+		desired_velocity = desired_direction * move_speed * approach_speed_scale
+
+	desired_velocity += _get_separation_push() * 0.2
+	var speed_limit := move_speed * maxf(retreat_speed_scale, approach_speed_scale)
+	if desired_velocity.length() > speed_limit:
+		desired_velocity = desired_velocity.normalized() * speed_limit
+
+	if desired_velocity.length_squared() > 0.01:
+		_update_facing_from_direction(desired_velocity.normalized())
+
+	return desired_velocity
+
+
 func _begin_wall_fallback(to_player: Vector2) -> void:
 	if direction_change_left > 0.0:
 		return
@@ -231,11 +289,11 @@ func _begin_wall_fallback(to_player: Vector2) -> void:
 	direction_change_left = direction_change_cooldown
 
 
-func _score_lateral_direction(test_direction: Vector2) -> float:
+func _score_lateral_direction(test_direction: Vector2, sample_distance: float = 24.0) -> float:
 	if arena_rect.size == Vector2.ZERO:
 		return 0.0
 
-	var test_position := global_position + test_direction * 24.0
+	var test_position := global_position + test_direction * sample_distance
 	var clamped_position := _clamp_position_to_arena(test_position)
 	var clipping_penalty := test_position.distance_to(clamped_position) * 4.0
 	var player_distance_bonus := 0.0
@@ -270,7 +328,6 @@ func _enter_reposition_state(start_cooldown: bool) -> void:
 	burst_shots_fired = 0
 	if start_cooldown:
 		attack_cooldown_left = attack_cooldown
-		_begin_post_burst_reposition()
 
 
 func _enter_aim_state() -> void:
@@ -298,6 +355,7 @@ func _enter_fire_state() -> void:
 	shooter_state = ShooterState.FIRE
 	state_time_left = burst_interval
 	burst_shots_fired = 0
+	active_burst_id = _get_next_burst_id()
 	velocity = Vector2.ZERO
 	_fire_burst_dart()
 
@@ -305,6 +363,7 @@ func _enter_fire_state() -> void:
 func _enter_recover_state() -> void:
 	shooter_state = ShooterState.RECOVER
 	state_time_left = recover_duration
+	attack_cooldown_left = attack_cooldown
 	velocity = Vector2.ZERO
 
 
@@ -314,27 +373,51 @@ func _fire_burst_dart() -> void:
 	if not active or is_dying or player == null or not player.is_alive():
 		return
 
+	var dart_index := burst_shots_fired
 	burst_shots_fired += 1
 	if burst_shots_fired == 1:
 		minimum_dart_interval_left = minimum_dart_interval
 
-	dart_requested.emit(_get_dart_spawn_position(), locked_direction)
+	dart_requested.emit(_get_dart_spawn_position(), locked_direction, active_burst_id, dart_index)
 
 
-func _begin_post_burst_reposition() -> void:
-	var base_direction := locked_direction.normalized()
-	if base_direction == Vector2.ZERO:
-		base_direction = _get_direction_to_player()
-	if base_direction == Vector2.ZERO:
-		base_direction = Vector2.RIGHT
+func _enter_arc_reposition_state() -> void:
+	shooter_state = ShooterState.ARC_REPOSITION
+	state_time_left = 0.0
+	burst_shots_fired = 0
+	arc_reposition_left = arc_reposition_duration
+	arc_reposition_reversed_for_wall = false
+	arc_reposition_side = _choose_arc_reposition_side()
 
-	var tangent_a := Vector2(-base_direction.y, base_direction.x).normalized()
-	var tangent_b := -tangent_a
-	if _score_lateral_direction(tangent_b) > _score_lateral_direction(tangent_a):
-		post_burst_reposition_direction = tangent_b
-	else:
-		post_burst_reposition_direction = tangent_a
-	post_burst_reposition_left = post_burst_reposition_duration
+
+func _get_next_burst_id() -> int:
+	burst_sequence += 1
+	return int(get_instance_id()) * 100000 + burst_sequence
+
+
+func _choose_arc_reposition_side() -> int:
+	var random_side := 1 if rng.randf() >= 0.5 else -1
+	var alternate_side := -random_side
+	if random_side == last_blocked_arc_side:
+		random_side = alternate_side
+
+	var random_score := _score_arc_side(random_side)
+	var alternate_score := _score_arc_side(alternate_side)
+	if alternate_score > random_score + 4.0:
+		return alternate_side
+	return random_side
+
+
+func _score_arc_side(side: int) -> float:
+	if player == null:
+		return 0.0
+
+	var from_player := global_position - player.global_position
+	if from_player.length_squared() <= 0.001:
+		from_player = Vector2.RIGHT
+	var tangent := Vector2(-from_player.y, from_player.x).normalized() * float(side)
+	var sample_distance := (arc_reposition_distance_min + arc_reposition_distance_max) * 0.5
+	return _score_lateral_direction(tangent, sample_distance)
 
 
 func _clear_attack_state() -> void:
@@ -344,9 +427,11 @@ func _clear_attack_state() -> void:
 	minimum_dart_interval_left = 0.0
 	wall_fallback_left = 0.0
 	wall_fallback_direction = Vector2.ZERO
-	post_burst_reposition_left = 0.0
-	post_burst_reposition_direction = Vector2.ZERO
+	arc_reposition_left = 0.0
+	arc_reposition_side = 1
+	arc_reposition_reversed_for_wall = false
 	burst_shots_fired = 0
+	active_burst_id = 0
 	velocity = Vector2.ZERO
 	queue_redraw()
 

@@ -21,6 +21,8 @@ godot4 --path .
 
 The game keeps a low internal resolution of `384x216` and opens at a default displayed size of `1536x864`. Rendering uses nearest-neighbor filtering with integer-scaled `16:9` presentation, so resizing preserves crisp pixels and uses letterboxing or pillarboxing instead of blurry fractional scaling.
 
+For a human-readable snapshot of gameplay timers, distances, speeds, probabilities, caps, and damage values, see [`TUNING.md`](TUNING.md). The source code remains authoritative for runtime values.
+
 ## Controls
 
 - `W`, `A`, `S`, `D`: move
@@ -50,7 +52,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - The visual pass keeps the arena readable first: muted daylight tones, clear silhouettes, and bright Charger telegraphs over a medium-value floor instead of a dark moody backdrop
 - The player, enemies, Charger, and spear now use small locally generated pixel sprites with lightweight bob/pulse animation instead of pure debug shapes
 - Shielded enemies use a compact broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow or boss-sized silhouette
-- Blowgun Shooters use a compact original wilderness-skirmisher silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
+- Blowgun Shooters use a small wiry wilderness-skirmisher silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -76,7 +78,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `art/sprites/enemy_creature.png`: base enemy sprite
 - `art/sprites/charger_beast.png`: Charger sprite
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
-- `art/sprites/shooter_enemy.png`: compact Blowgun Shooter body sprite
+- `art/sprites/shooter_enemy.png`: small wiry Blowgun Shooter body sprite
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
@@ -100,8 +102,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
-- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, aim/lock/two-dart burst/recover state machine, and dart request signal
-- `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, one-hit damage, invulnerability-safe contact, and cleanup
+- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, aim/lock/two-dart burst, short recoil, arc reposition, and dart request signal
+- `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
 - `scripts/destination_marker.gd`: brief right-click destination feedback marker
@@ -119,6 +121,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `tools/ShieldedEnemyRuntimeAudit.tscn`: runtime audit for Shielded hit ordering, STOPPED spear behavior, score, stagger, and ambient cap removal
 - `tools/shooter_enemy_audit.py`: static Phase 4.2 Shooter and dart contract audit
 - `tools/ShooterEnemyRuntimeAudit.tscn`: runtime audit for Shooter movement, aim locking, darts, damage rules, cleanup, and intro integration
+- `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
 ## Enemy behavior
 
@@ -126,9 +129,10 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
 - Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
-- Blowgun Shooter: compact ambient-only ranged enemy, tries to hold medium-long distance, visibly aims before locking one dart direction, fires a two-dart straight player-only burst, then relocates after a short recoil, and dies to one spear hit for `2` points
-- The two darts use the same locked direction with a deterministic `0.18` second burst interval, so one successful sidestep can avoid the whole committed volley
-- Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by hurt invulnerability, active dodge, or dodge exit grace
+- Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, visibly aims before locking one dart direction, fires a two-dart straight player-only burst, then performs a short tangential arc reposition around Akedra, and dies to one spear hit for `2` points
+- The two darts use the same locked direction with a deterministic `0.17` second burst interval, so one successful sidestep can avoid the whole committed volley
+- Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by active dodge or dodge exit grace
+- A narrow burst context lets two distinct darts from the same Shooter volley each deal one damage, while duplicate callbacks from either individual dart and unrelated damage sources still respect normal invulnerability
 - Darts currently do not collide with the spear, enemies, or Shielded shields; intact Shielded dart blocking is intentionally deferred to a later focused pass
 
 ## Encounter director
@@ -167,6 +171,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - The game-over screen shows the saved high score and marks a new record clearly
 
 ## Main adjustable values
+
+See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is a quick source-location index.
 
 - `scripts/player.gd`
   - `move_speed`
@@ -277,7 +283,10 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `recover_duration`
   - `attack_cooldown`
   - `minimum_dart_interval`
-  - `post_burst_reposition_duration`
+  - `arc_reposition_duration`
+  - `arc_reposition_distance_min`
+  - `arc_reposition_distance_max`
+  - `arc_radial_correction_strength`
 - `scripts/dart_projectile.gd`
   - `speed`
   - `max_lifetime`

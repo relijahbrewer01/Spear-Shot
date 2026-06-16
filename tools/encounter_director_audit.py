@@ -163,11 +163,49 @@ def main() -> int:
         failures,
     )
     require(
+        "charger_intro_target_time_min := 15.0" in main_script
+        and "charger_intro_target_time_max := 21.0" in main_script
+        and "charger_intro_seen" in main_script
+        and "charger_intro_target_time = rng.randf_range" in main_script,
+        "Charger first intro uses a randomized per-run target",
+        failures,
+    )
+    require(
         "shielded_unlock_time := 25.0" in main_script
         and "shielded_spawn_chance_at_unlock := 0.05" in main_script
         and "shielded_spawn_chance_growth_per_second := 0.0006" in main_script
         and "maximum_shielded_spawn_chance := 0.12" in main_script,
         "Shielded ambient tuning unlocks earlier but remains rare",
+        failures,
+    )
+    require(
+        "shielded_intro_target_time_min := 25.0" in main_script
+        and "shielded_intro_target_time_max := 30.0" in main_script
+        and "shielded_intro_seen" in main_script
+        and "shielded_intro_target_time = rng.randf_range" in main_script,
+        "Shielded first intro uses a randomized per-run target",
+        failures,
+    )
+    require(
+        "func _pick_pending_intro_enemy_kind" in main_script
+        and "pending_candidates.sort_custom(_sort_intro_candidates_by_target_time)" in main_script
+        and "return _pick_weighted_ambient_enemy_kind()" in main_script,
+        "Pending introductions are tried before the unchanged weighted selector",
+        failures,
+    )
+    require(
+        "enum SpawnSource" in main_script
+        and "SpawnSource.AMBIENT" in main_script
+        and "SpawnSource.WAVE" in main_script
+        and "SpawnSource.DEBUG" in main_script
+        and "if spawn_source == SpawnSource.DEBUG:" in main_script,
+        "Intro bookkeeping is source-aware and excludes debug spawns",
+        failures,
+    )
+    require(
+        "func debug_set_intro_target_sequence" in main_script
+        and "func debug_set_ambient_roll_sequence" in main_script,
+        "Intro behavior has deterministic audit hooks",
         failures,
     )
     require(

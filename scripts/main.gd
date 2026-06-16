@@ -14,6 +14,12 @@ enum RunState {
 	GAME_OVER,
 }
 
+enum SpawnSource {
+	AMBIENT,
+	WAVE,
+	DEBUG,
+}
+
 @export var base_spawn_interval := 2.2
 @export var minimum_spawn_interval := 0.75
 @export var spawn_interval_drop_per_second := 0.006
@@ -33,14 +39,22 @@ enum RunState {
 @export var charger_spawn_chance_at_unlock := 0.08
 @export var charger_spawn_chance_growth_per_second := 0.001
 @export var maximum_charger_spawn_chance := 0.22
+@export var charger_intro_target_time_min := 15.0
+@export var charger_intro_target_time_max := 21.0
 @export var shielded_unlock_time := 25.0
 @export var shielded_spawn_chance_at_unlock := 0.05
 @export var shielded_spawn_chance_growth_per_second := 0.0006
 @export var maximum_shielded_spawn_chance := 0.12
+@export var shielded_intro_target_time_min := 25.0
+@export var shielded_intro_target_time_max := 30.0
 
 var score := 0
 var high_score := 0
 var survival_time := 0.0
+var charger_intro_target_time := 15.0
+var shielded_intro_target_time := 25.0
+var charger_intro_seen := false
+var shielded_intro_seen := false
 var pause_active := false
 var run_state: RunState = RunState.RUNNING
 var shake_left := 0.0
@@ -50,6 +64,8 @@ var hit_stop_active := false
 var hit_stop_restore_token := 0
 var hit_stop_previous_time_scale := 1.0
 var rng := RandomNumberGenerator.new()
+var debug_intro_target_sequence: Array = []
+var debug_ambient_roll_sequence: Array = []
 
 @onready var arena: Arena = $Arena
 @onready var player: Player = $Player
@@ -122,6 +138,7 @@ func _reset_runtime_state() -> void:
 
 	score = 0
 	survival_time = 0.0
+	_reset_intro_state()
 	pause_active = false
 	run_state = RunState.RUNNING
 	get_tree().paused = false
@@ -206,11 +223,17 @@ func _spawn_enemy() -> bool:
 	return _try_spawn_enemy(
 		enemy_kind,
 		spawn_edge,
-		EncounterDirector.INVALID_WAVE_ID
+		EncounterDirector.INVALID_WAVE_ID,
+		SpawnSource.AMBIENT
 	)
 
 
-func _try_spawn_enemy(enemy_kind: int, spawn_edge: int, wave_id: int) -> bool:
+func _try_spawn_enemy(
+	enemy_kind: int,
+	spawn_edge: int,
+	wave_id: int,
+	spawn_source: int = SpawnSource.AMBIENT
+) -> bool:
 	if not encounter_director.can_spawn_enemy(enemy_kind, survival_time):
 		return false
 
@@ -234,6 +257,7 @@ func _try_spawn_enemy(enemy_kind: int, spawn_edge: int, wave_id: int) -> bool:
 		enemy.connect(&"shield_broken", _on_shielded_enemy_shield_broken)
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
+	_mark_intro_seen_for_spawn(enemy_kind, spawn_source)
 	return true
 
 
@@ -241,7 +265,8 @@ func _debug_spawn_shielded_enemy() -> void:
 	var spawned := _try_spawn_enemy(
 		EncounterDirector.EnemyKind.SHIELDED,
 		arena.get_random_spawn_edge(),
-		EncounterDirector.INVALID_WAVE_ID
+		EncounterDirector.INVALID_WAVE_ID,
+		SpawnSource.DEBUG
 	)
 	if spawned:
 		print("DEBUG: spawned Shielded enemy with key 1.")
@@ -276,6 +301,14 @@ func _get_next_spawn_interval() -> float:
 
 
 func _pick_ambient_enemy_kind() -> int:
+	var pending_intro_kind := _pick_pending_intro_enemy_kind()
+	if pending_intro_kind != NO_AMBIENT_ENEMY_KIND:
+		return pending_intro_kind
+
+	return _pick_weighted_ambient_enemy_kind()
+
+
+func _pick_weighted_ambient_enemy_kind() -> int:
 	var normal_available := encounter_director.can_spawn_enemy(
 		EncounterDirector.EnemyKind.NORMAL,
 		survival_time
@@ -296,7 +329,7 @@ func _pick_ambient_enemy_kind() -> int:
 	if shielded_available:
 		shielded_spawn_chance = _get_current_shielded_spawn_chance()
 
-	var roll := rng.randf()
+	var roll := _get_ambient_selection_roll()
 	if shielded_available and roll < shielded_spawn_chance:
 		return EncounterDirector.EnemyKind.SHIELDED
 
@@ -317,6 +350,67 @@ func _pick_ambient_enemy_kind() -> int:
 	return EncounterDirector.EnemyKind.SHIELDED
 
 
+func _pick_pending_intro_enemy_kind() -> int:
+	var pending_candidates: Array[Dictionary] = []
+	if _is_intro_pending_and_available(EncounterDirector.EnemyKind.CHARGER):
+		pending_candidates.append({
+			"enemy_kind": EncounterDirector.EnemyKind.CHARGER,
+			"target_time": charger_intro_target_time,
+		})
+	if _is_intro_pending_and_available(EncounterDirector.EnemyKind.SHIELDED):
+		pending_candidates.append({
+			"enemy_kind": EncounterDirector.EnemyKind.SHIELDED,
+			"target_time": shielded_intro_target_time,
+		})
+
+	if pending_candidates.is_empty():
+		return NO_AMBIENT_ENEMY_KIND
+
+	pending_candidates.sort_custom(_sort_intro_candidates_by_target_time)
+	var first_candidate := pending_candidates[0]
+	return int(first_candidate["enemy_kind"])
+
+
+func _sort_intro_candidates_by_target_time(first_candidate: Dictionary, second_candidate: Dictionary) -> bool:
+	return float(first_candidate["target_time"]) < float(second_candidate["target_time"])
+
+
+func _is_intro_pending_and_available(enemy_kind: int) -> bool:
+	match enemy_kind:
+		EncounterDirector.EnemyKind.CHARGER:
+			return (
+				not charger_intro_seen
+				and survival_time >= charger_intro_target_time
+				and _is_enemy_kind_available_for_ambient(enemy_kind)
+			)
+		EncounterDirector.EnemyKind.SHIELDED:
+			return (
+				not shielded_intro_seen
+				and survival_time >= shielded_intro_target_time
+				and _is_enemy_kind_available_for_ambient(enemy_kind)
+			)
+
+	return false
+
+
+func _is_enemy_kind_available_for_ambient(enemy_kind: int) -> bool:
+	match enemy_kind:
+		EncounterDirector.EnemyKind.NORMAL:
+			return encounter_director.can_spawn_enemy(enemy_kind, survival_time)
+		EncounterDirector.EnemyKind.CHARGER:
+			return (
+				survival_time >= charger_unlock_time
+				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
+			)
+		EncounterDirector.EnemyKind.SHIELDED:
+			return (
+				survival_time >= shielded_unlock_time
+				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
+			)
+
+	return false
+
+
 func _get_current_charger_spawn_chance() -> float:
 	var charger_spawn_chance := charger_spawn_chance_at_unlock + (
 		(survival_time - charger_unlock_time) * charger_spawn_chance_growth_per_second
@@ -329,6 +423,63 @@ func _get_current_shielded_spawn_chance() -> float:
 		(survival_time - shielded_unlock_time) * shielded_spawn_chance_growth_per_second
 	)
 	return min(shielded_spawn_chance, maximum_shielded_spawn_chance)
+
+
+func _reset_intro_state() -> void:
+	charger_intro_seen = false
+	shielded_intro_seen = false
+	_generate_intro_target_times()
+
+
+func _generate_intro_target_times() -> void:
+	if not debug_intro_target_sequence.is_empty():
+		var target_pair: Vector2 = debug_intro_target_sequence.pop_front()
+		charger_intro_target_time = target_pair.x
+		shielded_intro_target_time = target_pair.y
+		return
+
+	charger_intro_target_time = rng.randf_range(
+		charger_intro_target_time_min,
+		charger_intro_target_time_max
+	)
+	shielded_intro_target_time = rng.randf_range(
+		shielded_intro_target_time_min,
+		shielded_intro_target_time_max
+	)
+
+
+func _mark_intro_seen_for_spawn(enemy_kind: int, spawn_source: int) -> void:
+	if spawn_source == SpawnSource.DEBUG:
+		return
+
+	match enemy_kind:
+		EncounterDirector.EnemyKind.CHARGER:
+			charger_intro_seen = true
+		EncounterDirector.EnemyKind.SHIELDED:
+			shielded_intro_seen = true
+
+
+func _get_ambient_selection_roll() -> float:
+	if not debug_ambient_roll_sequence.is_empty():
+		return float(debug_ambient_roll_sequence.pop_front())
+
+	return rng.randf()
+
+
+func debug_set_intro_target_times(
+	new_charger_intro_target_time: float,
+	new_shielded_intro_target_time: float
+) -> void:
+	charger_intro_target_time = new_charger_intro_target_time
+	shielded_intro_target_time = new_shielded_intro_target_time
+
+
+func debug_set_intro_target_sequence(new_intro_target_sequence: Array) -> void:
+	debug_intro_target_sequence = new_intro_target_sequence.duplicate()
+
+
+func debug_set_ambient_roll_sequence(new_ambient_roll_sequence: Array) -> void:
+	debug_ambient_roll_sequence = new_ambient_roll_sequence.duplicate()
 
 
 func _on_spawn_timer_timeout() -> void:
@@ -351,7 +502,7 @@ func _on_director_spawn_requested(
 	spawn_edge: int,
 	wave_id: int
 ) -> void:
-	var spawned := _try_spawn_enemy(enemy_kind, spawn_edge, wave_id)
+	var spawned := _try_spawn_enemy(enemy_kind, spawn_edge, wave_id, SpawnSource.WAVE)
 	encounter_director.report_spawn_result(request_id, spawned)
 
 

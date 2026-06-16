@@ -133,6 +133,9 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals or Chargers
 - Charger ambient spawns unlock around `15` seconds with a small capped weight
 - Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
+- Each run also rolls first-introduction targets: Charger between `15-21` seconds and Shielded between `25-30` seconds
+- Before a target, specials can appear naturally through the existing weights; after an unseen target is overdue, the next valid ambient opportunity prioritizes that enemy until it successfully appears
+- After each special enemy has appeared once through organic play, it permanently returns to its ordinary long-term weighted selection for that run
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
 - Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
 - If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback
@@ -209,10 +212,14 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `charger_spawn_chance_at_unlock`
   - `charger_spawn_chance_growth_per_second`
   - `maximum_charger_spawn_chance`
+  - `charger_intro_target_time_min`
+  - `charger_intro_target_time_max`
   - `shielded_unlock_time`
   - `shielded_spawn_chance_at_unlock`
   - `shielded_spawn_chance_growth_per_second`
   - `maximum_shielded_spawn_chance`
+  - `shielded_intro_target_time_min`
+  - `shielded_intro_target_time_max`
   - `landed_spear_spawn_safe_radius`
   - `blocked_spawn_retry_interval`
   - `default_window_scale`

@@ -148,11 +148,39 @@ def main() -> int:
         failures,
     )
     require(
-        "shielded_unlock_time := 50.0" in main_script
-        and "shielded_spawn_chance_at_unlock := 0.08" in main_script
-        and "shielded_spawn_chance_growth_per_second := 0.0008" in main_script
-        and "maximum_shielded_spawn_chance := 0.16" in main_script,
-        "Shielded ambient tuning matches the Phase 4.1 plan",
+        "base_spawn_interval := 2.2" in main_script
+        and "minimum_spawn_interval := 0.75" in main_script
+        and "spawn_interval_drop_per_second := 0.006" in main_script,
+        "Ambient spawn-rate curve uses the slower density ramp",
+        failures,
+    )
+    require(
+        "charger_unlock_time := 15.0" in main_script
+        and "charger_spawn_chance_at_unlock := 0.08" in main_script
+        and "charger_spawn_chance_growth_per_second := 0.001" in main_script
+        and "maximum_charger_spawn_chance := 0.22" in main_script,
+        "Charger ambient tuning unlocks earlier but starts uncommon",
+        failures,
+    )
+    require(
+        "shielded_unlock_time := 25.0" in main_script
+        and "shielded_spawn_chance_at_unlock := 0.05" in main_script
+        and "shielded_spawn_chance_growth_per_second := 0.0006" in main_script
+        and "maximum_shielded_spawn_chance := 0.12" in main_script,
+        "Shielded ambient tuning unlocks earlier but remains rare",
+        failures,
+    )
+    require(
+        "first_wave_time_min := 28.0" in director
+        and "first_wave_time_max := 34.0" in director
+        and "inter_wave_interval_min := 18.0" in director
+        and "inter_wave_interval_max := 24.0" in director,
+        "Wave calendar timing remains unchanged",
+        failures,
+    )
+    require(
+        "WAVE_CHARGER_HUNT,\n\t\t\t48.0,\n\t\t\t1.75,\n\t\t\t3.0," in director,
+        "Charger Hunt earliest time and wave telegraph/recovery remain unchanged",
         failures,
     )
 

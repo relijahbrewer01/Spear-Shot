@@ -97,6 +97,7 @@ func _audit_hud_mouse_filters(hud: Node) -> void:
 		return
 
 	for node_path in [
+		"TimeLabel",
 		"ScoreLabel",
 		"PauseBackdrop",
 		"PauseLabel",

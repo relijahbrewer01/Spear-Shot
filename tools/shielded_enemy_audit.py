@@ -155,10 +155,10 @@ def main() -> int:
         "Rush, Pincer, and Charger Hunt contain no Shielded steps",
         failures,
     )
-    require("shielded_unlock_time := 50.0" in main_script, "Shielded unlocks around 50 seconds", failures)
-    require("shielded_spawn_chance_at_unlock := 0.08" in main_script, "Shielded starts at 0.08 ambient weight", failures)
-    require("shielded_spawn_chance_growth_per_second := 0.0008" in main_script, "Shielded growth is 0.0008 per second", failures)
-    require("maximum_shielded_spawn_chance := 0.16" in main_script, "Shielded max ambient weight is 0.16", failures)
+    require("shielded_unlock_time := 25.0" in main_script, "Shielded unlocks around 25 seconds", failures)
+    require("shielded_spawn_chance_at_unlock := 0.05" in main_script, "Shielded starts at 0.05 ambient weight", failures)
+    require("shielded_spawn_chance_growth_per_second := 0.0006" in main_script, "Shielded growth is 0.0006 per second", failures)
+    require("maximum_shielded_spawn_chance := 0.12" in main_script, "Shielded max ambient weight is 0.12", failures)
     require(
         "shielded_available := (" in main_script
         and "encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED" in main_script,

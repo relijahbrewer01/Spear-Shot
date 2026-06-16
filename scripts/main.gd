@@ -15,8 +15,8 @@ enum RunState {
 }
 
 @export var base_spawn_interval := 2.2
-@export var minimum_spawn_interval := 0.6
-@export var spawn_interval_drop_per_second := 0.012
+@export var minimum_spawn_interval := 0.75
+@export var spawn_interval_drop_per_second := 0.006
 @export var base_enemy_speed := 42.0
 @export var enemy_speed_bonus_per_second := 0.11
 @export var maximum_enemy_speed_bonus := 20.0
@@ -29,14 +29,14 @@ enum RunState {
 @export var close_hit_stop_duration := 0.045
 @export var close_hit_stop_time_scale := 0.05
 @export_range(1, 8, 1) var default_window_scale := 4
-@export var charger_unlock_time := 30.0
-@export var charger_spawn_chance_at_unlock := 0.12
-@export var charger_spawn_chance_growth_per_second := 0.0015
-@export var maximum_charger_spawn_chance := 0.28
-@export var shielded_unlock_time := 50.0
-@export var shielded_spawn_chance_at_unlock := 0.08
-@export var shielded_spawn_chance_growth_per_second := 0.0008
-@export var maximum_shielded_spawn_chance := 0.16
+@export var charger_unlock_time := 15.0
+@export var charger_spawn_chance_at_unlock := 0.08
+@export var charger_spawn_chance_growth_per_second := 0.001
+@export var maximum_charger_spawn_chance := 0.22
+@export var shielded_unlock_time := 25.0
+@export var shielded_spawn_chance_at_unlock := 0.05
+@export var shielded_spawn_chance_growth_per_second := 0.0006
+@export var maximum_shielded_spawn_chance := 0.12
 
 var score := 0
 var high_score := 0

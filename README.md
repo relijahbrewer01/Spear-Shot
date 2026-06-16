@@ -114,13 +114,14 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 ## Enemy behavior
 
 - Normal enemy: slow direct pursuit, worth `1` point
-- Charger: unlocks later, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
+- Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
 - Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
 
 ## Encounter director
 
 - Ambient survival spawning now gives way to temporary authored events after roughly `28-34` seconds
+- Ambient density ramps slowly from a `2.20` second spawn interval toward a `0.75` second floor reached after roughly four minutes
 - A bright world-space edge bracket and one restrained warning sound announce each wave for `1.75` seconds
 - Ambient spawning pauses during the telegraph, active wave, and `3.0` second recovery window
 - Ambient resumes afterward with a fresh interval calculated from the current survival-time difficulty
@@ -130,7 +131,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals or Chargers
-- Shielded ambient spawns unlock around `50` seconds with a small capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
+- Charger ambient spawns unlock around `15` seconds with a small capped weight
+- Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
 - Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
 - If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback

@@ -82,7 +82,8 @@ def main() -> int:
     require("class_name ShieldedEnemy" in shielded, "ShieldedEnemy has a class name", failures)
     require("extends Enemy" in shielded, "ShieldedEnemy extends Enemy", failures)
     require("score_value = 2" in shielded_scene, "Shielded scene score value is 2", failures)
-    require("body_radius = 11.0" in shielded_scene, "Shielded body radius starts at 11", failures)
+    require("body_radius = 9.0" in shielded_scene, "Shielded body radius starts at 9", failures)
+    require("separation_distance = 19.0" in shielded_scene, "Shielded separation footprint starts at 19", failures)
     require("movement_speed_scale := 0.72" in shielded, "Shielded movement scale starts at 72%", failures)
     require("stagger_duration := 0.65" in shielded, "Shielded stagger starts at 0.65 seconds", failures)
     require("knockback_distance := 14.0" in shielded, "Shielded knockback starts around 14 pixels", failures)
@@ -120,6 +121,19 @@ def main() -> int:
         "Forced shield-stop landing uses incoming-side candidates clamped to spear bounds",
         failures,
     )
+    require(
+        "stopped_hit_landing_clearance := 4.0" in spear
+        and "minimum_clear_distance := body_radius + maxf(stopped_hit_landing_clearance, 2.0)" in spear,
+        "Forced shield-stop landing uses the reduced body radius plus a small clearance",
+        failures,
+    )
+    require(
+        "func _enter_landed_state" in spear
+        and "_try_pickup_overlapping_player" in spear
+        and "_is_owner_player_inside_pickup_query" in spear,
+        "Normal and forced landing share landed setup with explicit already-overlapping pickup safety",
+        failures,
+    )
 
     require(
         'const ShieldedScene := preload("res://ShieldedEnemy.tscn")' in main_script,
@@ -133,7 +147,7 @@ def main() -> int:
     require("_on_enemy_killed" in main_script and "score += score_value" in main_script, "Score remains single-source in Main", failures)
 
     require("SHIELDED" in director, "EncounterDirector has a Shielded enemy kind", failures)
-    require("shielded_hostile_cap := 1" in director, "Shielded cap starts at 1", failures)
+    require("shielded_hostile_cap := 2" in director, "Shielded cap starts at 2", failures)
     require("get_total_hostile_count() >= total_hostile_cap" in director, "Shielded counts under total hostile cap", failures)
     require("get_shielded_hostile_count() < shielded_hostile_cap" in director, "Shielded has a dedicated cap", failures)
     require(
@@ -141,7 +155,7 @@ def main() -> int:
         "Rush, Pincer, and Charger Hunt contain no Shielded steps",
         failures,
     )
-    require("shielded_unlock_time := 55.0" in main_script, "Shielded unlocks around 55 seconds", failures)
+    require("shielded_unlock_time := 50.0" in main_script, "Shielded unlocks around 50 seconds", failures)
     require("shielded_spawn_chance_at_unlock := 0.08" in main_script, "Shielded starts at 0.08 ambient weight", failures)
     require("shielded_spawn_chance_growth_per_second := 0.0008" in main_script, "Shielded growth is 0.0008 per second", failures)
     require("maximum_shielded_spawn_chance := 0.16" in main_script, "Shielded max ambient weight is 0.16", failures)

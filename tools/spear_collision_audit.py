@@ -46,8 +46,16 @@ def main() -> int:
     require("launch_sweep_width := 4.0" in spear_script, "Release sweep width is explicitly defined", failures)
     require("launch_sweep_start_offset := 0.0" in spear_script, "Release sweep begins near Akedra", failures)
     require("launch_sweep_end_offset := 18.0" in spear_script, "Release sweep reaches the full visible spear length", failures)
-    require("flying_damage_area.monitoring = is_flying_active" in spear_script, "Flying damage area is active only while flying", failures)
-    require("pickup_area.monitoring = is_pickup_active" in spear_script, "Pickup area is active only while landed", failures)
+    require(
+        'flying_damage_area.set_deferred("monitoring", is_flying_active)' in spear_script,
+        "Flying damage area is active only while flying",
+        failures,
+    )
+    require(
+        'pickup_area.set_deferred("monitoring", is_pickup_active)' in spear_script,
+        "Pickup area is active only while landed",
+        failures,
+    )
     require("active and state == State.LANDED and not pickup_in_progress" in spear_script, "Held state leaves both pickup and damage areas inactive", failures)
     require("DEBUG_SHOW_SPEAR_COLLISION := false" in spear_script, "Collision debug visualization is disabled by default", failures)
     require("_hit_enemy_if_needed" in spear_script, "Release sweep reuses per-throw duplicate-hit tracking", failures)

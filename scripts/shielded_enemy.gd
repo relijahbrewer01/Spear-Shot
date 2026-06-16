@@ -149,13 +149,13 @@ func _draw_alive_body(fill_color: Color) -> void:
 
 func _draw_shield_plates() -> void:
 	var plate_points: Array[Vector2] = [
-		Vector2(-8.0, -7.0),
-		Vector2(0.0, -9.0),
-		Vector2(8.0, -7.0),
-		Vector2(10.0, 0.0),
-		Vector2(5.0, 7.0),
-		Vector2(-5.0, 7.0),
-		Vector2(-10.0, 0.0),
+		Vector2(-6.5, -5.5),
+		Vector2(0.0, -7.0),
+		Vector2(6.5, -5.5),
+		Vector2(8.0, 0.0),
+		Vector2(4.0, 5.5),
+		Vector2(-4.0, 5.5),
+		Vector2(-8.0, 0.0),
 	]
 
 	for index in plate_points.size():
@@ -166,9 +166,9 @@ func _draw_shield_plates() -> void:
 		if outward == Vector2.ZERO:
 			outward = Vector2.UP
 
-		var plate_size := Vector2(5.0, 3.0)
-		var plate_center := mid_point + outward * 1.5
-		draw_circle(plate_center + Vector2(0.0, 1.0), 3.0, shield_plate_shadow_color)
+		var plate_size := Vector2(4.0, 2.5)
+		var plate_center := mid_point + outward * 1.2
+		draw_circle(plate_center + Vector2(0.0, 1.0), 2.4, shield_plate_shadow_color)
 		draw_rect(
 			Rect2(plate_center - plate_size * 0.5, plate_size),
 			shield_plate_color,
@@ -182,5 +182,5 @@ func _draw_shield_break_fragments() -> void:
 	fragment_color.a = 1.0 - progress
 	for index in 6:
 		var angle := float(index) * TAU / 6.0 + progress * 0.7
-		var offset := Vector2.RIGHT.rotated(angle) * (8.0 + progress * 8.0)
+		var offset := Vector2.RIGHT.rotated(angle) * (6.5 + progress * 6.5)
 		draw_rect(Rect2(offset - Vector2.ONE, Vector2(2.0, 2.0)), fragment_color, true)

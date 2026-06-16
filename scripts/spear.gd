@@ -30,7 +30,7 @@ enum State {
 @export var launch_sweep_start_offset := 0.0
 @export var launch_sweep_end_offset := 18.0
 @export var launch_sweep_width := 4.0
-@export var stopped_hit_landing_clearance := 8.0
+@export var stopped_hit_landing_clearance := 4.0
 
 var state: State = State.HELD
 var owner_player: Player
@@ -192,6 +192,10 @@ func _land(final_position: Vector2) -> void:
 	if state != State.FLYING:
 		return
 
+	_enter_landed_state(final_position)
+
+
+func _enter_landed_state(final_position: Vector2) -> void:
 	global_position = _clamp_to_arena(final_position)
 	_set_rotation_from_direction(throw_direction)
 	_clear_trail()
@@ -445,7 +449,7 @@ func _get_stopped_hit_landing_position(enemy_body: Node) -> Vector2:
 
 	var body_radius := _get_enemy_body_radius(enemy_body)
 	var desired_distance := body_radius + stopped_hit_landing_clearance
-	var minimum_clear_distance := body_radius + 2.0
+	var minimum_clear_distance := body_radius + maxf(stopped_hit_landing_clearance, 2.0)
 	var incoming_side := -throw_direction
 	var tangent := Vector2(-throw_direction.y, throw_direction.x)
 	var raw_candidates: Array[Vector2] = [
@@ -482,16 +486,16 @@ func _apply_collision_activity() -> void:
 	var is_pickup_active := active and state == State.LANDED and not pickup_in_progress
 
 	if flying_damage_area != null:
-		flying_damage_area.monitoring = is_flying_active
-		flying_damage_area.monitorable = is_flying_active
+		flying_damage_area.set_deferred("monitoring", is_flying_active)
+		flying_damage_area.set_deferred("monitorable", is_flying_active)
 	if flying_damage_shape != null:
-		flying_damage_shape.disabled = not is_flying_active
+		flying_damage_shape.set_deferred("disabled", not is_flying_active)
 
 	if pickup_area != null:
-		pickup_area.monitoring = is_pickup_active
-		pickup_area.monitorable = is_pickup_active
+		pickup_area.set_deferred("monitoring", is_pickup_active)
+		pickup_area.set_deferred("monitorable", is_pickup_active)
 	if pickup_shape != null:
-		pickup_shape.disabled = not is_pickup_active
+		pickup_shape.set_deferred("disabled", not is_pickup_active)
 
 
 func _schedule_landed_pickup_overlap_check() -> void:
@@ -499,14 +503,46 @@ func _schedule_landed_pickup_overlap_check() -> void:
 
 
 func _check_landed_pickup_overlap() -> void:
-	await get_tree().physics_frame
-	if state != State.LANDED or pickup_in_progress or pickup_area == null or not pickup_area.monitoring:
+	if _try_pickup_overlapping_player():
 		return
+
+	await get_tree().physics_frame
+	_try_pickup_overlapping_player()
+
+
+func _try_pickup_overlapping_player() -> bool:
+	if state != State.LANDED or pickup_in_progress or pickup_area == null or not pickup_area.monitoring:
+		return false
 
 	for body in pickup_area.get_overlapping_bodies():
 		if body == owner_player:
 			_pickup()
-			return
+			return true
+
+	if _is_owner_player_inside_pickup_query():
+		_pickup()
+		return true
+
+	return false
+
+
+func _is_owner_player_inside_pickup_query() -> bool:
+	if owner_player == null or pickup_shape == null or pickup_shape.shape == null:
+		return false
+
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = pickup_shape.shape
+	query.transform = pickup_shape.global_transform
+	query.collision_mask = 1
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+
+	var results := get_world_2d().direct_space_state.intersect_shape(query, 8)
+	for result in results:
+		if result.get("collider") == owner_player:
+			return true
+
+	return false
 
 
 func _draw_collision_debug() -> void:

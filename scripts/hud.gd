@@ -13,6 +13,7 @@ signal pause_resume_click_requested
 signal resume_countdown_finished
 
 @onready var score_label: Label = $ScoreLabel
+@onready var time_label: Label = $TimeLabel
 @onready var pause_backdrop: ColorRect = $PauseBackdrop
 @onready var pause_label: Label = $PauseLabel
 @onready var game_over_backdrop: ColorRect = $GameOverBackdrop
@@ -82,8 +83,8 @@ func set_spear_status(_status_text: String) -> void:
 	pass
 
 
-func set_survival_time(_survival_time: float) -> void:
-	pass
+func set_survival_time(survival_time: float) -> void:
+	time_label.text = _format_time(survival_time)
 
 
 func set_high_score(_high_score: int) -> void:
@@ -158,6 +159,7 @@ func _update_countdown_label() -> void:
 
 
 func _apply_static_colors() -> void:
+	time_label.add_theme_color_override("font_color", TEXT_COLOR)
 	score_label.add_theme_color_override("font_color", TEXT_COLOR)
 	pause_label.add_theme_color_override("font_color", ACCENT_COLOR)
 	title_label.add_theme_color_override("font_color", ACCENT_COLOR)
@@ -170,6 +172,7 @@ func _apply_static_colors() -> void:
 
 func _configure_mouse_filters() -> void:
 	for control in [
+		time_label,
 		score_label,
 		pause_backdrop,
 		pause_label,

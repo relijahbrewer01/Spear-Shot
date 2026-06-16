@@ -131,6 +131,7 @@ def main() -> int:
     require("Trail" in spear_nodes, "Spear scene has dedicated Trail node", failures)
 
     gameplay_ignore_nodes = [
+        "TimeLabel",
         "ScoreLabel",
         "PauseBackdrop",
         "PauseLabel",
@@ -151,7 +152,6 @@ def main() -> int:
         "RightHudPanel",
         "HealthLabel",
         "SpearLabel",
-        "TimeLabel",
         "HighScoreLabel",
     ]:
         require(

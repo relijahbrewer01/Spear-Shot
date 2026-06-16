@@ -33,7 +33,7 @@ enum RunState {
 @export var charger_spawn_chance_at_unlock := 0.12
 @export var charger_spawn_chance_growth_per_second := 0.0015
 @export var maximum_charger_spawn_chance := 0.28
-@export var shielded_unlock_time := 55.0
+@export var shielded_unlock_time := 50.0
 @export var shielded_spawn_chance_at_unlock := 0.08
 @export var shielded_spawn_chance_growth_per_second := 0.0008
 @export var maximum_shielded_spawn_chance := 0.16
@@ -144,6 +144,7 @@ func _reset_runtime_state() -> void:
 	_stop_gameplay_sfx()
 
 	hud.set_score(0)
+	hud.set_survival_time(0.0)
 	hud.hide_pause()
 	hud.hide_game_over()
 
@@ -151,6 +152,7 @@ func _reset_runtime_state() -> void:
 func _process(delta: float) -> void:
 	if run_state == RunState.RUNNING:
 		survival_time += delta
+		hud.set_survival_time(survival_time)
 		encounter_director.advance(delta, survival_time)
 
 	_update_screen_shake(delta)

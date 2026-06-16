@@ -32,11 +32,15 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Escape` or `P`: pause, or begin the faster `3 2 1` resume countdown
 - Left or right mouse button while paused: begin the faster `3 2 1` resume countdown and consume that click
 - `R`: restart after death
-- `1`: debug-spawn a Shielded enemy immediately while the temporary `DEBUG_SHIELDED_SPAWN_ENABLED` hook is enabled
+
+## Development debug controls
+
+- Temporary Shielded live-test hook: `1` debug-spawns one Shielded enemy while `DEBUG_SHIELDED_SPAWN_ENABLED` is `true` in `scripts/main.gd`
+- This is intentionally separate from normal player controls and can be disabled by setting that constant to `false`
 
 ## HUD layout
 
-- Active play keeps only a small `SCORE` label in the top-right corner
+- Active play keeps a small survival timer in the top-left corner and `SCORE` in the top-right corner
 - Health is shown as world-space pips under Akedra in a shallow arc instead of a boxed HUD panel
 - Pause uses a simple dark overlay with `PAUSED`, and game-over controls stay interactive after death
 
@@ -44,7 +48,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 - The visual pass keeps the arena readable first: muted daylight tones, clear silhouettes, and bright Charger telegraphs over a medium-value floor instead of a dark moody backdrop
 - The player, enemies, Charger, and spear now use small locally generated pixel sprites with lightweight bob/pulse animation instead of pure debug shapes
-- Shielded enemies use a broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow
+- Shielded enemies use a compact broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow or boss-sized silhouette
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -69,7 +73,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `art/sprites/player_hunter.png`: hunter/player sprite
 - `art/sprites/enemy_creature.png`: base enemy sprite
 - `art/sprites/charger_beast.png`: Charger sprite
-- `art/sprites/shielded_enemy.png`: broad Shielded enemy body sprite
+- `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
@@ -111,7 +115,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 - Normal enemy: slow direct pursuit, worth `1` point
 - Charger: unlocks later, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
-- Shielded: ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
+- Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
+- Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
 
 ## Encounter director
 
@@ -124,8 +129,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Charger Hunt` sends two Normals followed by one Charger from one announced edge
 - Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
-- Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
-- Shielded ambient spawns unlock around `55` seconds with a small capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
+- Shielded enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals or Chargers
+- Shielded ambient spawns unlock around `50` seconds with a small capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
 - Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
 - If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback

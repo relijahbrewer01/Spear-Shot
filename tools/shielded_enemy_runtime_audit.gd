@@ -16,10 +16,14 @@ func _ready() -> void:
 
 func _run_audit() -> void:
 	_ensure_input_actions()
+	await _audit_reduced_shielded_size_values()
+	await _audit_shared_landing_state_initialization()
 	await _audit_launch_sweep_ordering()
 	await _audit_flying_callback_invalidation()
 	await _audit_second_hit_scoring()
 	await _audit_held_and_edge_landing_safety()
+	await _audit_forced_landing_pickup_recovery()
+	await _audit_already_overlapping_forced_pickup_sound_once()
 	await _audit_stagger_contact_pause_and_clear()
 	await _audit_director_counts_and_ambient_cap_removal()
 
@@ -30,6 +34,64 @@ func _run_audit() -> void:
 
 	get_tree().paused = false
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+func _audit_reduced_shielded_size_values() -> void:
+	var shielded := ShieldedScene.instantiate() as ShieldedEnemy
+	add_child(shielded)
+
+	var collision_shape := shielded.get_node("CollisionShape2D") as CollisionShape2D
+	var circle_shape := collision_shape.shape as CircleShape2D
+	var sprite := shielded.get_node("Sprite2D") as Sprite2D
+
+	_require(is_equal_approx(shielded.body_radius, 9.0), "Reduced Shielded body radius is 9.")
+	_require(is_equal_approx(circle_shape.radius, shielded.body_radius), "Reduced Shielded collision radius matches body radius.")
+	_require(is_equal_approx(shielded.separation_distance, 19.0), "Reduced Shielded separation footprint is 19.")
+	_require(sprite.texture.get_size() == Vector2(22.0, 22.0), "Reduced Shielded sprite is about 20% smaller.")
+
+	shielded.queue_free()
+	await get_tree().process_frame
+
+
+func _audit_shared_landing_state_initialization() -> void:
+	var case_root := Node2D.new()
+	add_child(case_root)
+
+	var player := _spawn_player(case_root, Vector2(96.0, 108.0))
+	var ordinary_spear := _spawn_spear(case_root, player)
+	await get_tree().physics_frame
+	_require(
+		ordinary_spear.try_throw(player.global_position + Vector2.RIGHT * 100.0),
+		"Ordinary landing audit throw starts."
+	)
+	ordinary_spear.call("_land", player.global_position + Vector2.RIGHT * 44.0)
+	await _wait_for_deferred_collision_update()
+	_assert_spear_landed_pickup_ready(
+		ordinary_spear,
+		"Ordinary landing enters recoverable LANDED state."
+	)
+
+	var forced_spear := _spawn_spear(case_root, player)
+	var shielded := _spawn_shielded(case_root, player, Vector2(132.0, 108.0))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	forced_spear.launch_sweep_end_offset = 56.0
+	_require(
+		forced_spear.try_throw(player.global_position + Vector2.RIGHT * 100.0),
+		"Forced landing audit throw starts."
+	)
+	await _wait_for_deferred_collision_update()
+	_assert_spear_landed_pickup_ready(
+		forced_spear,
+		"Shield-forced landing enters the same recoverable LANDED state."
+	)
+	_require(
+		not forced_spear.is_ancestor_of(shielded) and forced_spear.get_parent() == case_root,
+		"Shield-forced landed spear is not attached to the Shielded enemy."
+	)
+
+	case_root.queue_free()
+	await get_tree().process_frame
 
 
 func _audit_launch_sweep_ordering() -> void:
@@ -62,6 +124,7 @@ func _audit_launch_sweep_ordering() -> void:
 		counters["shield_breaks"] = int(counters["shield_breaks"]) + 1
 	)
 
+	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var threw := spear.try_throw(player.global_position + Vector2.RIGHT * 100.0)
 	_require(threw, "Launch-sweep audit throw starts successfully.")
@@ -174,6 +237,10 @@ func _audit_held_and_edge_landing_safety() -> void:
 	var edge_player := _spawn_player(edge_root, Vector2(24.0, 30.0))
 	var edge_spear := _spawn_spear(edge_root, edge_player)
 	var edge_shielded := _spawn_shielded(edge_root, edge_player, Vector2(30.0, 30.0))
+	var edge_pickups := {"count": 0}
+	edge_spear.picked_up.connect(func() -> void:
+		edge_pickups["count"] = int(edge_pickups["count"]) + 1
+	)
 	edge_spear.launch_sweep_end_offset = 1.0
 	await get_tree().physics_frame
 	_require(edge_spear.try_throw(edge_player.global_position + Vector2.RIGHT * 100.0), "Edge landing throw starts.")
@@ -184,8 +251,99 @@ func _audit_held_and_edge_landing_safety() -> void:
 	_require(edge_spear.is_landed(), "Edge shield stop still lands the spear.")
 	_require(clamped_rect.has_point(edge_spear.global_position), "Forced landing is clamped inside spear bounds.")
 	_require(clear_distance >= edge_shielded.body_radius + 2.0, "Forced landing does not remain centered in the Shielded body.")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_require(int(edge_pickups["count"]) == 1, "Corner-adjacent forced landing remains recoverable by overlap pickup.")
 
 	edge_root.queue_free()
+	await get_tree().process_frame
+
+
+func _audit_forced_landing_pickup_recovery() -> void:
+	var case_root := Node2D.new()
+	add_child(case_root)
+
+	var player := _spawn_player(case_root, Vector2(88.0, 108.0))
+	var spear := _spawn_spear(case_root, player)
+	var shielded := _spawn_shielded(case_root, player, Vector2(132.0, 108.0))
+	var pickup_counter := {"count": 0}
+	spear.picked_up.connect(func() -> void:
+		pickup_counter["count"] = int(pickup_counter["count"]) + 1
+	)
+	spear.launch_sweep_end_offset = 1.0
+
+	await get_tree().physics_frame
+	_require(spear.try_throw(player.global_position + Vector2.RIGHT * 100.0), "Forced pickup recovery throw starts.")
+	spear.call("_on_flying_damage_body_entered", shielded)
+	await _wait_for_deferred_collision_update()
+	_assert_spear_landed_pickup_ready(spear, "STOPPED spear is immediately pickup-ready.")
+
+	var landed_position := spear.global_position
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_require(spear.is_landed(), "Non-overlapping forced-landed spear waits in LANDED state.")
+	_require(
+		spear.global_position.distance_to(landed_position) <= 0.001,
+		"Shielded knockback does not move or reattach the landed spear."
+	)
+
+	player.global_position = spear.global_position
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_require(int(pickup_counter["count"]) == 1, "Player approaching a forced-landed spear retrieves it exactly once.")
+	_require(spear.is_held(), "Forced-landed spear returns to HELD after pickup.")
+	_require(spear.try_throw(player.global_position + Vector2.RIGHT * 100.0), "Spear can be thrown again after forced-landing pickup.")
+
+	case_root.queue_free()
+	await get_tree().process_frame
+
+
+func _audit_already_overlapping_forced_pickup_sound_once() -> void:
+	var main := MainScene.instantiate()
+	add_child(main)
+	await get_tree().process_frame
+	main.set_process(false)
+
+	var arena := main.get_node("Arena") as Arena
+	var player := main.get_node("Player") as Player
+	var spear := main.get_node("Spear") as Spear
+	var enemy_container := main.get_node("EnemyContainer") as Node2D
+	var pickup_player := main.get_node("AudioPlayers/PickupPlayer") as AudioStreamPlayer
+	var play_rect := arena.get_play_rect()
+	var pickup_counter := {"count": 0}
+
+	main.get_node("SpawnTimer").stop()
+	player.reset_for_new_run(Vector2(96.0, 108.0), play_rect)
+	spear.reset_for_new_run(player, play_rect)
+	spear.picked_up.connect(func() -> void:
+		pickup_counter["count"] = int(pickup_counter["count"]) + 1
+	)
+
+	var shielded := ShieldedScene.instantiate() as ShieldedEnemy
+	enemy_container.add_child(shielded)
+	shielded.setup(player, play_rect, 42.0)
+	shielded.global_position = player.global_position + Vector2.RIGHT * (
+		shielded.body_radius + spear.stopped_hit_landing_clearance
+	)
+	spear.launch_sweep_end_offset = 1.0
+	await get_tree().physics_frame
+
+	_require(
+		spear.try_throw(player.global_position + Vector2.RIGHT * 100.0),
+		"Already-overlapping forced pickup throw starts."
+	)
+	spear.call("_on_flying_damage_body_entered", shielded)
+	_require(spear.is_landed(), "Already-overlapping forced stop enters LANDED before pickup resolution.")
+	await _wait_for_deferred_collision_update()
+	await get_tree().physics_frame
+	_require(int(pickup_counter["count"]) == 1, "Already-overlapping player retrieves forced-landed spear exactly once.")
+	_require(spear.is_held(), "Already-overlapping pickup returns the spear to HELD.")
+	_require(pickup_player.playing, "Already-overlapping forced pickup plays the pickup sound.")
+	await get_tree().physics_frame
+	_require(int(pickup_counter["count"]) == 1, "Already-overlapping forced pickup does not double-fire.")
+
+	main.call("_stop_all_audio")
+	main.queue_free()
 	await get_tree().process_frame
 
 
@@ -239,16 +397,23 @@ func _audit_director_counts_and_ambient_cap_removal() -> void:
 	main.set_process(false)
 
 	var director := main.get_node("EncounterDirector") as EncounterDirector
-	var dummy_shielded := Node.new()
-	main.add_child(dummy_shielded)
+	var first_dummy_shielded := Node.new()
+	var second_dummy_shielded := Node.new()
+	main.add_child(first_dummy_shielded)
+	main.add_child(second_dummy_shielded)
 	director.register_enemy(
-		dummy_shielded,
+		first_dummy_shielded,
+		EncounterDirector.EnemyKind.SHIELDED,
+		EncounterDirector.INVALID_WAVE_ID
+	)
+	director.register_enemy(
+		second_dummy_shielded,
 		EncounterDirector.EnemyKind.SHIELDED,
 		EncounterDirector.INVALID_WAVE_ID
 	)
 
-	_require(director.get_total_hostile_count() == 1, "Shielded counts toward total hostile population.")
-	_require(director.get_shielded_hostile_count() == 1, "Shielded counts toward its dedicated cap.")
+	_require(director.get_total_hostile_count() == 2, "Shielded counts toward total hostile population.")
+	_require(director.get_shielded_hostile_count() == 2, "Shielded counts toward its dedicated cap.")
 	_require(director.get_normal_hostile_count() == 0, "Shielded does not count as a Normal.")
 	_require(director.get_charger_hostile_count() == 0, "Shielded does not count as a Charger.")
 	_require(not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED, 60.0), "Shielded cap blocks additional Shielded spawns.")
@@ -303,6 +468,24 @@ func _require(condition: bool, message: String) -> void:
 		print("PASS: ", message)
 		return
 	failures.append(message)
+
+
+func _assert_spear_landed_pickup_ready(spear: Spear, message: String) -> void:
+	var flying_damage_area := spear.get_node("FlyingDamageArea") as Area2D
+	var flying_damage_shape := spear.get_node("FlyingDamageArea/CollisionShape2D") as CollisionShape2D
+	var pickup_area := spear.get_node("PickupArea") as Area2D
+	var pickup_shape := spear.get_node("PickupArea/CollisionShape2D") as CollisionShape2D
+
+	_require(spear.state == Spear.State.LANDED, message)
+	_require(not flying_damage_area.monitoring, "%s Flying damage is disabled." % message)
+	_require(flying_damage_shape.disabled, "%s Flying damage shape is disabled." % message)
+	_require(pickup_area.monitoring, "%s Pickup Area2D is monitoring." % message)
+	_require(not pickup_shape.disabled, "%s Pickup shape is enabled." % message)
+
+
+func _wait_for_deferred_collision_update() -> void:
+	await get_tree().process_frame
+	await get_tree().physics_frame
 
 
 func _ensure_input_actions() -> void:

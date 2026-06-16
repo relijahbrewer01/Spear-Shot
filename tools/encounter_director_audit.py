@@ -94,7 +94,7 @@ def main() -> int:
     require("total_hostile_cap := 10" in director, "Total hostile cap is tunable from ten", failures)
     require("normal_hostile_cap := 9" in director, "Normal cap is tunable from nine", failures)
     require("charger_hostile_cap := 2" in director, "Charger safety cap is tunable from two", failures)
-    require("shielded_hostile_cap := 1" in director, "Shielded safety cap is tunable from one", failures)
+    require("shielded_hostile_cap := 2" in director, "Shielded safety cap is tunable from two", failures)
     require(
         "first_minute_charger_cap := 1" in director,
         "First-minute Charger production is limited to one",
@@ -148,7 +148,7 @@ def main() -> int:
         failures,
     )
     require(
-        "shielded_unlock_time := 55.0" in main_script
+        "shielded_unlock_time := 50.0" in main_script
         and "shielded_spawn_chance_at_unlock := 0.08" in main_script
         and "shielded_spawn_chance_growth_per_second := 0.0008" in main_script
         and "maximum_shielded_spawn_chance := 0.16" in main_script,

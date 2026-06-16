@@ -219,6 +219,51 @@ def generate_shield_break() -> list[float]:
     return samples
 
 
+def generate_blowgun_windup() -> list[float]:
+    length = int(SAMPLE_RATE * 0.34)
+    samples: list[float] = []
+    reed_body = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        reed_body = reed_body * 0.9 + raw_noise * 0.1
+        pressure_tone = math.sin(2.0 * math.pi * (240.0 + progress * 90.0) * index / SAMPLE_RATE)
+        hollow_tone = math.sin(2.0 * math.pi * 118.0 * index / SAMPLE_RATE)
+        build_curve = progress ** 1.6
+        samples.append(
+            (
+                reed_body * 0.30
+                + pressure_tone * 0.18 * build_curve
+                + hollow_tone * 0.10 * build_curve
+            )
+            * envelope(progress, 0.04, 0.18)
+        )
+    return samples
+
+
+def generate_blowgun_fire() -> list[float]:
+    length = int(SAMPLE_RATE * 0.14)
+    samples: list[float] = []
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        air_snap = raw_noise - previous_noise
+        previous_noise = raw_noise
+        puff = math.exp(-progress * 12.0)
+        reed_click = math.sin(2.0 * math.pi * (520.0 - progress * 120.0) * index / SAMPLE_RATE)
+        tiny_whistle = math.sin(2.0 * math.pi * (820.0 + progress * 120.0) * index / SAMPLE_RATE)
+        samples.append(
+            (
+                air_snap * 0.34 * puff
+                + reed_click * 0.28 * puff
+                + tiny_whistle * 0.08 * math.sin(progress * math.pi)
+            )
+            * envelope(progress, 0.008, 0.62)
+        )
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -231,6 +276,8 @@ def main() -> None:
         "dodge.wav": generate_dodge(),
         "wave_warning.wav": generate_wave_warning(),
         "shield_break.wav": generate_shield_break(),
+        "blowgun_windup.wav": generate_blowgun_windup(),
+        "blowgun_fire.wav": generate_blowgun_fire(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

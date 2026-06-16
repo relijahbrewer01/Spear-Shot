@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.5.0 - Encounter Director`
+Current milestone: `Spear Shot v0.6.0-alpha.2 - Blowgun Shooter`
 
 ## Game concept
 
@@ -21,6 +21,8 @@ godot4 --path .
 
 The game keeps a low internal resolution of `384x216` and opens at a default displayed size of `1536x864`. Rendering uses nearest-neighbor filtering with integer-scaled `16:9` presentation, so resizing preserves crisp pixels and uses letterboxing or pillarboxing instead of blurry fractional scaling.
 
+For a human-readable snapshot of gameplay timers, distances, speeds, probabilities, caps, and damage values, see [`TUNING.md`](TUNING.md). The source code remains authoritative for runtime values.
+
 ## Controls
 
 - `W`, `A`, `S`, `D`: move
@@ -36,7 +38,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 ## Development debug controls
 
 - Temporary Shielded live-test hook: `1` debug-spawns one Shielded enemy while `DEBUG_SHIELDED_SPAWN_ENABLED` is `true` in `scripts/main.gd`
-- This is intentionally separate from normal player controls and can be disabled by setting that constant to `false`
+- Temporary Shooter live-test hook: `2` debug-spawns one Blowgun Shooter while `DEBUG_SHOOTER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
+- These are intentionally separate from normal player controls and can be disabled by setting their constants to `false`
 
 ## HUD layout
 
@@ -49,6 +52,7 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - The visual pass keeps the arena readable first: muted daylight tones, clear silhouettes, and bright Charger telegraphs over a medium-value floor instead of a dark moody backdrop
 - The player, enemies, Charger, and spear now use small locally generated pixel sprites with lightweight bob/pulse animation instead of pure debug shapes
 - Shielded enemies use a compact broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow or boss-sized silhouette
+- Blowgun Shooters use a small wiry wilderness-skirmisher silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -74,12 +78,15 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `art/sprites/enemy_creature.png`: base enemy sprite
 - `art/sprites/charger_beast.png`: Charger sprite
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
+- `art/sprites/shooter_enemy.png`: small wiry Blowgun Shooter body sprite
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
 - `audio/shield_break.wav`: local physical crack/thud cue for Shielded shield break
+- `audio/blowgun_windup.wav`: local reed/breath cue for Blowgun Shooter aiming
+- `audio/blowgun_fire.wav`: local dry puff/snap cue for Blowgun Shooter dart release
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded enemy body sprite locally
+- `tools/generate_phase4_assets.py`: reproduces the Shielded and Shooter enemy body sprites locally
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -95,6 +102,8 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
+- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, aim/lock/two-dart burst, short recoil, arc reposition, and dart request signal
+- `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
 - `scripts/destination_marker.gd`: brief right-click destination feedback marker
@@ -110,6 +119,9 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - `tools/EncounterIntegrationAudit.tscn`: Main-scene telegraph, SFX, spawn, cleanup, recovery, and restart audit
 - `tools/shielded_enemy_audit.py`: static Phase 4.1 Shielded enemy contract audit
 - `tools/ShieldedEnemyRuntimeAudit.tscn`: runtime audit for Shielded hit ordering, STOPPED spear behavior, score, stagger, and ambient cap removal
+- `tools/shooter_enemy_audit.py`: static Phase 4.2 Shooter and dart contract audit
+- `tools/ShooterEnemyRuntimeAudit.tscn`: runtime audit for Shooter movement, aim locking, darts, damage rules, cleanup, and intro integration
+- `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
 ## Enemy behavior
 
@@ -117,6 +129,11 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
 - Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
+- Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, visibly aims before locking one dart direction, fires a two-dart straight player-only burst, then performs a short tangential arc reposition around Akedra, and dies to one spear hit for `2` points
+- The two darts use the same locked direction with a deterministic `0.17` second burst interval, so one successful sidestep can avoid the whole committed volley
+- Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by active dodge or dodge exit grace
+- A narrow burst context lets two distinct darts from the same Shooter volley each deal one damage, while duplicate callbacks from either individual dart and unrelated damage sources still respect normal invulnerability
+- Darts currently do not collide with the spear, enemies, or Shielded shields; intact Shielded dart blocking is intentionally deferred to a later focused pass
 
 ## Encounter director
 
@@ -131,9 +148,11 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 - Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals or Chargers
+- Shooter enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals, Chargers, or Shielded
 - Charger ambient spawns unlock around `15` seconds with a small capped weight
 - Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
-- Each run also rolls first-introduction targets: Charger between `15-21` seconds and Shielded between `25-30` seconds
+- Shooter ambient spawns unlock around `42` seconds with an even smaller capped weight, and capped/locked Shooter candidates are removed before choosing among remaining ambient types
+- Each run also rolls first-introduction targets: Charger between `15-21` seconds, Shielded between `25-30` seconds, and Shooter between `42-52` seconds
 - Before a target, specials can appear naturally through the existing weights; after an unseen target is overdue, the next valid ambient opportunity prioritizes that enemy until it successfully appears
 - After each special enemy has appeared once through organic play, it permanently returns to its ordinary long-term weighted selection for that run
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
@@ -144,12 +163,16 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 ## Scoring and high score
 
 - Normal enemy score: `1`
+- Shielded score: `2`
+- Blowgun Shooter score: `2`
 - Charger score: `3`
 - High score is saved locally in `user://highscore.save`
 - Invalid or missing save data falls back safely to `0`
 - The game-over screen shows the saved high score and marks a new record clearly
 
 ## Main adjustable values
+
+See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is a quick source-location index.
 
 - `scripts/player.gd`
   - `move_speed`
@@ -220,6 +243,12 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `maximum_shielded_spawn_chance`
   - `shielded_intro_target_time_min`
   - `shielded_intro_target_time_max`
+  - `shooter_unlock_time`
+  - `shooter_spawn_chance_at_unlock`
+  - `shooter_spawn_chance_growth_per_second`
+  - `maximum_shooter_spawn_chance`
+  - `shooter_intro_target_time_min`
+  - `shooter_intro_target_time_max`
   - `landed_spear_spawn_safe_radius`
   - `blocked_spawn_retry_interval`
   - `default_window_scale`
@@ -235,8 +264,33 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
   - `normal_hostile_cap`
   - `charger_hostile_cap`
   - `shielded_hostile_cap`
+  - `shooter_hostile_cap`
   - `first_minute_charger_cap`
   - `spawn_retry_interval`
+- `scripts/shooter_enemy.gd`
+  - `movement_speed_scale`
+  - `approach_speed_scale`
+  - `retreat_speed_scale`
+  - `lateral_fallback_speed_scale`
+  - `preferred_distance_min`
+  - `preferred_distance_max`
+  - `retreat_distance`
+  - `resume_after_retreat_distance`
+  - `attack_range_max`
+  - `aim_duration`
+  - `locked_duration`
+  - `burst_interval`
+  - `recover_duration`
+  - `attack_cooldown`
+  - `minimum_dart_interval`
+  - `arc_reposition_duration`
+  - `arc_reposition_distance_min`
+  - `arc_reposition_distance_max`
+  - `arc_radial_correction_strength`
+- `scripts/dart_projectile.gd`
+  - `speed`
+  - `max_lifetime`
+  - `bounds_padding`
 - `scripts/player_health_pips.gd`
   - `max_supported_pips`
   - `vertical_offset`
@@ -255,13 +309,14 @@ The game keeps a low internal resolution of `384x216` and opens at a default dis
 
 ## Known limitations
 
-- There are currently three enemy types, all using intentionally simple movement logic
+- There are currently four enemy types, all using intentionally simple movement logic
 - Art and music are intentionally simple local placeholder assets rather than a full content pipeline
 - Enemy avoidance is intentionally lightweight and not full pathfinding
 
 ## Features intentionally left for later
 
 - More enemy types
+- Shielded dart interception, where intact Shielded enemies can block Shooter darts without damaging or weakening the shield
 - Ring encounter formations
 - Opportunity encounters such as a Heart Runner, kept separate from hostile population slots
 - Wave reward selection driven by encounter completion signals

@@ -69,6 +69,16 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 		not _is_ambient_enemy_available(main, director, EncounterDirector.EnemyKind.SHIELDED),
 		"Shielded is unavailable before 25 seconds."
 	)
+	main.set("survival_time", 42.0)
+	_require(
+		_is_ambient_enemy_available(main, director, EncounterDirector.EnemyKind.SHOOTER),
+		"Shooter is eligible at 42 seconds."
+	)
+	main.set("survival_time", 41.9)
+	_require(
+		not _is_ambient_enemy_available(main, director, EncounterDirector.EnemyKind.SHOOTER),
+		"Shooter is unavailable before 42 seconds."
+	)
 
 	main.set("survival_time", 15.0)
 	_require(
@@ -99,6 +109,21 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 	_require(
 		is_equal_approx(float(main.call("_get_current_shielded_spawn_chance")), 0.12),
 		"Shielded spawn chance caps at 0.12."
+	)
+	main.set("survival_time", 42.0)
+	_require(
+		is_equal_approx(float(main.call("_get_current_shooter_spawn_chance")), 0.04),
+		"Shooter spawn chance starts at 0.04 at unlock."
+	)
+	main.set("survival_time", 52.0)
+	_require(
+		is_equal_approx(float(main.call("_get_current_shooter_spawn_chance")), 0.0445),
+		"Shooter spawn chance grows by 0.00045 per second after unlock."
+	)
+	main.set("survival_time", 1000.0)
+	_require(
+		is_equal_approx(float(main.call("_get_current_shooter_spawn_chance")), 0.10),
+		"Shooter spawn chance caps at 0.10."
 	)
 
 	director.reset_for_new_run()
@@ -141,6 +166,18 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 	_require(
 		not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED, 60.0),
 		"Current Shielded active cap remains two."
+	)
+	director.reset_for_new_run()
+	var shooter := Node.new()
+	main.add_child(shooter)
+	director.register_enemy(
+		shooter,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.INVALID_WAVE_ID
+	)
+	_require(
+		not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHOOTER, 60.0),
+		"Shooter active cap remains one."
 	)
 
 	main.set_process(true)
@@ -517,6 +554,11 @@ func _is_ambient_enemy_available(main: Node, director: EncounterDirector, enemy_
 		EncounterDirector.EnemyKind.SHIELDED:
 			return (
 				current_survival_time >= float(main.get("shielded_unlock_time"))
+				and director.can_spawn_enemy(enemy_kind, current_survival_time)
+			)
+		EncounterDirector.EnemyKind.SHOOTER:
+			return (
+				current_survival_time >= float(main.get("shooter_unlock_time"))
 				and director.can_spawn_enemy(enemy_kind, current_survival_time)
 			)
 

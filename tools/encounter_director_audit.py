@@ -95,6 +95,7 @@ def main() -> int:
     require("normal_hostile_cap := 9" in director, "Normal cap is tunable from nine", failures)
     require("charger_hostile_cap := 2" in director, "Charger safety cap is tunable from two", failures)
     require("shielded_hostile_cap := 2" in director, "Shielded safety cap is tunable from two", failures)
+    require("shooter_hostile_cap := 1" in director, "Shooter safety cap is tunable from one", failures)
     require(
         "first_minute_charger_cap := 1" in director,
         "First-minute Charger production is limited to one",
@@ -106,8 +107,15 @@ def main() -> int:
         failures,
     )
     require(
-        "SpawnStep.new" in director and "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1],
-        "Authored waves contain no Shielded spawn steps",
+        "get_shooter_hostile_count() < shooter_hostile_cap" in director,
+        "Shooter enemies use their own cap while still counting in total hostile cap",
+        failures,
+    )
+    require(
+        "SpawnStep.new" in director
+        and "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1]
+        and "EnemyKind.SHOOTER" not in director.split("func _build_wave_definitions", 1)[1],
+        "Authored waves contain no Shielded or Shooter spawn steps",
         failures,
     )
 
@@ -184,6 +192,22 @@ def main() -> int:
         and "shielded_intro_seen" in main_script
         and "shielded_intro_target_time = rng.randf_range" in main_script,
         "Shielded first intro uses a randomized per-run target",
+        failures,
+    )
+    require(
+        "shooter_unlock_time := 42.0" in main_script
+        and "shooter_spawn_chance_at_unlock := 0.04" in main_script
+        and "shooter_spawn_chance_growth_per_second := 0.00045" in main_script
+        and "maximum_shooter_spawn_chance := 0.10" in main_script,
+        "Shooter ambient tuning arrives later and stays uncommon",
+        failures,
+    )
+    require(
+        "shooter_intro_target_time_min := 42.0" in main_script
+        and "shooter_intro_target_time_max := 52.0" in main_script
+        and "shooter_intro_seen" in main_script
+        and "shooter_intro_target_time = rng.randf_range" in main_script,
+        "Shooter first intro uses a randomized per-run target",
         failures,
     )
     require(

@@ -3,9 +3,12 @@ extends Node2D
 const EnemyScene := preload("res://Enemy.tscn")
 const ChargerScene := preload("res://Charger.tscn")
 const ShieldedScene := preload("res://ShieldedEnemy.tscn")
+const ShooterScene := preload("res://ShooterEnemy.tscn")
+const DartProjectileScene := preload("res://DartProjectile.tscn")
 const HighScoreStore := preload("res://scripts/high_score_store.gd")
 const NO_AMBIENT_ENEMY_KIND := -1
 const DEBUG_SHIELDED_SPAWN_ENABLED := true
+const DEBUG_SHOOTER_SPAWN_ENABLED := true
 
 enum RunState {
 	RUNNING,
@@ -47,14 +50,22 @@ enum SpawnSource {
 @export var maximum_shielded_spawn_chance := 0.12
 @export var shielded_intro_target_time_min := 25.0
 @export var shielded_intro_target_time_max := 30.0
+@export var shooter_unlock_time := 42.0
+@export var shooter_spawn_chance_at_unlock := 0.04
+@export var shooter_spawn_chance_growth_per_second := 0.00045
+@export var maximum_shooter_spawn_chance := 0.10
+@export var shooter_intro_target_time_min := 42.0
+@export var shooter_intro_target_time_max := 52.0
 
 var score := 0
 var high_score := 0
 var survival_time := 0.0
 var charger_intro_target_time := 15.0
 var shielded_intro_target_time := 25.0
+var shooter_intro_target_time := 42.0
 var charger_intro_seen := false
 var shielded_intro_seen := false
+var shooter_intro_seen := false
 var pause_active := false
 var run_state: RunState = RunState.RUNNING
 var shake_left := 0.0
@@ -74,6 +85,7 @@ var debug_ambient_roll_sequence: Array = []
 @onready var encounter_telegraph: EncounterTelegraph = $EncounterTelegraph
 @onready var encounter_director: EncounterDirector = $EncounterDirector
 @onready var enemy_container: Node2D = $EnemyContainer
+@onready var projectile_container: Node2D = $ProjectileContainer
 @onready var spawn_timer: Timer = $SpawnTimer
 @onready var camera: Camera2D = $Camera2D
 @onready var hud: HUD = $HUD
@@ -87,6 +99,8 @@ var debug_ambient_roll_sequence: Array = []
 @onready var dodge_player: AudioStreamPlayer = $AudioPlayers/DodgePlayer
 @onready var wave_warning_player: AudioStreamPlayer = $AudioPlayers/WaveWarningPlayer
 @onready var shield_break_player: AudioStreamPlayer = $AudioPlayers/ShieldBreakPlayer
+@onready var blowgun_windup_player: AudioStreamPlayer = $AudioPlayers/BlowgunWindupPlayer
+@onready var blowgun_fire_player: AudioStreamPlayer = $AudioPlayers/BlowgunFirePlayer
 
 
 func _ready() -> void:
@@ -150,6 +164,7 @@ func _reset_runtime_state() -> void:
 
 	for child in enemy_container.get_children():
 		child.queue_free()
+	_clear_projectiles()
 
 	encounter_director.reset_for_new_run()
 	encounter_telegraph.clear_warning()
@@ -186,6 +201,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if DEBUG_SHIELDED_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_shielded"):
 		_debug_spawn_shielded_enemy()
+		return
+	if DEBUG_SHOOTER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_shooter"):
+		_debug_spawn_shooter_enemy()
 		return
 
 	if event.is_action_pressed("dodge_aim"):
@@ -255,6 +273,10 @@ func _try_spawn_enemy(
 	enemy.tree_exited.connect(_on_enemy_tree_exited.bind(enemy_id, run_generation))
 	if enemy.has_signal("shield_broken"):
 		enemy.connect(&"shield_broken", _on_shielded_enemy_shield_broken)
+	if enemy.has_signal("aim_started"):
+		enemy.connect(&"aim_started", _on_shooter_enemy_aim_started)
+	if enemy.has_signal("dart_requested"):
+		enemy.connect(&"dart_requested", _on_shooter_enemy_dart_requested)
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
 	_mark_intro_seen_for_spawn(enemy_kind, spawn_source)
@@ -274,6 +296,19 @@ func _debug_spawn_shielded_enemy() -> void:
 		print("DEBUG: Shielded enemy spawn failed; cap or safe spawn search blocked it.")
 
 
+func _debug_spawn_shooter_enemy() -> void:
+	var spawned := _try_spawn_enemy(
+		EncounterDirector.EnemyKind.SHOOTER,
+		arena.get_random_spawn_edge(),
+		EncounterDirector.INVALID_WAVE_ID,
+		SpawnSource.DEBUG
+	)
+	if spawned:
+		print("DEBUG: spawned Shooter enemy with key 2.")
+	else:
+		print("DEBUG: Shooter enemy spawn failed; cap or safe spawn search blocked it.")
+
+
 func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
 	var avoid_positions: Array[Vector2] = [player.global_position]
 	var avoid_radii: Array[float] = [spawn_safe_radius]
@@ -289,6 +324,8 @@ func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 		return ChargerScene
 	if enemy_kind == EncounterDirector.EnemyKind.SHIELDED:
 		return ShieldedScene
+	if enemy_kind == EncounterDirector.EnemyKind.SHOOTER:
+		return ShooterScene
 	return EnemyScene
 
 
@@ -321,8 +358,12 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 		survival_time >= shielded_unlock_time
 		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED, survival_time)
 	)
+	var shooter_available := (
+		survival_time >= shooter_unlock_time
+		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.SHOOTER, survival_time)
+	)
 
-	if not normal_available and not charger_available and not shielded_available:
+	if not normal_available and not charger_available and not shielded_available and not shooter_available:
 		return NO_AMBIENT_ENEMY_KIND
 
 	var shielded_spawn_chance := 0.0
@@ -337,16 +378,29 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 	if shielded_available and shielded_spawn_chance < 1.0:
 		non_shield_roll = (roll - shielded_spawn_chance) / (1.0 - shielded_spawn_chance)
 
+	var shooter_spawn_chance := 0.0
+	if shooter_available:
+		shooter_spawn_chance = _get_current_shooter_spawn_chance()
+
+	if shooter_available and non_shield_roll < shooter_spawn_chance:
+		return EncounterDirector.EnemyKind.SHOOTER
+
+	var non_shooter_roll := non_shield_roll
+	if shooter_available and shooter_spawn_chance < 1.0:
+		non_shooter_roll = (non_shield_roll - shooter_spawn_chance) / (1.0 - shooter_spawn_chance)
+
 	var charger_spawn_chance := 0.0
 	if charger_available:
 		charger_spawn_chance = _get_current_charger_spawn_chance()
 
-	if charger_available and non_shield_roll < charger_spawn_chance:
+	if charger_available and non_shooter_roll < charger_spawn_chance:
 		return EncounterDirector.EnemyKind.CHARGER
 	if normal_available:
 		return EncounterDirector.EnemyKind.NORMAL
 	if charger_available:
 		return EncounterDirector.EnemyKind.CHARGER
+	if shooter_available:
+		return EncounterDirector.EnemyKind.SHOOTER
 	return EncounterDirector.EnemyKind.SHIELDED
 
 
@@ -361,6 +415,11 @@ func _pick_pending_intro_enemy_kind() -> int:
 		pending_candidates.append({
 			"enemy_kind": EncounterDirector.EnemyKind.SHIELDED,
 			"target_time": shielded_intro_target_time,
+		})
+	if _is_intro_pending_and_available(EncounterDirector.EnemyKind.SHOOTER):
+		pending_candidates.append({
+			"enemy_kind": EncounterDirector.EnemyKind.SHOOTER,
+			"target_time": shooter_intro_target_time,
 		})
 
 	if pending_candidates.is_empty():
@@ -389,6 +448,12 @@ func _is_intro_pending_and_available(enemy_kind: int) -> bool:
 				and survival_time >= shielded_intro_target_time
 				and _is_enemy_kind_available_for_ambient(enemy_kind)
 			)
+		EncounterDirector.EnemyKind.SHOOTER:
+			return (
+				not shooter_intro_seen
+				and survival_time >= shooter_intro_target_time
+				and _is_enemy_kind_available_for_ambient(enemy_kind)
+			)
 
 	return false
 
@@ -405,6 +470,11 @@ func _is_enemy_kind_available_for_ambient(enemy_kind: int) -> bool:
 		EncounterDirector.EnemyKind.SHIELDED:
 			return (
 				survival_time >= shielded_unlock_time
+				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
+			)
+		EncounterDirector.EnemyKind.SHOOTER:
+			return (
+				survival_time >= shooter_unlock_time
 				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
 			)
 
@@ -425,19 +495,46 @@ func _get_current_shielded_spawn_chance() -> float:
 	return min(shielded_spawn_chance, maximum_shielded_spawn_chance)
 
 
+func _get_current_shooter_spawn_chance() -> float:
+	var shooter_spawn_chance := shooter_spawn_chance_at_unlock + (
+		(survival_time - shooter_unlock_time) * shooter_spawn_chance_growth_per_second
+	)
+	return min(shooter_spawn_chance, maximum_shooter_spawn_chance)
+
+
 func _reset_intro_state() -> void:
 	charger_intro_seen = false
 	shielded_intro_seen = false
+	shooter_intro_seen = false
 	_generate_intro_target_times()
 
 
 func _generate_intro_target_times() -> void:
 	if not debug_intro_target_sequence.is_empty():
-		var target_pair: Vector2 = debug_intro_target_sequence.pop_front()
-		charger_intro_target_time = target_pair.x
-		shielded_intro_target_time = target_pair.y
+		var target_values: Variant = debug_intro_target_sequence.pop_front()
+		if target_values is Vector3:
+			var target_triple: Vector3 = target_values
+			charger_intro_target_time = target_triple.x
+			shielded_intro_target_time = target_triple.y
+			shooter_intro_target_time = target_triple.z
+			return
+		if target_values is Vector2:
+			var target_pair: Vector2 = target_values
+			charger_intro_target_time = target_pair.x
+			shielded_intro_target_time = target_pair.y
+			shooter_intro_target_time = rng.randf_range(
+				shooter_intro_target_time_min,
+				shooter_intro_target_time_max
+			)
+			return
+		push_warning("Intro target audit values must be Vector2 or Vector3.")
+		_generate_random_intro_target_times()
 		return
 
+	_generate_random_intro_target_times()
+
+
+func _generate_random_intro_target_times() -> void:
 	charger_intro_target_time = rng.randf_range(
 		charger_intro_target_time_min,
 		charger_intro_target_time_max
@@ -445,6 +542,10 @@ func _generate_intro_target_times() -> void:
 	shielded_intro_target_time = rng.randf_range(
 		shielded_intro_target_time_min,
 		shielded_intro_target_time_max
+	)
+	shooter_intro_target_time = rng.randf_range(
+		shooter_intro_target_time_min,
+		shooter_intro_target_time_max
 	)
 
 
@@ -457,6 +558,8 @@ func _mark_intro_seen_for_spawn(enemy_kind: int, spawn_source: int) -> void:
 			charger_intro_seen = true
 		EncounterDirector.EnemyKind.SHIELDED:
 			shielded_intro_seen = true
+		EncounterDirector.EnemyKind.SHOOTER:
+			shooter_intro_seen = true
 
 
 func _get_ambient_selection_roll() -> float:
@@ -468,10 +571,13 @@ func _get_ambient_selection_roll() -> float:
 
 func debug_set_intro_target_times(
 	new_charger_intro_target_time: float,
-	new_shielded_intro_target_time: float
+	new_shielded_intro_target_time: float,
+	new_shooter_intro_target_time: float = -1.0
 ) -> void:
 	charger_intro_target_time = new_charger_intro_target_time
 	shielded_intro_target_time = new_shielded_intro_target_time
+	if new_shooter_intro_target_time >= 0.0:
+		shooter_intro_target_time = new_shooter_intro_target_time
 
 
 func debug_set_intro_target_sequence(new_intro_target_sequence: Array) -> void:
@@ -543,6 +649,9 @@ func _on_player_died() -> void:
 	for child in enemy_container.get_children():
 		if child.has_method("set_active"):
 			child.set_active(false)
+	_clear_projectiles()
+	if blowgun_windup_player != null:
+		blowgun_windup_player.stop()
 
 	var is_new_high_score := score > high_score
 	if is_new_high_score:
@@ -566,6 +675,51 @@ func _on_spear_enemy_hit(_hit_position: Vector2) -> void:
 
 func _on_shielded_enemy_shield_broken(_hit_position: Vector2) -> void:
 	_play_sfx(shield_break_player)
+
+
+func _on_shooter_enemy_aim_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+	_play_sfx(blowgun_windup_player)
+
+
+func _on_shooter_enemy_dart_requested(
+	spawn_position: Vector2,
+	fire_direction: Vector2,
+	burst_id: int,
+	dart_index: int
+) -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_spawn_dart_projectile(spawn_position, fire_direction, burst_id, dart_index)
+	_play_sfx(blowgun_fire_player)
+
+
+func _spawn_dart_projectile(
+	spawn_position: Vector2,
+	fire_direction: Vector2,
+	burst_id: int = Player.INVALID_DART_BURST_ID,
+	dart_index: int = Player.INVALID_DART_INDEX
+) -> void:
+	var dart := DartProjectileScene.instantiate() as DartProjectile
+	if dart == null:
+		return
+
+	projectile_container.add_child(dart)
+	dart.global_position = spawn_position
+	dart.setup(player, arena.get_play_rect(), fire_direction, burst_id, dart_index)
+
+
+func _clear_projectiles() -> void:
+	if projectile_container == null:
+		return
+
+	for projectile in projectile_container.get_children():
+		if projectile.has_method("destroy_projectile"):
+			projectile.call("destroy_projectile", DartProjectile.DESTROY_REASON_CLEARED)
+		else:
+			projectile.queue_free()
 
 
 func _on_spear_picked_up() -> void:
@@ -678,6 +832,8 @@ func _stop_all_audio() -> void:
 		dodge_player,
 		wave_warning_player,
 		shield_break_player,
+		blowgun_windup_player,
+		blowgun_fire_player,
 	]:
 		if audio_player == null:
 			continue
@@ -695,6 +851,8 @@ func _stop_gameplay_sfx() -> void:
 		dodge_player,
 		wave_warning_player,
 		shield_break_player,
+		blowgun_windup_player,
+		blowgun_fire_player,
 	]:
 		if audio_player == null:
 			continue
@@ -804,6 +962,7 @@ func _ensure_input_actions() -> void:
 	_add_key_action("dodge_aim", KEY_SHIFT)
 	_add_key_action("dodge_move", KEY_SPACE)
 	_add_key_action("debug_spawn_shielded", KEY_1)
+	_add_key_action("debug_spawn_shooter", KEY_2)
 	_remove_mouse_button_action("throw_spear", MOUSE_BUTTON_RIGHT)
 	_add_mouse_button_action("throw_spear", MOUSE_BUTTON_LEFT)
 	_add_mouse_button_action("move_to_cursor", MOUSE_BUTTON_RIGHT)

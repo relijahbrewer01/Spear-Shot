@@ -357,7 +357,10 @@ func _get_arc_reposition_velocity(delta: float, distance_to_player: float) -> Ve
 		desired_velocity = desired_direction * move_speed * arc_reposition_speed_scale
 
 	desired_velocity += _get_separation_push() * 0.2
-	var speed_limit := move_speed * maxf(retreat_speed_scale, approach_speed_scale, arc_reposition_speed_scale)
+	var speed_limit := move_speed * maxf(
+	retreat_speed_scale,
+	maxf(approach_speed_scale, arc_reposition_speed_scale)
+)
 	if desired_velocity.length() > speed_limit:
 		desired_velocity = desired_velocity.normalized() * speed_limit
 
@@ -396,7 +399,10 @@ func _get_aim_cancel_reposition_velocity(delta: float, distance_to_player: float
 		desired_velocity = desired_direction * move_speed * aim_cancel_reposition_speed_scale
 
 	desired_velocity += _get_separation_push() * 0.15
-	var speed_limit := move_speed * maxf(retreat_speed_scale, approach_speed_scale, aim_cancel_reposition_speed_scale)
+	var speed_limit := move_speed * maxf(
+	retreat_speed_scale,
+	maxf(approach_speed_scale, aim_cancel_reposition_speed_scale)
+)  
 	if desired_velocity.length() > speed_limit:
 		desired_velocity = desired_velocity.normalized() * speed_limit
 

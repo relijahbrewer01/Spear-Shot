@@ -13,14 +13,14 @@
 [ext_resource type="AudioStream" uid="uid://2qtec5epgxjy" path="res://audio/game_over.wav" id="11"]
 [ext_resource type="AudioStream" uid="uid://duhbd165otiqh" path="res://music/quiet_hunter_loop.wav" id="12"]
 [ext_resource type="Script" uid="uid://c6060nsi3i51r" path="res://scripts/destination_marker.gd" id="13"]
-[ext_resource type="AudioStream" path="res://audio/dodge.wav" id="14"]
-[ext_resource type="Script" path="res://scripts/encounter_director.gd" id="15"]
-[ext_resource type="Script" path="res://scripts/encounter_telegraph.gd" id="16"]
-[ext_resource type="AudioStream" path="res://audio/wave_warning.wav" id="17"]
-[ext_resource type="AudioStream" path="res://audio/shield_break.wav" id="18"]
-[ext_resource type="AudioStream" path="res://audio/blowgun_windup.wav" id="19"]
-[ext_resource type="AudioStream" path="res://audio/blowgun_fire.wav" id="20"]
-[ext_resource type="AudioStream" path="res://audio/blowgun_shove.wav" id="21"]
+[ext_resource type="AudioStream" uid="uid://ws3g4je5qpfr" path="res://audio/dodge.wav" id="14"]
+[ext_resource type="Script" uid="uid://dl8iwdku0poh5" path="res://scripts/encounter_director.gd" id="15"]
+[ext_resource type="Script" uid="uid://b8a480g75weyy" path="res://scripts/encounter_telegraph.gd" id="16"]
+[ext_resource type="AudioStream" uid="uid://xiag6ybl08wq" path="res://audio/wave_warning.wav" id="17"]
+[ext_resource type="AudioStream" uid="uid://cdsjsmw4p143u" path="res://audio/shield_break.wav" id="18"]
+[ext_resource type="AudioStream" uid="uid://bqjw7x77atx1b" path="res://audio/blowgun_windup.wav" id="19"]
+[ext_resource type="AudioStream" uid="uid://dalsfx5g5ytyy" path="res://audio/blowgun_fire.wav" id="20"]
+[ext_resource type="AudioStream" uid="uid://drdicc02ciac" path="res://audio/blowgun_shove.wav" id="21"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -29,7 +29,7 @@ script = ExtResource("1")
 
 [node name="EnemyContainer" type="Node2D" parent="." unique_id=801146545]
 
-[node name="ProjectileContainer" type="Node2D" parent="."]
+[node name="ProjectileContainer" type="Node2D" parent="." unique_id=1683581894]
 
 [node name="Player" parent="." unique_id=1101397378 instance=ExtResource("3")]
 position = Vector2(192, 108)
@@ -40,11 +40,11 @@ position = Vector2(206, 108)
 [node name="DestinationMarker" type="Node2D" parent="." unique_id=396738520]
 script = ExtResource("13")
 
-[node name="EncounterTelegraph" type="Node2D" parent="."]
+[node name="EncounterTelegraph" type="Node2D" parent="." unique_id=605381653]
 z_index = 6
 script = ExtResource("16")
 
-[node name="EncounterDirector" type="Node" parent="."]
+[node name="EncounterDirector" type="Node" parent="." unique_id=2032970317]
 script = ExtResource("15")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1156566816]
@@ -84,35 +84,35 @@ bus = &"SFX"
 stream = ExtResource("11")
 bus = &"SFX"
 
-[node name="DodgePlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+[node name="DodgePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1491217973]
 stream = ExtResource("14")
 volume_db = -5.0
 bus = &"SFX"
 
-[node name="WaveWarningPlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+[node name="WaveWarningPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1834849058]
 stream = ExtResource("17")
 volume_db = -8.0
 bus = &"SFX"
 
-[node name="ShieldBreakPlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+[node name="ShieldBreakPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=2097776872]
 stream = ExtResource("18")
 volume_db = -3.0
 max_polyphony = 4
 bus = &"SFX"
 
-[node name="BlowgunWindupPlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+[node name="BlowgunWindupPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1832174538]
 stream = ExtResource("19")
 volume_db = -9.0
 max_polyphony = 2
 bus = &"SFX"
 
-[node name="BlowgunFirePlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+[node name="BlowgunFirePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=743297180]
 stream = ExtResource("20")
 volume_db = -6.0
 max_polyphony = 4
 bus = &"SFX"
 
-[node name="BlowgunShovePlayer" type="AudioStreamPlayer" parent="AudioPlayers"]
+[node name="BlowgunShovePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1321107747]
 stream = ExtResource("21")
 volume_db = -7.0
 max_polyphony = 2

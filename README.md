@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.6.0-alpha.2 - Blowgun Shooter`
+Current milestone: `Spear Shot v0.6.0-alpha.2.2 - Shooter Visual & Behavior Refinement`
 
 ## Game concept
 

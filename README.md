@@ -52,8 +52,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - The visual pass keeps the arena readable first: muted daylight tones, clear silhouettes, and bright Charger telegraphs over a medium-value floor instead of a dark moody backdrop
 - The player, enemies, Charger, and spear now use small locally generated pixel sprites with lightweight bob/pulse animation instead of pure debug shapes
 - Shielded enemies use a compact broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow or boss-sized silhouette
-- Blowgun Shooters use a small wiry wilderness-skirmisher silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
-- The Shooter body sprite is intentionally a little smaller than its hitbox, so it still feels wiry without becoming annoying to hit at `384x216`
+- Blowgun Shooters use a small wiry hooded-forager silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
+- The approved final Shooter body uses a coherent moss-hood palette with a pale face, charcoal-brown torso, and restrained rust pouch on the roomier `16x18` canvas, keeping it small, readable, and distinct from the melee cast at `384x216`
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -79,7 +79,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/enemy_creature.png`: base enemy sprite
 - `art/sprites/charger_beast.png`: Charger sprite
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
-- `art/sprites/shooter_enemy.png`: small wiry Blowgun Shooter body sprite
+- `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
@@ -88,7 +88,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/blowgun_fire.wav`: local dry puff/snap cue for Blowgun Shooter dart release
 - `audio/blowgun_shove.wav`: local reed/wood swish-thump cue for Blowgun Shooter shove
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded and Shooter enemy body sprites locally
+- `tools/generate_phase4_assets.py`: reproduces the Shielded enemy sprite, the approved final Shooter sprite, and temporary Shooter palette-comparison outputs locally
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -96,7 +96,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Main.tscn` and `scripts/main.gd`: overall game flow, spawning, scoring, timer, restart, and screen shake
 - Run restarts reset gameplay state in place so window size, position, and maximized state are preserved
 - `Arena.tscn` and `scripts/arena.gd`: arena visuals, play bounds, and enemy edge spawn positions
-- `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, upright facing, dodge readability visuals, and narrow authored forced movement for Shooter shove knockback
+- `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, upright facing, dodge readability visuals, and narrow authored forced movement with shove-specific temporary damage protection
 - `scripts/player_dodge_trail.gd`: fixed-pool dodge afterimages sampled from Akedra's body visual
 - `scripts/player_dodge_cooldown_indicator.gd`: world-space exertion wisp and brief ready glint driven by the shared dodge cooldown
 - `Spear.tscn` and `scripts/spear.gd`: the single spear state loop (`HELD`, `FLYING`, `LANDED`)
@@ -104,7 +104,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
-- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, aim/lock/two-dart burst, committed aim-cancel reposition, non-damaging shove, longer post-burst relocation, and dart request signal
+- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, aim/lock/two-dart burst, committed aim-cancel reposition, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
@@ -122,6 +122,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/shielded_enemy_audit.py`: static Phase 4.1 Shielded enemy contract audit
 - `tools/ShieldedEnemyRuntimeAudit.tscn`: runtime audit for Shielded hit ordering, STOPPED spear behavior, score, stagger, and ambient cap removal
 - `tools/shooter_enemy_audit.py`: static Phase 4.2 Shooter and dart contract audit
+- `tools/shooter_visual_concept_audit.py`: verifies the temporary Shooter palette-variant outputs and native-scale comparison image
 - `tools/ShooterEnemyRuntimeAudit.tscn`: runtime audit for Shooter movement, aim locking, darts, damage rules, cleanup, and intro integration
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
@@ -136,10 +137,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - The two darts use the same locked direction with a deterministic `0.17` second burst interval, so one successful sidestep can avoid the whole committed volley
 - If Akedra crowds a Shooter before lock, the Shooter now lowers the blowgun and commits to a short lateral cancel-reposition instead of instantly re-aiming
 - Shooter body overlap no longer deals ordinary enemy contact damage
-- At very close range, the Shooter can use a short non-damaging shove that knocks Akedra back through the existing movement authority instead of taking health
+- At very close range, the Shooter can use a short non-damaging shove that knocks Akedra back through the existing movement authority, grants shove-only temporary damage protection while that authored displacement resolves, and then quickly repositions into a normal readable follow-up shot
 - Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by active dodge or dodge exit grace
 - A narrow burst context lets two distinct darts from the same Shooter volley each deal one damage, while duplicate callbacks from either individual dart and unrelated damage sources still respect normal invulnerability
-- Darts currently do not collide with the spear, enemies, or Shielded shields; intact Shielded dart blocking is intentionally deferred to a later focused pass
+- Darts currently do not collide with the spear, enemies, or Shielded shields; intact Shielded dart blocking remains deferred to the later Phase 4.6 interaction pass
 
 ## Encounter director
 
@@ -154,7 +155,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
-- Shooter enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals, Chargers, or Shielded
+- Shooter enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals, Chargers, or Shielded
 - Charger ambient spawns unlock around `15` seconds with a small capped weight
 - Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - Shooter ambient spawns unlock around `42` seconds with an even smaller capped weight, and capped/locked Shooter candidates are removed before choosing among remaining ambient types
@@ -339,7 +340,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 ## Features intentionally left for later
 
 - More enemy types
-- Shielded dart interception, where intact Shielded enemies can block Shooter darts without damaging or weakening the shield
+- Phase 4.6 enemy interaction work, including Shielded dart interception and coordinated ranged/melee screening behavior
 - Ring encounter formations
 - Opportunity encounters such as a Heart Runner, kept separate from hostile population slots
 - Wave reward selection driven by encounter completion signals

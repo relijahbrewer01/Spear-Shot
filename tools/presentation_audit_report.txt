@@ -1,0 +1,36 @@
+texture=res://art/arena/arena_floor.png size=(384.0, 216.0)
+texture=res://art/sprites/player_hunter.png size=(16.0, 16.0)
+texture=res://art/sprites/enemy_creature.png size=(16.0, 16.0)
+texture=res://art/sprites/charger_beast.png size=(16.0, 16.0)
+texture=res://art/sprites/shielded_enemy.png size=(22.0, 22.0)
+texture=res://art/sprites/shooter_enemy.png size=(16.0, 18.0)
+texture=res://art/sprites/spear_hunter.png size=(20.0, 8.0)
+audio=res://music/quiet_hunter_loop.wav class=AudioStreamWAV
+audio=res://audio/dodge.wav class=AudioStreamWAV
+audio=res://audio/wave_warning.wav class=AudioStreamWAV
+audio=res://audio/shield_break.wav class=AudioStreamWAV
+audio=res://audio/blowgun_windup.wav class=AudioStreamWAV
+audio=res://audio/blowgun_fire.wav class=AudioStreamWAV
+audio=res://audio/blowgun_shove.wav class=AudioStreamWAV
+scene=res://Player.tscn sprite=BodyVisual/Sprite2D texture=res://art/sprites/player_hunter.png
+scene=res://Enemy.tscn sprite=Sprite2D texture=res://art/sprites/enemy_creature.png
+scene=res://Charger.tscn sprite=Sprite2D texture=res://art/sprites/charger_beast.png
+scene=res://ShieldedEnemy.tscn sprite=Sprite2D texture=res://art/sprites/shielded_enemy.png
+scene=res://ShooterEnemy.tscn sprite=Sprite2D texture=res://art/sprites/shooter_enemy.png
+scene=res://Spear.tscn sprite=Sprite2D texture=res://art/sprites/spear_hunter.png
+bus=Master mute=false volume_db=0.0
+bus=Music mute=false volume_db=-13.0
+bus=SFX mute=false volume_db=-4.0
+player=AudioPlayers/MusicPlayer bus=Music stream=res://music/quiet_hunter_loop.wav volume_db=0.0
+player=AudioPlayers/ThrowPlayer bus=SFX stream=res://audio/throw.wav volume_db=0.0
+player=AudioPlayers/EnemyHitPlayer bus=SFX stream=res://audio/enemy_hit.wav volume_db=0.0
+player=AudioPlayers/EnemyDeathPlayer bus=SFX stream=res://audio/enemy_death.wav volume_db=0.0
+player=AudioPlayers/PickupPlayer bus=SFX stream=res://audio/pickup.wav volume_db=0.0
+player=AudioPlayers/PlayerHurtPlayer bus=SFX stream=res://audio/player_hurt.wav volume_db=0.0
+player=AudioPlayers/GameOverPlayer bus=SFX stream=res://audio/game_over.wav volume_db=0.0
+player=AudioPlayers/DodgePlayer bus=SFX stream=res://audio/dodge.wav volume_db=-5.0
+player=AudioPlayers/WaveWarningPlayer bus=SFX stream=res://audio/wave_warning.wav volume_db=-8.0
+player=AudioPlayers/ShieldBreakPlayer bus=SFX stream=res://audio/shield_break.wav volume_db=-3.0
+player=AudioPlayers/BlowgunWindupPlayer bus=SFX stream=res://audio/blowgun_windup.wav volume_db=-9.0
+player=AudioPlayers/BlowgunFirePlayer bus=SFX stream=res://audio/blowgun_fire.wav volume_db=-6.0
+player=AudioPlayers/BlowgunShovePlayer bus=SFX stream=res://audio/blowgun_shove.wav volume_db=-7.0

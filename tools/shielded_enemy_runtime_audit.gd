@@ -414,6 +414,7 @@ func _audit_director_counts_and_ambient_cap_removal() -> void:
 
 	main.set("survival_time", 60.0)
 	main.set("charger_unlock_time", 999.0)
+	main.set("shooter_unlock_time", 999.0)
 	var picked_kind := int(main.call("_pick_ambient_enemy_kind"))
 	_require(
 		picked_kind == EncounterDirector.EnemyKind.NORMAL,

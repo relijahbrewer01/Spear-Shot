@@ -5,6 +5,8 @@ const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
 const BODY_VISUAL_Z_INDEX := 10
 const DAMAGE_SOURCE_CONTACT := &"contact"
 const DAMAGE_SOURCE_DART := &"dart"
+const FORCED_MOVEMENT_PROTECTION_NONE := &"none"
+const FORCED_MOVEMENT_PROTECTION_SHOVE := &"shove"
 const INVALID_DART_BURST_ID := -1
 const INVALID_DART_INDEX := -1
 const INVALID_PROJECTILE_TOKEN := -1
@@ -45,6 +47,9 @@ signal dodge_ready
 @export var dodge_trail_sample_interval := 0.045
 @export var dodge_trail_lifetime := 0.22
 @export var dodge_trail_color := Color8(176, 212, 255, 92)
+@export var shove_protection_smear_length := 6.0
+@export var shove_protection_smear_width := 3.0
+@export var shove_protection_smear_color := Color8(228, 214, 180, 72)
 @export var body_color := Color8(111, 182, 255)
 @export var hurt_color := Color8(255, 244, 180)
 
@@ -67,6 +72,7 @@ var forced_movement_distance := 0.0
 var forced_movement_duration := 0.0
 var forced_movement_time_left := 0.0
 var forced_movement_velocity := Vector2.ZERO
+var forced_movement_damage_protection_source: StringName = FORCED_MOVEMENT_PROTECTION_NONE
 var last_valid_aim_direction := Vector2.RIGHT
 var facing_direction := 1
 var suppressed_movement_actions: Dictionary = {}
@@ -168,6 +174,17 @@ func is_in_forced_movement() -> bool:
 	return action_state == ActionState.FORCED_MOVEMENT
 
 
+func is_in_shove_forced_movement() -> bool:
+	return (
+		is_in_forced_movement()
+		and forced_movement_damage_protection_source == FORCED_MOVEMENT_PROTECTION_SHOVE
+	)
+
+
+func has_shove_damage_protection() -> bool:
+	return is_in_shove_forced_movement()
+
+
 func can_start_dodge() -> bool:
 	return (
 		active
@@ -189,6 +206,8 @@ func can_take_damage(
 	projectile_token: int = INVALID_PROJECTILE_TOKEN
 ) -> bool:
 	if not is_alive():
+		return false
+	if has_shove_damage_protection():
 		return false
 	if is_dodging() or dodge_exit_invulnerability_left > 0.0:
 		return false
@@ -300,7 +319,12 @@ func try_start_dodge(direction: Vector2, suppress_held_movement := false) -> boo
 	return true
 
 
-func try_start_forced_movement(direction: Vector2, distance: float, duration: float) -> bool:
+func try_start_forced_movement(
+	direction: Vector2,
+	distance: float,
+	duration: float,
+	damage_protection_source: StringName = FORCED_MOVEMENT_PROTECTION_NONE
+) -> bool:
 	if not active or not is_alive():
 		return false
 	if is_dodging() or dodge_exit_invulnerability_left > 0.0:
@@ -316,6 +340,7 @@ func try_start_forced_movement(direction: Vector2, distance: float, duration: fl
 	forced_movement_duration = duration
 	forced_movement_time_left = duration
 	forced_movement_velocity = forced_movement_direction * (distance / duration)
+	forced_movement_damage_protection_source = damage_protection_source
 	velocity = forced_movement_velocity
 	_update_horizontal_facing(forced_movement_direction)
 	queue_redraw()
@@ -588,6 +613,8 @@ func _draw() -> void:
 	var shadow_color := body_color.darkened(0.8)
 	shadow_color.a = shadow_alpha
 	draw_circle(Vector2(0.0, 6.0), body_radius - 2.0, shadow_color)
+	if has_shove_damage_protection():
+		_draw_shove_protection_smear()
 
 
 func _update_body_visuals(delta: float) -> void:
@@ -787,6 +814,19 @@ func _clear_forced_movement_state() -> void:
 	forced_movement_duration = 0.0
 	forced_movement_time_left = 0.0
 	forced_movement_velocity = Vector2.ZERO
+	forced_movement_damage_protection_source = FORCED_MOVEMENT_PROTECTION_NONE
+
+
+func _draw_shove_protection_smear() -> void:
+	var smear_direction := forced_movement_direction
+	if smear_direction.length_squared() <= 0.001 and forced_movement_velocity.length_squared() > 0.001:
+		smear_direction = forced_movement_velocity.normalized()
+	if smear_direction.length_squared() <= 0.001:
+		smear_direction = Vector2(float(facing_direction), 0.0)
+
+	var smear_end := -smear_direction.normalized() * shove_protection_smear_length
+	draw_line(Vector2.ZERO, smear_end, shove_protection_smear_color, shove_protection_smear_width)
+	draw_circle(smear_end * 0.6, maxf(shove_protection_smear_width, 1.0), shove_protection_smear_color)
 
 
 func _reset_body_visual_roll() -> void:

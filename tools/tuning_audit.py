@@ -77,16 +77,21 @@ def main() -> int:
         "arc_reposition_duration",
         "arc_reposition_speed_scale",
         "arc_radial_correction_strength",
+        "post_shove_reposition_duration",
+        "post_shove_side_sample_distance",
+        "post_shove_follow_up_delay",
         "shove_cooldown",
         "PROJECTILE_KIND_DART",
         "DAMAGE_SOURCE_DART",
+        "FORCED_MOVEMENT_PROTECTION_SHOVE",
         "try_start_forced_movement",
     ]:
         require(variable_name in tuning, f"TUNING.md documents {variable_name}", failures)
 
     for approved_value in [
-        "14x16px",
+        "16x18px",
         "`movement_speed_scale` | `0.90`",
+        "`blowgun_length` | `14.0px`",
         "`aim_duration` | `0.48s`",
         "`locked_duration` | `0.24s`",
         "`burst_interval` | `0.17s`",
@@ -96,6 +101,8 @@ def main() -> int:
         "`arc_reposition_speed_scale` | `1.35`",
         "`arc_reposition_side_sample_distance` | `60.0px`",
         "`arc_radial_correction_strength` | `0.28`",
+        "`post_shove_reposition_duration` | `0.42s`",
+        "`shove_knockback_distance/duration` | `52.0px / 0.24s`",
         "`shove_cooldown` | `2.10s`",
         "Two distinct dart indices from one `burst_id` may both damage",
     ]:

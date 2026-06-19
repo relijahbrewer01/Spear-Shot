@@ -104,11 +104,12 @@ def main() -> int:
         "enum ShooterState" in shooter
         and "LOCKED" in shooter
         and "ARC_REPOSITION" in shooter
+        and "POST_SHOVE_REPOSITION" in shooter
         and "AIM_CANCEL_REPOSITION" in shooter
         and "SHOVE_WINDUP" in shooter
         and "SHOVE_ACTIVE" in shooter
         and "SHOVE_RECOVER" in shooter,
-        "Shooter uses explicit attack, reposition, and shove states",
+        "Shooter uses explicit attack, reposition, follow-up, and shove states",
         failures,
     )
     require("aim_duration := 0.48" in shooter and "locked_duration := 0.24" in shooter, "Shooter refined telegraph timing is explicit", failures)
@@ -123,8 +124,10 @@ def main() -> int:
     require("arc_reposition_speed_scale := 1.35" in shooter and "arc_reposition_side_sample_distance := 60.0" in shooter, "Shooter arc reposition has dedicated travel and side-sampling values", failures)
     require("arc_radial_correction_strength := 0.28" in shooter, "Shooter has updated arc radial correction", failures)
     require("shove_trigger_distance := 20.0" in shooter and "shove_cooldown := 2.10" in shooter, "Shooter has close-range shove tuning values", failures)
-    require("shove_knockback_distance := 26.0" in shooter and "shove_knockback_duration := 0.18" in shooter, "Shooter shove exports authored player knockback values", failures)
-    require("signal shove_used" in shooter and "player.try_start_forced_movement" in shooter, "Shooter shove uses the narrow player forced-movement seam", failures)
+    require("shove_knockback_distance := 52.0" in shooter and "shove_knockback_duration := 0.24" in shooter, "Shooter shove exports the stronger authored player knockback values", failures)
+    require("post_shove_reposition_duration := 0.42" in shooter and "post_shove_reposition_speed_scale := 1.45" in shooter, "Shooter has an authored successful-shove follow-up reposition", failures)
+    require("post_shove_side_sample_distance := 48.0" in shooter and "post_shove_follow_up_delay := 0.12" in shooter, "Shooter follow-up reposition has dedicated side sampling and follow-up delay", failures)
+    require("signal shove_used" in shooter and "player.try_start_forced_movement" in shooter and "Player.FORCED_MOVEMENT_PROTECTION_SHOVE" in shooter, "Shooter shove uses the narrow protected forced-movement seam", failures)
     require("minimum_dart_interval := 2.4" in shooter, "Shooter has a minimum dart interval", failures)
     require("dart_requested.emit" in shooter and "active_burst_id" in shooter, "Shooter asks Main to spawn burst-identified darts", failures)
     require("burst_shots_fired >= 2" in shooter and "burst_shots_fired < 2" in shooter, "Shooter fire state is capped to two darts", failures)
@@ -145,6 +148,7 @@ def main() -> int:
     require("damaged_dart_indices_by_burst" in player, "Player tracks accepted dart indices by burst", failures)
     require("accepted_dart_projectile_tokens" in player, "Player blocks duplicate dart projectile tokens", failures)
     require("FORCED_MOVEMENT" in player and "try_start_forced_movement" in player, "Player exposes the narrow forced-movement state used by shove", failures)
+    require("FORCED_MOVEMENT_PROTECTION_SHOVE" in player and "has_shove_damage_protection" in player, "Player exposes shove-specific damage protection without turning it into dodge invulnerability", failures)
     require("ShieldedEnemy" not in dart and "receive_combat_hit" not in dart, "Dart does not implement Shielded interception yet", failures)
 
     require("EnemyProjectile" in project, "Project names the EnemyProjectile physics layer", failures)
@@ -164,7 +168,7 @@ def main() -> int:
     require("EnemyKind.SHOOTER" in main_script, "Main can select Shooter enemy kind", failures)
 
     require("SHOOTER" in director, "EncounterDirector defines Shooter kind", failures)
-    require("shooter_hostile_cap := 1" in director, "Shooter cap is 1", failures)
+    require("shooter_hostile_cap := 2" in director, "Shooter cap is 2", failures)
     require("get_shooter_hostile_count() < shooter_hostile_cap" in director, "Shooter has a dedicated cap", failures)
     require("get_total_hostile_count() >= total_hostile_cap" in director, "Shooter still counts under total hostile cap", failures)
     require("EnemyKind.SHOOTER" not in director.split("func _build_wave_definitions", 1)[1], "Authored waves contain no Shooter steps", failures)
@@ -178,9 +182,28 @@ def main() -> int:
     require("generate_blowgun_fire" in generator, "Fire SFX is reproducible", failures)
     require("generate_blowgun_shove" in generator, "Shove SFX is reproducible", failures)
     require("draw_shooter_enemy" in asset_generator, "Shooter sprite is reproducible", failures)
+    require("build_shooter_palette_variant_specs" in asset_generator, "Shooter palette variants are defined in the local asset workflow", failures)
+    require("draw_shooter_palette_comparison" in asset_generator, "Shooter comparison output is reproducible in the local asset workflow", failures)
+    require("--generate-dev-shooter-concepts" in asset_generator, "Shooter concept generation stays behind an explicit temporary workflow flag", failures)
     require("mipmaps/generate=false" in shooter_import, "Shooter sprite import disables mipmaps", failures)
+    require("blowgun_length := 14.0" in shooter, "Shooter runtime blowgun length is reduced to 14", failures)
+    require("blowgun_shaft_width := 1.0" in shooter and "blowgun_tip_width := 1.0" in shooter, "Shooter runtime blowgun uses the lighter 1-pixel shaft and tip", failures)
     shooter_image = Image.open(ROOT / "art/sprites/shooter_enemy.png")
-    require(shooter_image.size == (14, 16), "Shooter sprite is reduced to 14x16 pixels", failures)
+    require(shooter_image.size == (16, 18), "Shooter sprite uses the approved 16x18 hybrid canvas", failures)
+    approved_palette = {
+        (83, 103, 63, 255),
+        (205, 186, 133, 255),
+        (37, 31, 27, 255),
+        (68, 57, 48, 255),
+        (116, 122, 88, 255),
+        (137, 96, 66, 255),
+    }
+    live_palette = {
+        pixel
+        for pixel in shooter_image.getdata()
+        if pixel[3] > 0
+    }
+    require(live_palette == approved_palette, "Shooter live sprite uses the approved Variant 2 moss-hood palette", failures)
     require('importer="wav"' in windup_import, "Wind-up audio import uses WAV importer", failures)
     require('importer="wav"' in fire_import, "Fire audio import uses WAV importer", failures)
     if shove_import:

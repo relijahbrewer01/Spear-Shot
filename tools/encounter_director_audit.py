@@ -95,7 +95,7 @@ def main() -> int:
     require("normal_hostile_cap := 9" in director, "Normal cap is tunable from nine", failures)
     require("charger_hostile_cap := 2" in director, "Charger safety cap is tunable from two", failures)
     require("shielded_hostile_cap := 1" in director, "Shielded safety cap is tunable from one", failures)
-    require("shooter_hostile_cap := 1" in director, "Shooter safety cap is tunable from one", failures)
+    require("shooter_hostile_cap := 2" in director, "Shooter safety cap is tunable from two", failures)
     require(
         "first_minute_charger_cap := 1" in director,
         "First-minute Charger production is limited to one",

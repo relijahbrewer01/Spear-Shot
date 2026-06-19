@@ -1,0 +1,30 @@
+Godot Engine v4.7.stable.steam.5b4e0cb0f - https://godotengine.org
+
+CHECK res://scripts/arena.gd
+CHECK res://scripts/charger.gd
+CHECK res://scripts/dart_projectile.gd
+CHECK res://scripts/destination_marker.gd
+CHECK res://scripts/encounter_director.gd
+CHECK res://scripts/encounter_telegraph.gd
+CHECK res://scripts/enemy.gd
+CHECK res://scripts/high_score_store.gd
+CHECK res://scripts/hud.gd
+CHECK res://scripts/main.gd
+CHECK res://scripts/player.gd
+CHECK res://scripts/player_dodge_cooldown_indicator.gd
+CHECK res://scripts/player_dodge_trail.gd
+CHECK res://scripts/player_health_pips.gd
+CHECK res://scripts/shielded_enemy.gd
+CHECK res://scripts/shooter_enemy.gd
+CHECK res://scripts/spear.gd
+CHECK res://scripts/spear_trail.gd
+CHECK res://tools/bugfix_audit.gd
+CHECK res://tools/check_main_scene_startup.gd
+CHECK res://tools/check_project_scripts.gd
+CHECK res://tools/encounter_director_runtime_audit.gd
+CHECK res://tools/encounter_integration_audit.gd
+CHECK res://tools/player_forced_movement_runtime_audit.gd
+CHECK res://tools/presentation_audit.gd
+CHECK res://tools/shielded_enemy_runtime_audit.gd
+CHECK res://tools/shooter_enemy_runtime_audit.gd
+All project scripts loaded successfully.

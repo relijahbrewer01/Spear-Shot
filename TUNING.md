@@ -36,7 +36,7 @@
 | Shooter | `shooter_spawn_chance_at_unlock` | `0.04` | `scripts/main.gd` | Starting ambient weight once unlocked. |
 | Shooter | `shooter_spawn_chance_growth_per_second` | `0.00045` | `scripts/main.gd` | Chance growth after unlock. |
 | Shooter | `maximum_shooter_spawn_chance` | `0.10` | `scripts/main.gd` | Long-run chance cap. |
-| Shooter | `shooter_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Shooter cap. |
+| Shooter | `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated active Shooter cap. |
 
 ## Encounter Director
 
@@ -53,7 +53,7 @@
 | `normal_hostile_cap` | `9` | `scripts/encounter_director.gd` | Dedicated Normal cap. |
 | `charger_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated Charger cap. |
 | `shielded_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Shielded cap. |
-| `shooter_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Shooter cap. |
+| `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated Shooter cap. |
 | `spawn_safe_radius` | `72.0px` | `scripts/main.gd` | Safe distance from Akedra for enemy spawns. |
 | `landed_spear_spawn_safe_radius` | `36.0px` | `scripts/main.gd` | Safe distance from a landed spear for enemy spawns. |
 | `spawn_retry_interval` | `0.3s` | `scripts/encounter_director.gd` | Retry delay for blocked wave spawn steps. |
@@ -72,7 +72,8 @@
 | `horizontal_facing_dead_zone` | `0.12` | `scripts/player.gd` | Left/right visual facing threshold. |
 | `DAMAGE_SOURCE_DART` | `&"dart"` | `scripts/player.gd` | Narrow dart damage-context identity. |
 | `ActionState.FORCED_MOVEMENT` | enabled | `scripts/player.gd` | Narrow authored knockback state used by Shooter shove. |
-| `try_start_forced_movement(direction, distance, duration)` | authored inputs | `scripts/player.gd` | Applies knockback without clearing move intent or granting invulnerability. |
+| `try_start_forced_movement(direction, distance, duration, damage_protection_source)` | authored inputs | `scripts/player.gd` | Applies knockback without clearing move intent and can optionally attach narrow shove-only protection. |
+| `FORCED_MOVEMENT_PROTECTION_SHOVE` | enabled | `scripts/player.gd` | Successful Shooter shoves use this narrow protection instead of dodge or hurt invulnerability. |
 
 ## Dodge
 
@@ -155,7 +156,9 @@
 | Setting | Current value | Source | Purpose / tuning effect |
 | --- | --- | --- | --- |
 | `score_value` | `2` | `ShooterEnemy.tscn` | Score for a killed Shooter. |
-| Body sprite dimensions | `14x16px` | `art/sprites/shooter_enemy.png`, `tools/generate_phase4_assets.py` | Smaller wiry skirmisher presentation with a still-generous hitbox. |
+| Body sprite canvas dimensions | `16x18px` | `art/sprites/shooter_enemy.png`, `tools/generate_phase4_assets.py` | Final approved canvas with breathing room around the still-small Shooter silhouette. |
+| Approved live palette | Moss hood, pale ochre face, charcoal-brown torso, restrained rust pouch | `art/sprites/shooter_enemy.png`, `tools/generate_phase4_assets.py` | Final approved palette cleanup chosen from the Stage 4.2 approval board. |
+| Apparent silhouette bounds | About `10x16px` | `art/sprites/shooter_enemy.png`, `tools/generate_phase4_assets.py` | Measured non-transparent Shooter silhouette on the approved canvas. |
 | Normal visual scale | `Vector2.ONE` | `scripts/shooter_enemy.gd` | Base sprite scale. |
 | Aim visual scale | `Vector2(1.08, 0.92)` | `scripts/shooter_enemy.gd` | Inhale/body-compression cue. |
 | Fire visual scale | `Vector2(0.96, 1.04)` | `scripts/shooter_enemy.gd` | Exhale/recoil cue. |
@@ -169,6 +172,8 @@
 | `retreat_distance` | `58.0px` | `scripts/shooter_enemy.gd` | Dangerous range where direct retreat overrides arc movement. |
 | `resume_after_retreat_distance` | `72.0px` | `scripts/shooter_enemy.gd` | Retreat hysteresis reference. |
 | `attack_range_max` | `126.0px` | `scripts/shooter_enemy.gd` | Max range for beginning attacks. |
+| `blowgun_length` | `14.0px` | `scripts/shooter_enemy.gd` | Final reed blowgun length for role readability without spear-like heaviness. |
+| `blowgun_shaft_width/tip_width` | `1.0px / 1.0px` | `scripts/shooter_enemy.gd` | Lighter runtime blowgun profile chosen from the visual concept pass. |
 | `direction_change_cooldown` | `0.35s` | `scripts/shooter_enemy.gd` | Wall/fallback side-change restraint. |
 | `wall_fallback_commit_duration` | `0.45s` | `scripts/shooter_enemy.gd` | Brief wall tangent commitment. |
 | `first_attack_delay_min/max` | `1.0-1.6s` | `scripts/shooter_enemy.gd` | Prevents immediate spawn shot. |
@@ -190,13 +195,18 @@
 | `arc_reposition_speed_scale` | `1.35` | `scripts/shooter_enemy.gd` | Post-burst relocation speed multiplier. |
 | `arc_reposition_side_sample_distance` | `60.0px` | `scripts/shooter_enemy.gd` | Space sample distance for choosing a post-burst side. |
 | `arc_radial_correction_strength` | `0.28` | `scripts/shooter_enemy.gd` | Mild correction toward preferred range during post-burst relocation. |
+| `post_shove_reposition_duration` | `0.42s` | `scripts/shooter_enemy.gd` | Successful-shove movement window before the next valid attack setup. |
+| `post_shove_reposition_speed_scale` | `1.45` | `scripts/shooter_enemy.gd` | Successful-shove reposition speed multiplier. |
+| `post_shove_side_sample_distance` | `48.0px` | `scripts/shooter_enemy.gd` | Side-sampling distance for successful-shove follow-up reposition. |
+| `post_shove_follow_up_delay` | `0.12s` | `scripts/shooter_enemy.gd` | Extra gate before a successful shove may begin the next valid AIM. |
 | `shove_trigger_distance` | `20.0px` | `scripts/shooter_enemy.gd` | Close-range threshold for the defensive shove. |
 | `shove_windup/active/recover_duration` | `0.20/0.08/0.18s` | `scripts/shooter_enemy.gd` | Shove state timings. |
-| `shove_knockback_distance/duration` | `26.0px / 0.18s` | `scripts/shooter_enemy.gd` | Authored player knockback values for a successful shove. |
+| `shove_knockback_distance/duration` | `52.0px / 0.24s` | `scripts/shooter_enemy.gd` | Authored player knockback values for a successful shove. |
 | `shove_cooldown` | `2.10s` | `scripts/shooter_enemy.gd` | Minimum time between shove attempts. |
 | `shove_hit_radius` | `11.0px` | `scripts/shooter_enemy.gd` | Circular shove hit-check radius. |
 | `shove_hit_offset` | `13.0px` | `scripts/shooter_enemy.gd` | Forward offset for the shove hit check. |
-| `shooter_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Shooter cap. |
+| Successful-shove damage protection | active for authored forced movement only | `scripts/player.gd`, `scripts/shooter_enemy.gd` | Prevents unfair chained HP loss while Akedra is being displaced by a landed shove. |
+| `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated active Shooter cap. |
 | Spawn and introduction values | `42s`, `42-52s`, `0.04`, `0.00045`, `0.10` | `scripts/main.gd` | Shooter unlock, intro target, starting chance, growth, and max chance. |
 
 ## Dart Projectile

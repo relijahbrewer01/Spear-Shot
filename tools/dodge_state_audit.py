@@ -29,8 +29,8 @@ def main() -> int:
     roadmap_text = read_text("ROADMAP.md")
 
     require(
-        'Current milestone: `Spear Shot v0.6.0-alpha.2 - Blowgun Shooter`' in readme_text,
-        "README milestone is stamped v0.6.0-alpha.2 Blowgun Shooter",
+        'Current milestone: `Spear Shot v0.6.0-alpha.2.2 - Shooter Visual & Behavior Refinement`' in readme_text,
+        "README milestone is stamped v0.6.0-alpha.2.2 Shooter Visual & Behavior Refinement",
         failures,
     )
     require("signal dodge_started" in player_script and "signal dodge_ended" in player_script and "signal dodge_ready" in player_script, "Player exposes dodge start/end/ready hooks", failures)
@@ -40,7 +40,13 @@ def main() -> int:
     require("dodge_cooldown := 2.0" in player_script, "Player dodge cooldown matches the final tuning", failures)
     require("dodge_cooldown_left = dodge_cooldown" in player_script, "Shift and Space share the same cooldown timer", failures)
     require("The shared dodge cooldown starts when the dodge begins" in readme_text, "README documents when dodge cooldown timing begins", failures)
-    require("action_state == ActionState.NORMAL and dodge_cooldown_left == 0.0" in player_script, "Dodge cannot start while already dodging or cooling down", failures)
+    require(
+        "action_state != ActionState.DODGING" in player_script
+        and "action_state != ActionState.DISABLED" in player_script
+        and "dodge_cooldown_left == 0.0" in player_script,
+        "Dodge cannot start while already dodging, while disabled, or while cooling down.",
+        failures,
+    )
     require(
         "is_damage_invulnerable" in player_script
         and "invulnerability_left > 0.0 or is_dodging() or dodge_exit_invulnerability_left > 0.0" in player_script,

@@ -3,6 +3,7 @@ class_name ShooterEnemy
 
 signal aim_started
 signal dart_requested(spawn_position: Vector2, fire_direction: Vector2, burst_id: int, dart_index: int)
+signal shove_used
 
 enum ShooterState {
 	REPOSITION,
@@ -11,6 +12,11 @@ enum ShooterState {
 	FIRE,
 	RECOVER,
 	ARC_REPOSITION,
+	POST_SHOVE_REPOSITION,
+	AIM_CANCEL_REPOSITION,
+	SHOVE_WINDUP,
+	SHOVE_ACTIVE,
+	SHOVE_RECOVER,
 }
 
 @export var movement_speed_scale := 0.90
@@ -33,11 +39,34 @@ enum ShooterState {
 @export var recover_duration := 0.16
 @export var attack_cooldown := 0.95
 @export var minimum_dart_interval := 2.4
-@export var arc_reposition_duration := 0.65
-@export var arc_reposition_distance_min := 24.0
-@export var arc_reposition_distance_max := 36.0
-@export var arc_radial_correction_strength := 0.35
-@export var blowgun_length := 17.0
+@export var aim_retry_delay := 0.18
+@export var aim_cancel_min_distance := 74.0
+@export var aim_cancel_max_distance := 134.0
+@export var aim_cancel_reposition_duration := 0.55
+@export var aim_cancel_reposition_speed_scale := 1.12
+@export var aim_cancel_reposition_sample_distance := 40.0
+@export var aim_cancel_reposition_radial_correction_strength := 0.22
+@export var arc_reposition_duration := 1.10
+@export var arc_reposition_speed_scale := 1.35
+@export var arc_reposition_side_sample_distance := 60.0
+@export var arc_radial_correction_strength := 0.28
+@export var shove_trigger_distance := 20.0
+@export var shove_windup_duration := 0.20
+@export var shove_active_duration := 0.08
+@export var shove_recover_duration := 0.18
+@export var shove_knockback_distance := 52.0
+@export var shove_knockback_duration := 0.24
+@export var shove_cooldown := 2.10
+@export var shove_hit_radius := 11.0
+@export var shove_hit_offset := 13.0
+@export var post_shove_reposition_duration := 0.42
+@export var post_shove_reposition_speed_scale := 1.45
+@export var post_shove_side_sample_distance := 48.0
+@export var post_shove_radial_correction_strength := 0.36
+@export var post_shove_follow_up_delay := 0.12
+@export var blowgun_length := 14.0
+@export var blowgun_shaft_width := 1.0
+@export var blowgun_tip_width := 1.0
 @export var blowgun_color := Color8(132, 101, 58)
 @export var blowgun_tip_color := Color8(220, 206, 158)
 @export var aim_line_color := Color8(232, 221, 170, 135)
@@ -49,6 +78,8 @@ var state_time_left := 0.0
 var first_attack_delay_left := 0.0
 var attack_cooldown_left := 0.0
 var minimum_dart_interval_left := 0.0
+var aim_retry_left := 0.0
+var shove_cooldown_left := 0.0
 var direction_change_left := 0.0
 var wall_fallback_left := 0.0
 var wall_fallback_direction := Vector2.ZERO
@@ -56,13 +87,23 @@ var arc_reposition_left := 0.0
 var arc_reposition_side := 1
 var arc_reposition_reversed_for_wall := false
 var last_blocked_arc_side := 0
+var post_shove_reposition_side := 1
+var post_shove_reposition_reversed_for_wall := false
+var last_blocked_post_shove_side := 0
+var post_shove_follow_up_left := 0.0
+var aim_cancel_reposition_side := 1
+var aim_cancel_reposition_reversed_for_wall := false
+var last_blocked_cancel_side := 0
 var aim_direction := Vector2.RIGHT
 var locked_direction := Vector2.RIGHT
+var shove_direction := Vector2.RIGHT
 var burst_shots_fired := 0
 var burst_sequence := 0
 var active_burst_id := 0
 var facing_direction := 1
 var is_retreating := false
+var shove_has_attempted_hit := false
+var shove_connected := false
 var rng := RandomNumberGenerator.new()
 
 
@@ -105,6 +146,16 @@ func _physics_process(delta: float) -> void:
 				_process_recover_state(delta)
 			ShooterState.ARC_REPOSITION:
 				_process_arc_reposition_state(delta)
+			ShooterState.POST_SHOVE_REPOSITION:
+				_process_post_shove_reposition_state(delta)
+			ShooterState.AIM_CANCEL_REPOSITION:
+				_process_aim_cancel_reposition_state(delta)
+			ShooterState.SHOVE_WINDUP:
+				_process_shove_windup_state(delta)
+			ShooterState.SHOVE_ACTIVE:
+				_process_shove_active_state(delta)
+			ShooterState.SHOVE_RECOVER:
+				_process_shove_recover_state(delta)
 
 		_try_contact_damage()
 	else:
@@ -118,13 +169,19 @@ func _update_shooter_timers(delta: float) -> void:
 	first_attack_delay_left = maxf(first_attack_delay_left - delta, 0.0)
 	attack_cooldown_left = maxf(attack_cooldown_left - delta, 0.0)
 	minimum_dart_interval_left = maxf(minimum_dart_interval_left - delta, 0.0)
+	aim_retry_left = maxf(aim_retry_left - delta, 0.0)
+	shove_cooldown_left = maxf(shove_cooldown_left - delta, 0.0)
 	direction_change_left = maxf(direction_change_left - delta, 0.0)
 	wall_fallback_left = maxf(wall_fallback_left - delta, 0.0)
 	arc_reposition_left = maxf(arc_reposition_left - delta, 0.0)
+	post_shove_follow_up_left = maxf(post_shove_follow_up_left - delta, 0.0)
 
 
 func _process_reposition_state(delta: float) -> void:
 	var distance_to_player := _get_distance_to_player()
+	if _should_start_shove(distance_to_player):
+		_enter_shove_windup_state()
+		return
 	if _can_begin_attack(distance_to_player):
 		_enter_aim_state()
 		return
@@ -134,15 +191,25 @@ func _process_reposition_state(delta: float) -> void:
 
 func _process_aim_state(delta: float) -> void:
 	var distance_to_player := _get_distance_to_player()
-	if distance_to_player < retreat_distance or distance_to_player > attack_range_max + distance_dead_zone:
+	if _should_start_shove(distance_to_player):
+		_enter_shove_windup_state()
+		return
+	if distance_to_player < aim_cancel_min_distance:
+		aim_retry_left = maxf(aim_retry_left, aim_retry_delay)
 		_enter_reposition_state(false)
+		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
+		return
+	if distance_to_player > aim_cancel_max_distance:
+		_enter_aim_cancel_reposition_state()
 		return
 
 	var current_direction := _get_direction_to_player()
-	if current_direction != Vector2.ZERO:
-		aim_direction = current_direction
-		_update_facing_from_direction(aim_direction)
+	if current_direction == Vector2.ZERO:
+		_enter_aim_cancel_reposition_state()
+		return
 
+	aim_direction = current_direction
+	_update_facing_from_direction(aim_direction)
 	state_time_left = maxf(state_time_left - delta, 0.0)
 	velocity = Vector2.ZERO
 	if state_time_left == 0.0:
@@ -187,6 +254,70 @@ func _process_arc_reposition_state(delta: float) -> void:
 		return
 
 	_move_with_velocity(_get_arc_reposition_velocity(delta, distance_to_player))
+
+
+func _process_post_shove_reposition_state(delta: float) -> void:
+	var distance_to_player := _get_distance_to_player()
+	state_time_left = maxf(state_time_left - delta, 0.0)
+	_move_with_velocity(_get_post_shove_reposition_velocity(delta, distance_to_player))
+
+	if _can_begin_post_shove_follow_up(distance_to_player):
+		_enter_aim_state()
+		return
+
+	if state_time_left == 0.0:
+		_enter_reposition_state(false)
+
+
+func _process_aim_cancel_reposition_state(delta: float) -> void:
+	var distance_to_player := _get_distance_to_player()
+	if _should_start_shove(distance_to_player):
+		_enter_shove_windup_state()
+		return
+	if distance_to_player <= retreat_distance:
+		_enter_reposition_state(false)
+		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
+		return
+
+	state_time_left = maxf(state_time_left - delta, 0.0)
+	_move_with_velocity(_get_aim_cancel_reposition_velocity(delta, distance_to_player))
+	if state_time_left == 0.0:
+		_enter_reposition_state(false)
+
+
+func _process_shove_windup_state(delta: float) -> void:
+	var current_direction := _get_direction_to_player()
+	if current_direction != Vector2.ZERO:
+		shove_direction = current_direction
+		_update_facing_from_direction(shove_direction)
+
+	state_time_left = maxf(state_time_left - delta, 0.0)
+	velocity = Vector2.ZERO
+	if state_time_left == 0.0:
+		_enter_shove_active_state()
+
+
+func _process_shove_active_state(delta: float) -> void:
+	state_time_left = maxf(state_time_left - delta, 0.0)
+	velocity = Vector2.ZERO
+	if state_time_left == 0.0:
+		if shove_connected:
+			_enter_post_shove_reposition_state()
+			return
+		_enter_shove_recover_state()
+
+
+func _process_shove_recover_state(delta: float) -> void:
+	state_time_left = maxf(state_time_left - delta, 0.0)
+	velocity = Vector2.ZERO
+	if state_time_left > 0.0:
+		return
+
+	var distance_to_player := _get_distance_to_player()
+	if distance_to_player <= retreat_distance:
+		_enter_reposition_state(false)
+		return
+	_enter_arc_reposition_state()
 
 
 func _get_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
@@ -242,25 +373,24 @@ func _get_arc_reposition_velocity(delta: float, distance_to_player: float) -> Ve
 		from_player = Vector2.RIGHT
 
 	var radial_direction := from_player.normalized()
-	var tangent_direction := Vector2(-radial_direction.y, radial_direction.x).normalized() * float(arc_reposition_side)
-	var radial_correction := Vector2.ZERO
-	if distance_to_player < preferred_distance_min:
-		radial_correction = radial_direction * arc_radial_correction_strength
-	elif distance_to_player > preferred_distance_max:
-		radial_correction = -radial_direction * arc_radial_correction_strength
+	var tangent_direction := Vector2(-radial_direction.y, radial_direction.x).normalized()
+	tangent_direction *= float(arc_reposition_side)
 
+	var radial_correction := _get_radial_correction(distance_to_player, radial_direction, arc_radial_correction_strength)
 	var desired_direction := (tangent_direction + radial_correction).normalized()
-	var desired_velocity := desired_direction * move_speed * approach_speed_scale
+	var desired_velocity := desired_direction * move_speed * arc_reposition_speed_scale
+
 	if _motion_would_leave_arena(desired_velocity, delta) and not arc_reposition_reversed_for_wall:
 		last_blocked_arc_side = arc_reposition_side
 		arc_reposition_side *= -1
 		arc_reposition_reversed_for_wall = true
 		tangent_direction = -tangent_direction
 		desired_direction = (tangent_direction + radial_correction).normalized()
-		desired_velocity = desired_direction * move_speed * approach_speed_scale
+		desired_velocity = desired_direction * move_speed * arc_reposition_speed_scale
 
 	desired_velocity += _get_separation_push() * 0.2
-	var speed_limit := move_speed * maxf(retreat_speed_scale, approach_speed_scale)
+	var arc_peak_scale := maxf(approach_speed_scale, arc_reposition_speed_scale)
+	var speed_limit := move_speed * maxf(retreat_speed_scale, arc_peak_scale)
 	if desired_velocity.length() > speed_limit:
 		desired_velocity = desired_velocity.normalized() * speed_limit
 
@@ -268,6 +398,94 @@ func _get_arc_reposition_velocity(delta: float, distance_to_player: float) -> Ve
 		_update_facing_from_direction(desired_velocity.normalized())
 
 	return desired_velocity
+
+
+func _get_post_shove_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
+	if player == null:
+		return Vector2.ZERO
+
+	var from_player := global_position - player.global_position
+	if from_player.length_squared() <= 0.001:
+		from_player = Vector2.RIGHT
+
+	var radial_direction := from_player.normalized()
+	var tangent_direction := Vector2(-radial_direction.y, radial_direction.x).normalized()
+	tangent_direction *= float(post_shove_reposition_side)
+
+	var radial_correction := _get_radial_correction(
+		distance_to_player,
+		radial_direction,
+		post_shove_radial_correction_strength
+	)
+	var desired_direction := (tangent_direction + radial_correction).normalized()
+	var desired_velocity := desired_direction * move_speed * post_shove_reposition_speed_scale
+
+	if _motion_would_leave_arena(desired_velocity, delta) and not post_shove_reposition_reversed_for_wall:
+		last_blocked_post_shove_side = post_shove_reposition_side
+		post_shove_reposition_side *= -1
+		post_shove_reposition_reversed_for_wall = true
+		tangent_direction = -tangent_direction
+		desired_direction = (tangent_direction + radial_correction).normalized()
+		desired_velocity = desired_direction * move_speed * post_shove_reposition_speed_scale
+
+	desired_velocity += _get_separation_push() * 0.15
+	var reposition_peak_scale := maxf(approach_speed_scale, post_shove_reposition_speed_scale)
+	var speed_limit := move_speed * maxf(retreat_speed_scale, reposition_peak_scale)
+	if desired_velocity.length() > speed_limit:
+		desired_velocity = desired_velocity.normalized() * speed_limit
+
+	if desired_velocity.length_squared() > 0.01:
+		_update_facing_from_direction(desired_velocity.normalized())
+
+	return desired_velocity
+
+
+func _get_aim_cancel_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
+	if player == null:
+		return Vector2.ZERO
+
+	var from_player := global_position - player.global_position
+	if from_player.length_squared() <= 0.001:
+		from_player = Vector2.RIGHT
+
+	var radial_direction := from_player.normalized()
+	var tangent_direction := Vector2(-radial_direction.y, radial_direction.x).normalized()
+	tangent_direction *= float(aim_cancel_reposition_side)
+
+	var radial_correction := _get_radial_correction(
+		distance_to_player,
+		radial_direction,
+		aim_cancel_reposition_radial_correction_strength
+	)
+	var desired_direction := (tangent_direction + radial_correction).normalized()
+	var desired_velocity := desired_direction * move_speed * aim_cancel_reposition_speed_scale
+
+	if _motion_would_leave_arena(desired_velocity, delta) and not aim_cancel_reposition_reversed_for_wall:
+		last_blocked_cancel_side = aim_cancel_reposition_side
+		aim_cancel_reposition_side *= -1
+		aim_cancel_reposition_reversed_for_wall = true
+		tangent_direction = -tangent_direction
+		desired_direction = (tangent_direction + radial_correction).normalized()
+		desired_velocity = desired_direction * move_speed * aim_cancel_reposition_speed_scale
+
+	desired_velocity += _get_separation_push() * 0.15
+	var cancel_peak_scale := maxf(approach_speed_scale, aim_cancel_reposition_speed_scale)
+	var speed_limit := move_speed * maxf(retreat_speed_scale, cancel_peak_scale)
+	if desired_velocity.length() > speed_limit:
+		desired_velocity = desired_velocity.normalized() * speed_limit
+
+	if desired_velocity.length_squared() > 0.01:
+		_update_facing_from_direction(desired_velocity.normalized())
+
+	return desired_velocity
+
+
+func _get_radial_correction(distance_to_player: float, radial_direction: Vector2, correction_strength: float) -> Vector2:
+	if distance_to_player < preferred_distance_min:
+		return radial_direction * correction_strength
+	if distance_to_player > preferred_distance_max:
+		return -radial_direction * correction_strength
+	return Vector2.ZERO
 
 
 func _begin_wall_fallback(to_player: Vector2) -> void:
@@ -317,15 +535,32 @@ func _can_begin_attack(distance_to_player: float) -> bool:
 		first_attack_delay_left == 0.0
 		and attack_cooldown_left == 0.0
 		and minimum_dart_interval_left == 0.0
+		and aim_retry_left == 0.0
 		and distance_to_player >= preferred_distance_min
 		and distance_to_player <= attack_range_max
 	)
+
+
+func _can_begin_post_shove_follow_up(distance_to_player: float) -> bool:
+	return (
+		player != null
+		and not player.is_in_shove_forced_movement()
+		and post_shove_follow_up_left == 0.0
+		and _can_begin_attack(distance_to_player)
+	)
+
+
+func _should_start_shove(distance_to_player: float) -> bool:
+	return shove_cooldown_left == 0.0 and distance_to_player <= shove_trigger_distance
 
 
 func _enter_reposition_state(start_cooldown: bool) -> void:
 	shooter_state = ShooterState.REPOSITION
 	state_time_left = 0.0
 	burst_shots_fired = 0
+	shove_has_attempted_hit = false
+	shove_connected = false
+	post_shove_follow_up_left = 0.0
 	if start_cooldown:
 		attack_cooldown_left = attack_cooldown
 
@@ -333,12 +568,14 @@ func _enter_reposition_state(start_cooldown: bool) -> void:
 func _enter_aim_state() -> void:
 	shooter_state = ShooterState.AIM
 	state_time_left = aim_duration
+	post_shove_follow_up_left = 0.0
 	aim_direction = _get_direction_to_player()
 	if aim_direction == Vector2.ZERO:
 		aim_direction = locked_direction
 	if aim_direction == Vector2.ZERO:
 		aim_direction = Vector2.RIGHT
 	_update_facing_from_direction(aim_direction)
+	velocity = Vector2.ZERO
 	aim_started.emit()
 
 
@@ -367,6 +604,83 @@ func _enter_recover_state() -> void:
 	velocity = Vector2.ZERO
 
 
+func _enter_arc_reposition_state() -> void:
+	shooter_state = ShooterState.ARC_REPOSITION
+	state_time_left = 0.0
+	burst_shots_fired = 0
+	arc_reposition_left = arc_reposition_duration
+	arc_reposition_reversed_for_wall = false
+	arc_reposition_side = _choose_arc_reposition_side()
+	velocity = Vector2.ZERO
+
+
+func _enter_post_shove_reposition_state() -> void:
+	shooter_state = ShooterState.POST_SHOVE_REPOSITION
+	state_time_left = post_shove_reposition_duration
+	post_shove_follow_up_left = post_shove_follow_up_delay
+	post_shove_reposition_reversed_for_wall = false
+	post_shove_reposition_side = _choose_post_shove_reposition_side()
+	velocity = Vector2.ZERO
+
+
+func _enter_aim_cancel_reposition_state() -> void:
+	shooter_state = ShooterState.AIM_CANCEL_REPOSITION
+	state_time_left = aim_cancel_reposition_duration
+	aim_retry_left = maxf(aim_retry_left, aim_retry_delay)
+	aim_cancel_reposition_reversed_for_wall = false
+	aim_cancel_reposition_side = _choose_cancel_reposition_side()
+	velocity = Vector2.ZERO
+
+
+func _enter_shove_windup_state() -> void:
+	shooter_state = ShooterState.SHOVE_WINDUP
+	state_time_left = shove_windup_duration
+	aim_retry_left = maxf(aim_retry_left, aim_retry_delay)
+	shove_has_attempted_hit = false
+	shove_connected = false
+	shove_direction = _get_direction_to_player()
+	if shove_direction == Vector2.ZERO:
+		shove_direction = Vector2(float(facing_direction), 0.0)
+	_update_facing_from_direction(shove_direction)
+	velocity = Vector2.ZERO
+
+
+func _enter_shove_active_state() -> void:
+	shooter_state = ShooterState.SHOVE_ACTIVE
+	state_time_left = shove_active_duration
+	shove_cooldown_left = shove_cooldown
+	velocity = Vector2.ZERO
+	shove_used.emit()
+	_perform_shove_hit_check()
+
+
+func _enter_shove_recover_state() -> void:
+	shooter_state = ShooterState.SHOVE_RECOVER
+	state_time_left = shove_recover_duration
+	velocity = Vector2.ZERO
+
+
+func _perform_shove_hit_check() -> void:
+	if shove_has_attempted_hit:
+		return
+
+	shove_has_attempted_hit = true
+	if player == null or not player.is_alive():
+		return
+
+	var hit_center := global_position + shove_direction.normalized() * shove_hit_offset
+	var hit_distance := player.global_position.distance_to(hit_center)
+	if hit_distance > shove_hit_radius + player.body_radius:
+		return
+
+	shove_connected = player.try_start_forced_movement(
+		shove_direction,
+		shove_knockback_distance,
+		shove_knockback_duration,
+		Player.FORCED_MOVEMENT_PROTECTION_SHOVE
+	)
+
+
 func _fire_burst_dart() -> void:
 	if burst_shots_fired >= 2:
 		return
@@ -379,15 +693,6 @@ func _fire_burst_dart() -> void:
 		minimum_dart_interval_left = minimum_dart_interval
 
 	dart_requested.emit(_get_dart_spawn_position(), locked_direction, active_burst_id, dart_index)
-
-
-func _enter_arc_reposition_state() -> void:
-	shooter_state = ShooterState.ARC_REPOSITION
-	state_time_left = 0.0
-	burst_shots_fired = 0
-	arc_reposition_left = arc_reposition_duration
-	arc_reposition_reversed_for_wall = false
-	arc_reposition_side = _choose_arc_reposition_side()
 
 
 func _get_next_burst_id() -> int:
@@ -408,6 +713,19 @@ func _choose_arc_reposition_side() -> int:
 	return random_side
 
 
+func _choose_post_shove_reposition_side() -> int:
+	var random_side := 1 if rng.randf() >= 0.5 else -1
+	var alternate_side := -random_side
+	if random_side == last_blocked_post_shove_side:
+		random_side = alternate_side
+
+	var random_score := _score_post_shove_side(random_side)
+	var alternate_score := _score_post_shove_side(alternate_side)
+	if alternate_score > random_score + 4.0:
+		return alternate_side
+	return random_side
+
+
 func _score_arc_side(side: int) -> float:
 	if player == null:
 		return 0.0
@@ -416,8 +734,42 @@ func _score_arc_side(side: int) -> float:
 	if from_player.length_squared() <= 0.001:
 		from_player = Vector2.RIGHT
 	var tangent := Vector2(-from_player.y, from_player.x).normalized() * float(side)
-	var sample_distance := (arc_reposition_distance_min + arc_reposition_distance_max) * 0.5
-	return _score_lateral_direction(tangent, sample_distance)
+	return _score_lateral_direction(tangent, arc_reposition_side_sample_distance)
+
+
+func _score_post_shove_side(side: int) -> float:
+	if player == null:
+		return 0.0
+
+	var from_player := global_position - player.global_position
+	if from_player.length_squared() <= 0.001:
+		from_player = Vector2.RIGHT
+	var tangent := Vector2(-from_player.y, from_player.x).normalized() * float(side)
+	return _score_lateral_direction(tangent, post_shove_side_sample_distance)
+
+
+func _choose_cancel_reposition_side() -> int:
+	var random_side := 1 if rng.randf() >= 0.5 else -1
+	var alternate_side := -random_side
+	if random_side == last_blocked_cancel_side:
+		random_side = alternate_side
+
+	var random_score := _score_cancel_side(random_side)
+	var alternate_score := _score_cancel_side(alternate_side)
+	if alternate_score > random_score + 4.0:
+		return alternate_side
+	return random_side
+
+
+func _score_cancel_side(side: int) -> float:
+	if player == null:
+		return 0.0
+
+	var from_player := global_position - player.global_position
+	if from_player.length_squared() <= 0.001:
+		from_player = Vector2.RIGHT
+	var tangent := Vector2(-from_player.y, from_player.x).normalized() * float(side)
+	return _score_lateral_direction(tangent, aim_cancel_reposition_sample_distance)
 
 
 func _clear_attack_state() -> void:
@@ -425,13 +777,22 @@ func _clear_attack_state() -> void:
 	state_time_left = 0.0
 	attack_cooldown_left = 0.0
 	minimum_dart_interval_left = 0.0
+	aim_retry_left = 0.0
+	shove_cooldown_left = 0.0
 	wall_fallback_left = 0.0
 	wall_fallback_direction = Vector2.ZERO
 	arc_reposition_left = 0.0
 	arc_reposition_side = 1
 	arc_reposition_reversed_for_wall = false
+	post_shove_reposition_side = 1
+	post_shove_reposition_reversed_for_wall = false
+	post_shove_follow_up_left = 0.0
+	aim_cancel_reposition_side = 1
+	aim_cancel_reposition_reversed_for_wall = false
 	burst_shots_fired = 0
 	active_burst_id = 0
+	shove_has_attempted_hit = false
+	shove_connected = false
 	velocity = Vector2.ZERO
 	queue_redraw()
 
@@ -466,6 +827,10 @@ func _update_facing_from_direction(direction: Vector2) -> void:
 		facing_direction = -1
 
 
+func _try_contact_damage() -> void:
+	return
+
+
 func _draw_alive_body(fill_color: Color) -> void:
 	super._draw_alive_body(fill_color)
 	_draw_blowgun()
@@ -479,9 +844,14 @@ func _draw_blowgun() -> void:
 	var start_point := draw_offset + visual_direction * 3.0 + side_offset
 	var end_point := start_point + visual_direction * blowgun_length
 
-	draw_line(start_point + Vector2(0.0, 1.0), end_point + Vector2(0.0, 1.0), Color(0.0, 0.0, 0.0, 0.22), 3.0)
-	draw_line(start_point, end_point, blowgun_color, 3.0)
-	draw_line(end_point - visual_direction * 2.0, end_point, blowgun_tip_color, 2.0)
+	draw_line(
+		start_point + Vector2(0.0, 1.0),
+		end_point + Vector2(0.0, 1.0),
+		Color(0.0, 0.0, 0.0, 0.22),
+		2.0
+	)
+	draw_line(start_point, end_point, blowgun_color, blowgun_shaft_width)
+	draw_line(end_point - visual_direction * 2.0, end_point, blowgun_tip_color, blowgun_tip_width)
 
 
 func _draw_attack_cue() -> void:
@@ -505,12 +875,14 @@ func _draw_attack_cue() -> void:
 
 
 func _get_visual_aim_direction() -> Vector2:
-	var visual_direction := locked_direction
 	if shooter_state == ShooterState.AIM:
-		visual_direction = aim_direction
-	if visual_direction == Vector2.ZERO:
-		visual_direction = Vector2.RIGHT * float(facing_direction)
-	return visual_direction.normalized()
+		return aim_direction.normalized()
+	if shooter_state == ShooterState.LOCKED or shooter_state == ShooterState.FIRE:
+		return locked_direction.normalized()
+	if shooter_state == ShooterState.SHOVE_WINDUP or shooter_state == ShooterState.SHOVE_ACTIVE or shooter_state == ShooterState.SHOVE_RECOVER:
+		return shove_direction.normalized()
+
+	return Vector2(float(facing_direction), 0.28).normalized()
 
 
 func _get_visual_offset() -> Vector2:
@@ -524,6 +896,12 @@ func _get_visual_offset() -> Vector2:
 			base_offset -= visual_direction * 0.5
 		ShooterState.FIRE:
 			base_offset -= visual_direction * 2.0
+		ShooterState.SHOVE_WINDUP:
+			base_offset -= visual_direction * 1.2
+		ShooterState.SHOVE_ACTIVE:
+			base_offset += visual_direction * 1.6
+		ShooterState.SHOVE_RECOVER:
+			base_offset -= visual_direction * 0.8
 		_:
 			if velocity.length_squared() > 1.0:
 				base_offset += velocity.normalized() * 1.0
@@ -532,10 +910,15 @@ func _get_visual_offset() -> Vector2:
 
 
 func _get_visual_scale() -> Vector2:
-	if shooter_state == ShooterState.AIM:
-		return Vector2(1.08, 0.92)
-	if shooter_state == ShooterState.FIRE:
-		return Vector2(0.96, 1.04)
+	match shooter_state:
+		ShooterState.AIM:
+			return Vector2(1.08, 0.92)
+		ShooterState.FIRE:
+			return Vector2(0.96, 1.04)
+		ShooterState.SHOVE_WINDUP:
+			return Vector2(1.05, 0.95)
+		ShooterState.SHOVE_ACTIVE:
+			return Vector2(0.92, 1.08)
 	return Vector2.ONE
 
 

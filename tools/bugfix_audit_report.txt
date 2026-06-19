@@ -1,0 +1,32 @@
+audio_bus_layout_setting=res://default_bus_layout.tres
+spawn_timer_exists=true
+enemy_container_exists=true
+hud_exists=true
+spawn_timer_wait_time=2.2
+spawn_timer_one_shot=true
+spawn_timer_autostart=false
+spawn_timer_is_stopped_initial=false
+spawn_timer_time_left_initial=2.04157666666667
+spawn_timer_connected_to_main=true
+hud_mouse_filter TimeLabel=2 focus_mode=0
+hud_mouse_filter ScoreLabel=2 focus_mode=0
+hud_mouse_filter PauseBackdrop=2 focus_mode=0
+hud_mouse_filter PauseLabel=2 focus_mode=0
+hud_mouse_filter GameOverBackdrop=2 focus_mode=0
+hud_mouse_filter GameOverPanel=0 focus_mode=0
+hud_mouse_filter GameOverPanel/RestartButton=0 focus_mode=2
+scene_instantiated=res://Enemy.tscn node=Enemy
+scene_instantiated=res://Charger.tscn node=Charger
+play_rect=[P: (16.0, 16.0), S: (352.0, 184.0)]
+spawn_timeout_count_after_2_6s=1
+enemy_count_after_2_6s=1
+after_2_6s_positions=Enemy pos=(46.42704, 67.06598) inside_play_rect=true
+spawn_timeout_count_after_5_2s=2
+enemy_count_after_5_2s=2
+after_5_2s_positions=Enemy pos=(152.156, 96.79614) inside_play_rect=true | @CharacterBody2D@10 pos=(181.4075, 152.0111) inside_play_rect=true
+enemy_count_before_manual_spawn=2
+enemy_count_after_manual_spawn=3
+after_manual_spawn_positions=Enemy pos=(152.8337, 96.98672) inside_play_rect=true | @CharacterBody2D@10 pos=(181.5732, 151.3228) inside_play_rect=true | @CharacterBody2D@11 pos=(264.2469, 191.4256) inside_play_rect=true
+enemy_child_entered_tree=Enemy pos=(24.0, 60.75972) visible=true
+enemy_child_entered_tree=@CharacterBody2D@10 pos=(171.783, 192.0) visible=true
+enemy_child_entered_tree=@CharacterBody2D@11 pos=(264.7443, 192.0) visible=true

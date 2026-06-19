@@ -147,7 +147,7 @@ def main() -> int:
     require("_on_enemy_killed" in main_script and "score += score_value" in main_script, "Score remains single-source in Main", failures)
 
     require("SHIELDED" in director, "EncounterDirector has a Shielded enemy kind", failures)
-    require("shielded_hostile_cap := 2" in director, "Shielded cap starts at 2", failures)
+    require("shielded_hostile_cap := 1" in director, "Shielded cap starts at 1", failures)
     require("get_total_hostile_count() >= total_hostile_cap" in director, "Shielded counts under total hostile cap", failures)
     require("get_shielded_hostile_count() < shielded_hostile_cap" in director, "Shielded has a dedicated cap", failures)
     require(

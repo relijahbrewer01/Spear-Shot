@@ -1,0 +1,171 @@
+{
+  "comparison_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\shooter_candidates\\shooter_palette_comparison.png",
+  "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\shooter_enemy.png",
+  "candidates": [
+    {
+      "key": "1",
+      "title": "Olive Hood",
+      "file_name": "shooter_palette_variant_1.png",
+      "palette_summary": "olive hood, warm tan face, dark umber torso, muted ochre pouch",
+      "contrast_summary": "Warm face pulls focus first, the olive hood stays distinct, and the torso shadows stay clean against the arena.",
+      "hood_color": [
+        96,
+        111,
+        61,
+        255
+      ],
+      "face_color": [
+        191,
+        167,
+        124,
+        255
+      ],
+      "shadow_color": [
+        43,
+        34,
+        26,
+        255
+      ],
+      "torso_color": [
+        76,
+        59,
+        41,
+        255
+      ],
+      "strap_color": [
+        124,
+        132,
+        86,
+        255
+      ],
+      "pouch_color": [
+        153,
+        119,
+        68,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 18,
+      "apparent_body_width": 10,
+      "apparent_body_height": 16,
+      "blowgun_length": 14,
+      "blowgun_width": 1,
+      "blowgun_origin_x": 10,
+      "blowgun_origin_y": 7,
+      "blowgun_direction_x": 14,
+      "blowgun_direction_y": -1,
+      "silhouette_summary": "Approved A/B hybrid silhouette on the live 16x18 canvas.",
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\shooter_candidates\\shooter_palette_variant_1.png"
+    },
+    {
+      "key": "2",
+      "title": "Moss Hood",
+      "file_name": "shooter_palette_variant_2.png",
+      "palette_summary": "moss-green hood, pale ochre face, charcoal-brown torso, restrained rust accent",
+      "contrast_summary": "The pale face reads fastest, the darker charcoal torso anchors the legs, and the rust pouch keeps the lower silhouette from turning to mud.",
+      "hood_color": [
+        83,
+        103,
+        63,
+        255
+      ],
+      "face_color": [
+        205,
+        186,
+        133,
+        255
+      ],
+      "shadow_color": [
+        37,
+        31,
+        27,
+        255
+      ],
+      "torso_color": [
+        68,
+        57,
+        48,
+        255
+      ],
+      "strap_color": [
+        116,
+        122,
+        88,
+        255
+      ],
+      "pouch_color": [
+        137,
+        96,
+        66,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 18,
+      "apparent_body_width": 10,
+      "apparent_body_height": 16,
+      "blowgun_length": 14,
+      "blowgun_width": 1,
+      "blowgun_origin_x": 10,
+      "blowgun_origin_y": 7,
+      "blowgun_direction_x": 14,
+      "blowgun_direction_y": -1,
+      "silhouette_summary": "Approved A/B hybrid silhouette on the live 16x18 canvas.",
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\shooter_candidates\\shooter_palette_variant_2.png"
+    },
+    {
+      "key": "3",
+      "title": "Peat Hood",
+      "file_name": "shooter_palette_variant_3.png",
+      "palette_summary": "darker peat hood, light bone/tan face, medium bark torso, muted sage accent",
+      "contrast_summary": "This version leans darkest overall, so the face pops strongly and the sage accent helps the forward-leaning posture stay readable.",
+      "hood_color": [
+        69,
+        76,
+        52,
+        255
+      ],
+      "face_color": [
+        214,
+        196,
+        150,
+        255
+      ],
+      "shadow_color": [
+        34,
+        28,
+        24,
+        255
+      ],
+      "torso_color": [
+        94,
+        72,
+        50,
+        255
+      ],
+      "strap_color": [
+        121,
+        133,
+        97,
+        255
+      ],
+      "pouch_color": [
+        122,
+        113,
+        80,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 18,
+      "apparent_body_width": 10,
+      "apparent_body_height": 16,
+      "blowgun_length": 14,
+      "blowgun_width": 1,
+      "blowgun_origin_x": 10,
+      "blowgun_origin_y": 7,
+      "blowgun_direction_x": 14,
+      "blowgun_direction_y": -1,
+      "silhouette_summary": "Approved A/B hybrid silhouette on the live 16x18 canvas.",
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\shooter_candidates\\shooter_palette_variant_3.png"
+    }
+  ]
+}

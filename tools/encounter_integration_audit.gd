@@ -155,17 +155,16 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 	)
 
 	director.reset_for_new_run()
-	for _index in range(2):
-		var shielded := Node.new()
-		main.add_child(shielded)
-		director.register_enemy(
-			shielded,
-			EncounterDirector.EnemyKind.SHIELDED,
-			EncounterDirector.INVALID_WAVE_ID
-		)
+	var shielded := Node.new()
+	main.add_child(shielded)
+	director.register_enemy(
+		shielded,
+		EncounterDirector.EnemyKind.SHIELDED,
+		EncounterDirector.INVALID_WAVE_ID
+	)
 	_require(
 		not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHIELDED, 60.0),
-		"Current Shielded active cap remains two."
+		"Current Shielded active cap remains one."
 	)
 	director.reset_for_new_run()
 	var shooter := Node.new()
@@ -176,8 +175,19 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 		EncounterDirector.INVALID_WAVE_ID
 	)
 	_require(
+		director.can_spawn_enemy(EncounterDirector.EnemyKind.SHOOTER, 60.0),
+		"Shooter active cap allows a second Shooter."
+	)
+	var second_shooter := Node.new()
+	main.add_child(second_shooter)
+	director.register_enemy(
+		second_shooter,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.INVALID_WAVE_ID
+	)
+	_require(
 		not director.can_spawn_enemy(EncounterDirector.EnemyKind.SHOOTER, 60.0),
-		"Shooter active cap remains one."
+		"Shooter active cap remains two."
 	)
 
 	main.set_process(true)

@@ -50,8 +50,8 @@ const INVALID_WAVE_ID := -1
 @export var total_hostile_cap := 10
 @export var normal_hostile_cap := 9
 @export var charger_hostile_cap := 2
-@export var shielded_hostile_cap := 2
-@export var shooter_hostile_cap := 1
+@export var shielded_hostile_cap := 1
+@export var shooter_hostile_cap := 2
 @export var first_minute_charger_cap := 1
 @export var spawn_retry_interval := 0.3
 

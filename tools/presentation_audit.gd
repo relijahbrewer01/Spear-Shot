@@ -17,6 +17,7 @@ const AUDIO_PATHS := [
 	"res://audio/shield_break.wav",
 	"res://audio/blowgun_windup.wav",
 	"res://audio/blowgun_fire.wav",
+	"res://audio/blowgun_shove.wav",
 ]
 
 const SCENE_SPRITES := {
@@ -143,6 +144,7 @@ func _audit_main_scene_audio(report_lines: Array[String]) -> int:
 		"AudioPlayers/ShieldBreakPlayer",
 		"AudioPlayers/BlowgunWindupPlayer",
 		"AudioPlayers/BlowgunFirePlayer",
+		"AudioPlayers/BlowgunShovePlayer",
 	]:
 		var player := main.get_node_or_null(player_path) as AudioStreamPlayer
 		if player == null:

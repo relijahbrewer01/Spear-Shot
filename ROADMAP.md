@@ -20,7 +20,10 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Distinct darts in one Shooter burst can each damage Akedra through a narrow player-owned burst context; duplicate callbacks and unrelated damage still respect ordinary invulnerability.
 - Shooters die to one valid thrown-spear hit for `2` points, count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normal, Charger, or Shielded.
 - Phase 4.2.2 refines the Shooter into a final hooded-forager presentation on a small `16x18` canvas, locks the approved moss-hood palette cleanup, and adds the successful-shove follow-up behavior while keeping the live gameplay size intentionally small and fair.
-- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, combo scoring, and broader combat frameworks are deferred.
+- Phase 4.3 adds the ambient-only Exploder as a late-run, cap-1 hopping battlefield weapon: it deals no ordinary contact damage, can be killed safely for `2` before fuse, and otherwise commits to an immediate landing-time three-pulse fuse followed by a damaging core blast and a non-damaging outer shockwave.
+- Exploder self-destruction awards no direct score, but enemies killed by the blast still use their normal death/scoring pathways.
+- The narrow Shooter follow-up correction in the same subphase makes `AIM` fully committed once it starts, so player distance changes no longer cancel the live wind-up.
+- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, Exploder authored waves, combo scoring, and broader combat frameworks are deferred.
 
 ## Phase 4.6 Enemy Interaction And Formation Pass
 

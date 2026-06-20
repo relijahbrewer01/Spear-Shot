@@ -292,6 +292,109 @@ def generate_blowgun_shove() -> list[float]:
     return samples
 
 
+def generate_exploder_hop_prep() -> list[float]:
+    length = int(SAMPLE_RATE * 0.18)
+    samples: list[float] = []
+    body_resonance = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        body_resonance = body_resonance * 0.88 + raw_noise * 0.12
+        compression = math.sin(2.0 * math.pi * (132.0 - progress * 24.0) * index / SAMPLE_RATE)
+        creak = math.sin(2.0 * math.pi * (286.0 + progress * 34.0) * index / SAMPLE_RATE)
+        squash_curve = progress ** 1.4
+        samples.append(
+            (
+                compression * 0.34 * squash_curve
+                + creak * 0.18 * squash_curve
+                + body_resonance * 0.24 * squash_curve
+            )
+            * envelope(progress, 0.03, 0.28)
+        )
+    return samples
+
+
+def generate_exploder_land() -> list[float]:
+    length = int(SAMPLE_RATE * 0.16)
+    samples: list[float] = []
+    body_resonance = 0.0
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        impact_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        body_resonance = body_resonance * 0.85 + raw_noise * 0.15
+        thud = math.sin(2.0 * math.pi * (108.0 - progress * 20.0) * index / SAMPLE_RATE)
+        shell_rattle = math.sin(2.0 * math.pi * 248.0 * index / SAMPLE_RATE)
+        impact_curve = math.exp(-progress * 8.0)
+        samples.append(
+            (
+                thud * 0.46 * impact_curve
+                + body_resonance * 0.26 * impact_curve
+                + impact_noise * 0.24 * impact_curve
+                + shell_rattle * 0.12 * impact_curve
+            )
+            * envelope(progress, 0.006, 0.58)
+        )
+    return samples
+
+
+def generate_exploder_fuse() -> list[float]:
+    length = int(SAMPLE_RATE * 0.80)
+    samples: list[float] = []
+    body_noise = 0.0
+    pulse_centers = [0.06, 0.38, 0.68]
+    pulse_widths = [0.07, 0.06, 0.05]
+    pulse_gains = [0.42, 0.54, 0.68]
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        body_noise = body_noise * 0.91 + raw_noise * 0.09
+        base_tone = math.sin(2.0 * math.pi * (154.0 + progress * 28.0) * index / SAMPLE_RATE)
+        pressure_tone = math.sin(2.0 * math.pi * (242.0 + progress * 82.0) * index / SAMPLE_RATE)
+        pulse_energy = 0.0
+        for pulse_center, pulse_width, pulse_gain in zip(pulse_centers, pulse_widths, pulse_gains):
+            pulse_energy += math.exp(-((progress - pulse_center) / pulse_width) ** 2) * pulse_gain
+        samples.append(
+            (
+                base_tone * 0.10
+                + pressure_tone * 0.08 * pulse_energy
+                + body_noise * 0.18 * (0.25 + pulse_energy)
+            )
+            * envelope(progress, 0.02, 0.14)
+        )
+    return samples
+
+
+def generate_exploder_explosion() -> list[float]:
+    length = int(SAMPLE_RATE * 0.28)
+    samples: list[float] = []
+    body_resonance = 0.0
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        blast_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        body_resonance = body_resonance * 0.83 + raw_noise * 0.17
+        thump = math.sin(2.0 * math.pi * (96.0 - progress * 18.0) * index / SAMPLE_RATE)
+        crack = math.sin(2.0 * math.pi * (510.0 - progress * 130.0) * index / SAMPLE_RATE)
+        air_burst = math.sin(2.0 * math.pi * 164.0 * index / SAMPLE_RATE)
+        blast_curve = math.exp(-progress * 5.2)
+        samples.append(
+            (
+                thump * 0.56 * blast_curve
+                + body_resonance * 0.30 * blast_curve
+                + blast_noise * 0.32 * blast_curve
+                + crack * 0.14 * blast_curve
+                + air_burst * 0.10 * blast_curve
+            )
+            * envelope(progress, 0.004, 0.44)
+        )
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -307,6 +410,10 @@ def main() -> None:
         "blowgun_windup.wav": generate_blowgun_windup(),
         "blowgun_fire.wav": generate_blowgun_fire(),
         "blowgun_shove.wav": generate_blowgun_shove(),
+        "exploder_hop_prep.wav": generate_exploder_hop_prep(),
+        "exploder_land.wav": generate_exploder_land(),
+        "exploder_fuse.wav": generate_exploder_fuse(),
+        "exploder_explosion.wav": generate_exploder_explosion(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

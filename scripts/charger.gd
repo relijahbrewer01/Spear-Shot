@@ -52,15 +52,16 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if _can_run_behavior():
-		match state:
-			State.CHASE:
-				_process_chase_state(delta)
-			State.TELEGRAPH:
-				_process_telegraph_state(delta)
-			State.DASH:
-				_process_dash_state(delta)
-			State.RECOVER:
-				_process_recover_state(delta)
+		if not _process_explosion_knockback(delta):
+			match state:
+				State.CHASE:
+					_process_chase_state(delta)
+				State.TELEGRAPH:
+					_process_telegraph_state(delta)
+				State.DASH:
+					_process_dash_state(delta)
+				State.RECOVER:
+					_process_recover_state(delta)
 
 	_update_sprite_visuals()
 	_update_visible_entry_state()
@@ -134,6 +135,11 @@ func _enter_recover_state() -> void:
 	velocity = Vector2.ZERO
 
 
+func apply_explosion_knockback(direction: Vector2, distance: float, duration: float) -> void:
+	_enter_recover_state()
+	super.apply_explosion_knockback(direction, distance, duration)
+
+
 func _get_current_fill_color() -> Color:
 	if hit_flash_left > 0.0:
 		return hit_flash_color
@@ -205,6 +211,8 @@ func _update_visible_entry_state() -> void:
 
 func _can_deal_contact_damage() -> bool:
 	if not active or player == null or not player.is_alive():
+		return false
+	if is_in_explosion_knockback():
 		return false
 	if not has_visible_arena_entry:
 		return false

@@ -4,11 +4,14 @@ const EnemyScene := preload("res://Enemy.tscn")
 const ChargerScene := preload("res://Charger.tscn")
 const ShieldedScene := preload("res://ShieldedEnemy.tscn")
 const ShooterScene := preload("res://ShooterEnemy.tscn")
+const ExploderScene := preload("res://ExploderEnemy.tscn")
+const ExploderBlastEffectScene := preload("res://ExploderBlastEffect.tscn")
 const DartProjectileScene := preload("res://DartProjectile.tscn")
 const HighScoreStore := preload("res://scripts/high_score_store.gd")
 const NO_AMBIENT_ENEMY_KIND := -1
 const DEBUG_SHIELDED_SPAWN_ENABLED := true
 const DEBUG_SHOOTER_SPAWN_ENABLED := true
+const DEBUG_EXPLODER_SPAWN_ENABLED := true
 
 enum RunState {
 	RUNNING,
@@ -56,6 +59,12 @@ enum SpawnSource {
 @export var maximum_shooter_spawn_chance := 0.10
 @export var shooter_intro_target_time_min := 42.0
 @export var shooter_intro_target_time_max := 52.0
+@export var exploder_unlock_time := 65.0
+@export var exploder_spawn_chance_at_unlock := 0.025
+@export var exploder_spawn_chance_growth_per_second := 0.00035
+@export var maximum_exploder_spawn_chance := 0.07
+@export var exploder_intro_target_time_min := 65.0
+@export var exploder_intro_target_time_max := 78.0
 
 var score := 0
 var high_score := 0
@@ -63,9 +72,11 @@ var survival_time := 0.0
 var charger_intro_target_time := 15.0
 var shielded_intro_target_time := 25.0
 var shooter_intro_target_time := 42.0
+var exploder_intro_target_time := 65.0
 var charger_intro_seen := false
 var shielded_intro_seen := false
 var shooter_intro_seen := false
+var exploder_intro_seen := false
 var pause_active := false
 var run_state: RunState = RunState.RUNNING
 var shake_left := 0.0
@@ -85,6 +96,7 @@ var debug_ambient_roll_sequence: Array = []
 @onready var encounter_telegraph: EncounterTelegraph = $EncounterTelegraph
 @onready var encounter_director: EncounterDirector = $EncounterDirector
 @onready var enemy_container: Node2D = $EnemyContainer
+@onready var effect_container: Node2D = $EffectContainer
 @onready var projectile_container: Node2D = $ProjectileContainer
 @onready var spawn_timer: Timer = $SpawnTimer
 @onready var camera: Camera2D = $Camera2D
@@ -102,6 +114,10 @@ var debug_ambient_roll_sequence: Array = []
 @onready var blowgun_windup_player: AudioStreamPlayer = $AudioPlayers/BlowgunWindupPlayer
 @onready var blowgun_fire_player: AudioStreamPlayer = $AudioPlayers/BlowgunFirePlayer
 @onready var blowgun_shove_player: AudioStreamPlayer = $AudioPlayers/BlowgunShovePlayer
+@onready var exploder_hop_prep_player: AudioStreamPlayer = $AudioPlayers/ExploderHopPrepPlayer
+@onready var exploder_land_player: AudioStreamPlayer = $AudioPlayers/ExploderLandPlayer
+@onready var exploder_fuse_player: AudioStreamPlayer = $AudioPlayers/ExploderFusePlayer
+@onready var exploder_explosion_player: AudioStreamPlayer = $AudioPlayers/ExploderExplosionPlayer
 
 
 func _ready() -> void:
@@ -165,6 +181,7 @@ func _reset_runtime_state() -> void:
 
 	for child in enemy_container.get_children():
 		child.queue_free()
+	_clear_transient_effects()
 	_clear_projectiles()
 
 	encounter_director.reset_for_new_run()
@@ -205,6 +222,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if DEBUG_SHOOTER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_shooter"):
 		_debug_spawn_shooter_enemy()
+		return
+	if DEBUG_EXPLODER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_exploder"):
+		_debug_spawn_exploder_enemy()
 		return
 
 	if event.is_action_pressed("dodge_aim"):
@@ -280,6 +300,14 @@ func _try_spawn_enemy(
 		enemy.connect(&"dart_requested", _on_shooter_enemy_dart_requested)
 	if enemy.has_signal("shove_used"):
 		enemy.connect(&"shove_used", _on_shooter_enemy_shove_used)
+	if enemy.has_signal("hop_prepared"):
+		enemy.connect(&"hop_prepared", _on_exploder_enemy_hop_prepared)
+	if enemy.has_signal("hop_landed"):
+		enemy.connect(&"hop_landed", _on_exploder_enemy_hop_landed)
+	if enemy.has_signal("fuse_started"):
+		enemy.connect(&"fuse_started", _on_exploder_enemy_fuse_started)
+	if enemy.has_signal("detonated"):
+		enemy.connect(&"detonated", _on_exploder_enemy_detonated)
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
 	_mark_intro_seen_for_spawn(enemy_kind, spawn_source)
@@ -312,6 +340,19 @@ func _debug_spawn_shooter_enemy() -> void:
 		print("DEBUG: Shooter enemy spawn failed; cap or safe spawn search blocked it.")
 
 
+func _debug_spawn_exploder_enemy() -> void:
+	var spawned := _try_spawn_enemy(
+		EncounterDirector.EnemyKind.EXPLODER,
+		arena.get_random_spawn_edge(),
+		EncounterDirector.INVALID_WAVE_ID,
+		SpawnSource.DEBUG
+	)
+	if spawned:
+		print("DEBUG: spawned Exploder enemy with key 3.")
+	else:
+		print("DEBUG: Exploder enemy spawn failed; cap or safe spawn search blocked it.")
+
+
 func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
 	var avoid_positions: Array[Vector2] = [player.global_position]
 	var avoid_radii: Array[float] = [spawn_safe_radius]
@@ -329,6 +370,8 @@ func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 		return ShieldedScene
 	if enemy_kind == EncounterDirector.EnemyKind.SHOOTER:
 		return ShooterScene
+	if enemy_kind == EncounterDirector.EnemyKind.EXPLODER:
+		return ExploderScene
 	return EnemyScene
 
 
@@ -365,8 +408,18 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 		survival_time >= shooter_unlock_time
 		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.SHOOTER, survival_time)
 	)
+	var exploder_available := (
+		survival_time >= exploder_unlock_time
+		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.EXPLODER, survival_time)
+	)
 
-	if not normal_available and not charger_available and not shielded_available and not shooter_available:
+	if (
+		not normal_available
+		and not charger_available
+		and not shielded_available
+		and not shooter_available
+		and not exploder_available
+	):
 		return NO_AMBIENT_ENEMY_KIND
 
 	var shielded_spawn_chance := 0.0
@@ -398,8 +451,20 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 
 	if charger_available and non_shooter_roll < charger_spawn_chance:
 		return EncounterDirector.EnemyKind.CHARGER
+	var non_charger_roll := non_shooter_roll
+	if charger_available and charger_spawn_chance < 1.0:
+		non_charger_roll = (non_shooter_roll - charger_spawn_chance) / (1.0 - charger_spawn_chance)
+
+	var exploder_spawn_chance := 0.0
+	if exploder_available:
+		exploder_spawn_chance = _get_current_exploder_spawn_chance()
+
+	if exploder_available and non_charger_roll < exploder_spawn_chance:
+		return EncounterDirector.EnemyKind.EXPLODER
 	if normal_available:
 		return EncounterDirector.EnemyKind.NORMAL
+	if exploder_available:
+		return EncounterDirector.EnemyKind.EXPLODER
 	if charger_available:
 		return EncounterDirector.EnemyKind.CHARGER
 	if shooter_available:
@@ -423,6 +488,11 @@ func _pick_pending_intro_enemy_kind() -> int:
 		pending_candidates.append({
 			"enemy_kind": EncounterDirector.EnemyKind.SHOOTER,
 			"target_time": shooter_intro_target_time,
+		})
+	if _is_intro_pending_and_available(EncounterDirector.EnemyKind.EXPLODER):
+		pending_candidates.append({
+			"enemy_kind": EncounterDirector.EnemyKind.EXPLODER,
+			"target_time": exploder_intro_target_time,
 		})
 
 	if pending_candidates.is_empty():
@@ -457,6 +527,12 @@ func _is_intro_pending_and_available(enemy_kind: int) -> bool:
 				and survival_time >= shooter_intro_target_time
 				and _is_enemy_kind_available_for_ambient(enemy_kind)
 			)
+		EncounterDirector.EnemyKind.EXPLODER:
+			return (
+				not exploder_intro_seen
+				and survival_time >= exploder_intro_target_time
+				and _is_enemy_kind_available_for_ambient(enemy_kind)
+			)
 
 	return false
 
@@ -478,6 +554,11 @@ func _is_enemy_kind_available_for_ambient(enemy_kind: int) -> bool:
 		EncounterDirector.EnemyKind.SHOOTER:
 			return (
 				survival_time >= shooter_unlock_time
+				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
+			)
+		EncounterDirector.EnemyKind.EXPLODER:
+			return (
+				survival_time >= exploder_unlock_time
 				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
 			)
 
@@ -505,21 +586,40 @@ func _get_current_shooter_spawn_chance() -> float:
 	return min(shooter_spawn_chance, maximum_shooter_spawn_chance)
 
 
+func _get_current_exploder_spawn_chance() -> float:
+	var exploder_spawn_chance := exploder_spawn_chance_at_unlock + (
+		(survival_time - exploder_unlock_time) * exploder_spawn_chance_growth_per_second
+	)
+	return min(exploder_spawn_chance, maximum_exploder_spawn_chance)
+
+
 func _reset_intro_state() -> void:
 	charger_intro_seen = false
 	shielded_intro_seen = false
 	shooter_intro_seen = false
+	exploder_intro_seen = false
 	_generate_intro_target_times()
 
 
 func _generate_intro_target_times() -> void:
 	if not debug_intro_target_sequence.is_empty():
 		var target_values: Variant = debug_intro_target_sequence.pop_front()
+		if target_values is Vector4:
+			var target_quad: Vector4 = target_values
+			charger_intro_target_time = target_quad.x
+			shielded_intro_target_time = target_quad.y
+			shooter_intro_target_time = target_quad.z
+			exploder_intro_target_time = target_quad.w
+			return
 		if target_values is Vector3:
 			var target_triple: Vector3 = target_values
 			charger_intro_target_time = target_triple.x
 			shielded_intro_target_time = target_triple.y
 			shooter_intro_target_time = target_triple.z
+			exploder_intro_target_time = rng.randf_range(
+				exploder_intro_target_time_min,
+				exploder_intro_target_time_max
+			)
 			return
 		if target_values is Vector2:
 			var target_pair: Vector2 = target_values
@@ -529,8 +629,18 @@ func _generate_intro_target_times() -> void:
 				shooter_intro_target_time_min,
 				shooter_intro_target_time_max
 			)
+			exploder_intro_target_time = rng.randf_range(
+				exploder_intro_target_time_min,
+				exploder_intro_target_time_max
+			)
 			return
-		push_warning("Intro target audit values must be Vector2 or Vector3.")
+		if target_values is Array and target_values.size() >= 4:
+			charger_intro_target_time = float(target_values[0])
+			shielded_intro_target_time = float(target_values[1])
+			shooter_intro_target_time = float(target_values[2])
+			exploder_intro_target_time = float(target_values[3])
+			return
+		push_warning("Intro target audit values must be Vector2, Vector3, Vector4, or an Array of four floats.")
 		_generate_random_intro_target_times()
 		return
 
@@ -550,6 +660,10 @@ func _generate_random_intro_target_times() -> void:
 		shooter_intro_target_time_min,
 		shooter_intro_target_time_max
 	)
+	exploder_intro_target_time = rng.randf_range(
+		exploder_intro_target_time_min,
+		exploder_intro_target_time_max
+	)
 
 
 func _mark_intro_seen_for_spawn(enemy_kind: int, spawn_source: int) -> void:
@@ -563,6 +677,8 @@ func _mark_intro_seen_for_spawn(enemy_kind: int, spawn_source: int) -> void:
 			shielded_intro_seen = true
 		EncounterDirector.EnemyKind.SHOOTER:
 			shooter_intro_seen = true
+		EncounterDirector.EnemyKind.EXPLODER:
+			exploder_intro_seen = true
 
 
 func _get_ambient_selection_roll() -> float:
@@ -575,12 +691,15 @@ func _get_ambient_selection_roll() -> float:
 func debug_set_intro_target_times(
 	new_charger_intro_target_time: float,
 	new_shielded_intro_target_time: float,
-	new_shooter_intro_target_time: float = -1.0
+	new_shooter_intro_target_time: float = -1.0,
+	new_exploder_intro_target_time: float = -1.0
 ) -> void:
 	charger_intro_target_time = new_charger_intro_target_time
 	shielded_intro_target_time = new_shielded_intro_target_time
 	if new_shooter_intro_target_time >= 0.0:
 		shooter_intro_target_time = new_shooter_intro_target_time
+	if new_exploder_intro_target_time >= 0.0:
+		exploder_intro_target_time = new_exploder_intro_target_time
 
 
 func debug_set_intro_target_sequence(new_intro_target_sequence: Array) -> void:
@@ -655,6 +774,8 @@ func _on_player_died() -> void:
 	_clear_projectiles()
 	if blowgun_windup_player != null:
 		blowgun_windup_player.stop()
+	if exploder_fuse_player != null:
+		exploder_fuse_player.stop()
 
 	var is_new_high_score := score > high_score
 	if is_new_high_score:
@@ -706,6 +827,41 @@ func _on_shooter_enemy_shove_used() -> void:
 	_play_sfx(blowgun_shove_player)
 
 
+func _on_exploder_enemy_hop_prepared() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(exploder_hop_prep_player)
+
+
+func _on_exploder_enemy_hop_landed() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(exploder_land_player)
+
+
+func _on_exploder_enemy_fuse_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(exploder_fuse_player)
+
+
+func _on_exploder_enemy_detonated(
+	position: Vector2,
+	core_radius: float,
+	outer_radius: float
+) -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	if exploder_fuse_player != null:
+		exploder_fuse_player.stop()
+	_play_sfx(exploder_explosion_player)
+	_spawn_exploder_blast_effect(position, core_radius, outer_radius)
+
+
 func _spawn_dart_projectile(
 	spawn_position: Vector2,
 	fire_direction: Vector2,
@@ -730,6 +886,14 @@ func _clear_projectiles() -> void:
 			projectile.call("destroy_projectile", DartProjectile.DESTROY_REASON_CLEARED)
 		else:
 			projectile.queue_free()
+
+
+func _clear_transient_effects() -> void:
+	if effect_container == null:
+		return
+
+	for effect in effect_container.get_children():
+		effect.queue_free()
 
 
 func _on_spear_picked_up() -> void:
@@ -810,6 +974,16 @@ func _play_sfx(audio_player: AudioStreamPlayer) -> void:
 	audio_player.play()
 
 
+func _spawn_exploder_blast_effect(position: Vector2, core_radius: float, outer_radius: float) -> void:
+	var blast_effect := ExploderBlastEffectScene.instantiate() as ExploderBlastEffect
+	if blast_effect == null:
+		return
+
+	effect_container.add_child(blast_effect)
+	blast_effect.global_position = position
+	blast_effect.setup(core_radius, outer_radius)
+
+
 func _start_background_music() -> void:
 	if music_player == null:
 		return
@@ -845,6 +1019,10 @@ func _stop_all_audio() -> void:
 		blowgun_windup_player,
 		blowgun_fire_player,
 		blowgun_shove_player,
+		exploder_hop_prep_player,
+		exploder_land_player,
+		exploder_fuse_player,
+		exploder_explosion_player,
 	]:
 		if audio_player == null:
 			continue
@@ -865,6 +1043,10 @@ func _stop_gameplay_sfx() -> void:
 		blowgun_windup_player,
 		blowgun_fire_player,
 		blowgun_shove_player,
+		exploder_hop_prep_player,
+		exploder_land_player,
+		exploder_fuse_player,
+		exploder_explosion_player,
 	]:
 		if audio_player == null:
 			continue
@@ -975,6 +1157,7 @@ func _ensure_input_actions() -> void:
 	_add_key_action("dodge_move", KEY_SPACE)
 	_add_key_action("debug_spawn_shielded", KEY_1)
 	_add_key_action("debug_spawn_shooter", KEY_2)
+	_add_key_action("debug_spawn_exploder", KEY_3)
 	_remove_mouse_button_action("throw_spear", MOUSE_BUTTON_RIGHT)
 	_add_mouse_button_action("throw_spear", MOUSE_BUTTON_LEFT)
 	_add_mouse_button_action("move_to_cursor", MOUSE_BUTTON_RIGHT)

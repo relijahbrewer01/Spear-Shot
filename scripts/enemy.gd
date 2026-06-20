@@ -30,6 +30,10 @@ var hit_flash_left := 0.0
 var death_left := 0.0
 var visual_time := 0.0
 var last_sprite_target_global_position := Vector2.ZERO
+var explosion_knockback_direction := Vector2.ZERO
+var explosion_knockback_distance := 0.0
+var explosion_knockback_duration := 0.0
+var explosion_knockback_time_left := 0.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -51,6 +55,7 @@ func setup(player_ref: Player, new_arena_rect: Rect2, starting_speed: float) -> 
 func set_active(is_active: bool) -> void:
 	active = is_active
 	if not active:
+		_clear_explosion_knockback()
 		velocity = Vector2.ZERO
 
 
@@ -73,9 +78,9 @@ func receive_combat_hit(
 	_hit_position: Vector2,
 	_hit_direction: Vector2
 ) -> HitResponse:
-	if hit_source != HIT_SOURCE_SPEAR:
-		return HitResponse.IGNORED
 	if is_dying:
+		return HitResponse.IGNORED
+	if hit_source != HIT_SOURCE_SPEAR and hit_source != HIT_SOURCE_EXPLOSION:
 		return HitResponse.IGNORED
 
 	take_spear_hit()
@@ -90,7 +95,8 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if _can_run_behavior():
-		_process_alive_behavior(delta)
+		if not _process_explosion_knockback(delta):
+			_process_alive_behavior(delta)
 
 	_update_sprite_visuals()
 	queue_redraw()
@@ -142,6 +148,55 @@ func _move_with_velocity(desired_velocity: Vector2) -> void:
 	velocity = desired_velocity
 	move_and_slide()
 	_clamp_inside_arena()
+
+
+func apply_explosion_knockback(direction: Vector2, distance: float, duration: float) -> void:
+	if is_dying or not active:
+		return
+	if direction.length_squared() <= 0.001:
+		return
+	if distance <= 0.0 or duration <= 0.0:
+		return
+
+	explosion_knockback_direction = direction.normalized()
+	explosion_knockback_distance = distance
+	explosion_knockback_duration = duration
+	explosion_knockback_time_left = duration
+	velocity = explosion_knockback_direction * (distance / duration)
+
+
+func is_in_explosion_knockback() -> bool:
+	return explosion_knockback_time_left > 0.0
+
+
+func _process_explosion_knockback(delta: float) -> bool:
+	if not is_in_explosion_knockback():
+		return false
+
+	if explosion_knockback_duration <= 0.0:
+		_clear_explosion_knockback()
+		return false
+
+	var motion_delta := minf(delta, explosion_knockback_time_left)
+	var step_distance := explosion_knockback_distance * (motion_delta / explosion_knockback_duration)
+	global_position += explosion_knockback_direction * step_distance
+	_clamp_inside_arena()
+	if delta > 0.0:
+		velocity = explosion_knockback_direction * step_distance / delta
+	else:
+		velocity = Vector2.ZERO
+
+	explosion_knockback_time_left = maxf(explosion_knockback_time_left - delta, 0.0)
+	if explosion_knockback_time_left == 0.0:
+		_clear_explosion_knockback()
+	return true
+
+
+func _clear_explosion_knockback() -> void:
+	explosion_knockback_direction = Vector2.ZERO
+	explosion_knockback_distance = 0.0
+	explosion_knockback_duration = 0.0
+	explosion_knockback_time_left = 0.0
 
 
 func _try_contact_damage() -> void:

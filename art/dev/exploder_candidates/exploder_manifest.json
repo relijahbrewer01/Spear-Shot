@@ -1,0 +1,114 @@
+{
+  "comparison_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\exploder_candidates\\exploder_comparison.png",
+  "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\exploder_enemy.png",
+  "candidates": [
+    {
+      "key": "1",
+      "title": "Seed Pod",
+      "file_name": "exploder_variant_1.png",
+      "palette_summary": "dry bark body, ochre seed-pod sac, dark sap cracks",
+      "silhouette_summary": "A squat hopper with a side-loaded seed pod bulge and stubby forward paws.",
+      "body_color": [
+        112,
+        86,
+        61,
+        255
+      ],
+      "sac_color": [
+        190,
+        153,
+        100,
+        255
+      ],
+      "mark_color": [
+        79,
+        55,
+        38,
+        255
+      ],
+      "eye_color": [
+        228,
+        214,
+        170,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 18,
+      "apparent_body_width": 14,
+      "apparent_body_height": 14,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\exploder_candidates\\exploder_variant_1.png"
+    },
+    {
+      "key": "2",
+      "title": "Throat Sac",
+      "file_name": "exploder_variant_2.png",
+      "palette_summary": "peat-brown body, pale stretched throat sac, dark root markings",
+      "silhouette_summary": "A hunched frog-locust hopper with a swollen forward throat sac and clear crouched legs.",
+      "body_color": [
+        96,
+        72,
+        54,
+        255
+      ],
+      "sac_color": [
+        208,
+        177,
+        126,
+        255
+      ],
+      "mark_color": [
+        69,
+        47,
+        36,
+        255
+      ],
+      "eye_color": [
+        237,
+        224,
+        181,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 18,
+      "apparent_body_width": 13,
+      "apparent_body_height": 13,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\exploder_candidates\\exploder_variant_2.png"
+    },
+    {
+      "key": "3",
+      "title": "Resin Bladder",
+      "file_name": "exploder_variant_3.png",
+      "palette_summary": "darker bark body, amber resin bladder, sharp charcoal cracks",
+      "silhouette_summary": "A compressed hopper with a larger rear bladder, sharper crack lines, and a flatter predatory head.",
+      "body_color": [
+        88,
+        66,
+        49,
+        255
+      ],
+      "sac_color": [
+        198,
+        146,
+        96,
+        255
+      ],
+      "mark_color": [
+        54,
+        39,
+        31,
+        255
+      ],
+      "eye_color": [
+        228,
+        209,
+        161,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 18,
+      "apparent_body_width": 14,
+      "apparent_body_height": 13,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\exploder_candidates\\exploder_variant_3.png"
+    }
+  ]
+}

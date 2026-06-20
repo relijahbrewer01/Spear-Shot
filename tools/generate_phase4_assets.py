@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 SPRITE_DIR = ROOT / "art" / "sprites"
 DEV_SHOOTER_DIR = ROOT / "art" / "dev" / "shooter_candidates"
-DEV_EXPLODER_DIR = ROOT / "art" / "dev" / "exploder_candidates"
+DEV_BOOMER_DIR = ROOT / "art" / "dev" / "boomer_candidates"
 ARENA_TEXTURE_PATH = ROOT / "art" / "arena" / "arena_floor.png"
 ARENA_SIZE = (384, 216)
 PLAY_RECT = (16, 16, 368, 200)
@@ -18,7 +18,7 @@ BOUNDARY_COLOR = (204, 220, 190, 170)
 LABEL_TEXT_COLOR = (239, 242, 230, 255)
 LABEL_SHADOW_COLOR = (17, 20, 18, 220)
 SHOOTER_CANVAS_SIZE = (16, 18)
-EXPLODER_CANVAS_SIZE = (16, 18)
+BOOMER_CANVAS_SIZE = (16, 18)
 SHOOTER_BLOWGUN_LENGTH = 14
 SHOOTER_BLOWGUN_WIDTH = 1
 SHOOTER_BLOWGUN_ORIGIN = (10, 7)
@@ -52,7 +52,7 @@ class ShooterPaletteVariantSpec:
 
 
 @dataclass(frozen=True)
-class ExploderVariantSpec:
+class BoomerVariantSpec:
     key: str
     title: str
     file_name: str
@@ -62,16 +62,16 @@ class ExploderVariantSpec:
     sac_color: tuple[int, int, int, int]
     mark_color: tuple[int, int, int, int]
     eye_color: tuple[int, int, int, int]
-    canvas_width: int = EXPLODER_CANVAS_SIZE[0]
-    canvas_height: int = EXPLODER_CANVAS_SIZE[1]
+    canvas_width: int = BOOMER_CANVAS_SIZE[0]
+    canvas_height: int = BOOMER_CANVAS_SIZE[1]
     apparent_body_width: int = 0
     apparent_body_height: int = 0
 
 
-def draw_exploder_enemy(path: Path) -> None:
-    image = Image.new("RGBA", EXPLODER_CANVAS_SIZE, (0, 0, 0, 0))
+def draw_boomer_enemy(path: Path) -> None:
+    image = Image.new("RGBA", BOOMER_CANVAS_SIZE, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    _draw_exploder_variant_silhouette(draw, build_exploder_variant_specs()[1])
+    _draw_boomer_variant_silhouette(draw, build_boomer_variant_specs()[1])
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -106,12 +106,12 @@ def draw_shooter_enemy(path: Path) -> None:
     image.save(path)
 
 
-def build_exploder_variant_specs() -> list[ExploderVariantSpec]:
+def build_boomer_variant_specs() -> list[BoomerVariantSpec]:
     return [
-        ExploderVariantSpec(
+        BoomerVariantSpec(
             key="1",
             title="Seed Pod",
-            file_name="exploder_variant_1.png",
+            file_name="boomer_variant_1.png",
             palette_summary="dry bark body, ochre seed-pod sac, dark sap cracks",
             silhouette_summary="A squat hopper with a side-loaded seed pod bulge and stubby forward paws.",
             body_color=(112, 86, 61, 255),
@@ -119,10 +119,10 @@ def build_exploder_variant_specs() -> list[ExploderVariantSpec]:
             mark_color=(79, 55, 38, 255),
             eye_color=(228, 214, 170, 255),
         ),
-        ExploderVariantSpec(
+        BoomerVariantSpec(
             key="2",
             title="Throat Sac",
-            file_name="exploder_variant_2.png",
+            file_name="boomer_variant_2.png",
             palette_summary="peat-brown body, pale stretched throat sac, dark root markings",
             silhouette_summary="A hunched frog-locust hopper with a swollen forward throat sac and clear crouched legs.",
             body_color=(96, 72, 54, 255),
@@ -130,10 +130,10 @@ def build_exploder_variant_specs() -> list[ExploderVariantSpec]:
             mark_color=(69, 47, 36, 255),
             eye_color=(237, 224, 181, 255),
         ),
-        ExploderVariantSpec(
+        BoomerVariantSpec(
             key="3",
             title="Resin Bladder",
-            file_name="exploder_variant_3.png",
+            file_name="boomer_variant_3.png",
             palette_summary="darker bark body, amber resin bladder, sharp charcoal cracks",
             silhouette_summary="A compressed hopper with a larger rear bladder, sharper crack lines, and a flatter predatory head.",
             body_color=(88, 66, 49, 255),
@@ -188,10 +188,10 @@ def build_shooter_palette_variant_specs() -> list[ShooterPaletteVariantSpec]:
     ]
 
 
-def draw_exploder_variant(spec: ExploderVariantSpec, path: Path) -> ExploderVariantSpec:
+def draw_boomer_variant(spec: BoomerVariantSpec, path: Path) -> BoomerVariantSpec:
     image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    _draw_exploder_variant_silhouette(draw, spec)
+    _draw_boomer_variant_silhouette(draw, spec)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -220,7 +220,7 @@ def draw_shooter_palette_variant(spec: ShooterPaletteVariantSpec, path: Path) ->
     )
 
 
-def _draw_exploder_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ExploderVariantSpec) -> None:
+def _draw_boomer_variant_silhouette(draw: ImageDraw.ImageDraw, spec: BoomerVariantSpec) -> None:
     if spec.key == "1":
         draw.ellipse((3, 8, 12, 15), fill=spec.body_color)
         draw.ellipse((8, 4, 14, 11), fill=spec.sac_color)
@@ -309,27 +309,27 @@ def generate_shooter_candidate_assets() -> dict[str, object]:
     return manifest
 
 
-def generate_exploder_candidate_assets() -> dict[str, object]:
-    DEV_EXPLODER_DIR.mkdir(parents=True, exist_ok=True)
-    comparison_path = DEV_EXPLODER_DIR / "exploder_comparison.png"
-    manifest_path = DEV_EXPLODER_DIR / "exploder_manifest.json"
+def generate_boomer_candidate_assets() -> dict[str, object]:
+    DEV_BOOMER_DIR.mkdir(parents=True, exist_ok=True)
+    comparison_path = DEV_BOOMER_DIR / "boomer_comparison.png"
+    manifest_path = DEV_BOOMER_DIR / "boomer_manifest.json"
 
-    variant_specs: list[ExploderVariantSpec] = []
+    variant_specs: list[BoomerVariantSpec] = []
     manifest_candidates: list[dict[str, object]] = []
 
-    for spec in build_exploder_variant_specs():
-        variant_path = DEV_EXPLODER_DIR / spec.file_name
-        finalized_spec = draw_exploder_variant(spec, variant_path)
+    for spec in build_boomer_variant_specs():
+        variant_path = DEV_BOOMER_DIR / spec.file_name
+        finalized_spec = draw_boomer_variant(spec, variant_path)
         variant_specs.append(finalized_spec)
         manifest_candidates.append({
             **asdict(finalized_spec),
             "path": str(variant_path),
         })
 
-    draw_exploder_comparison(variant_specs, comparison_path)
+    draw_boomer_comparison(variant_specs, comparison_path)
     manifest = {
         "comparison_path": str(comparison_path),
-        "active_reference_path": str(SPRITE_DIR / "exploder_enemy.png"),
+        "active_reference_path": str(SPRITE_DIR / "boomer_enemy.png"),
         "candidates": manifest_candidates,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -375,14 +375,14 @@ def draw_shooter_palette_comparison(
     background.save(comparison_path)
 
 
-def draw_exploder_comparison(
-    variant_specs: list[ExploderVariantSpec], comparison_path: Path
+def draw_boomer_comparison(
+    variant_specs: list[BoomerVariantSpec], comparison_path: Path
 ) -> None:
     background = _load_arena_background()
     draw = ImageDraw.Draw(background)
     font = ImageFont.load_default()
 
-    _draw_label(draw, (8, 8), "Exploder Candidate Comparison", font)
+    _draw_label(draw, (8, 8), "Boomer Candidate Comparison", font)
     _draw_label(draw, (8, 20), "Small hopper scale against the live arena and current roster", font)
 
     benchmark_row = [
@@ -393,9 +393,9 @@ def draw_exploder_comparison(
         ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (332, 116)),
     ]
     variant_row = [
-        ("Variant 1", DEV_EXPLODER_DIR / variant_specs[0].file_name, (96, 194)),
-        ("Variant 2", DEV_EXPLODER_DIR / variant_specs[1].file_name, (192, 194)),
-        ("Variant 3", DEV_EXPLODER_DIR / variant_specs[2].file_name, (288, 194)),
+        ("Variant 1", DEV_BOOMER_DIR / variant_specs[0].file_name, (96, 194)),
+        ("Variant 2", DEV_BOOMER_DIR / variant_specs[1].file_name, (192, 194)),
+        ("Variant 3", DEV_BOOMER_DIR / variant_specs[2].file_name, (288, 194)),
     ]
 
     for label, sprite_path, feet_position in benchmark_row:
@@ -490,7 +490,7 @@ def _draw_label(
 def draw_standard_assets() -> None:
     draw_shielded_enemy(SPRITE_DIR / "shielded_enemy.png")
     draw_shooter_enemy(SPRITE_DIR / "shooter_enemy.png")
-    draw_exploder_enemy(SPRITE_DIR / "exploder_enemy.png")
+    draw_boomer_enemy(SPRITE_DIR / "boomer_enemy.png")
 
 
 def parse_args() -> argparse.Namespace:
@@ -501,26 +501,26 @@ def parse_args() -> argparse.Namespace:
         help="Generate temporary Blowgun Shooter palette-variant outputs and comparison board.",
     )
     parser.add_argument(
-        "--generate-dev-exploder-concepts",
+        "--generate-dev-boomer-concepts",
         action="store_true",
-        help="Generate temporary Exploder candidate outputs and comparison board.",
+        help="Generate temporary Boomer candidate outputs and comparison board.",
     )
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Generate both live assets and the temporary Shooter palette outputs.",
+        help="Generate live assets plus the temporary Shooter and Boomer concept outputs.",
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    if args.all or (not args.generate_dev_shooter_concepts and not args.generate_dev_exploder_concepts):
+    if args.all or (not args.generate_dev_shooter_concepts and not args.generate_dev_boomer_concepts):
         draw_standard_assets()
     if args.all or args.generate_dev_shooter_concepts:
         generate_shooter_candidate_assets()
-    if args.all or args.generate_dev_exploder_concepts:
-        generate_exploder_candidate_assets()
+    if args.all or args.generate_dev_boomer_concepts:
+        generate_boomer_candidate_assets()
 
 
 if __name__ == "__main__":

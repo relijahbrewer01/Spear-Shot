@@ -1,12 +1,17 @@
 extends Enemy
-class_name ExploderEnemy
+class_name BoomerEnemy
 
 signal hop_prepared
 signal hop_landed
 signal fuse_started
-signal detonated(position: Vector2, core_radius: float, outer_radius: float)
+signal detonated(
+	position: Vector2,
+	core_radius: float,
+	outer_radius: float,
+	landed_spear_shockwave_displacement: float
+)
 
-enum ExploderState {
+enum BoomerState {
 	HOP_PREP,
 	HOPPING,
 	LAND_RECOVERY,
@@ -27,6 +32,7 @@ enum ExploderState {
 @export var outer_shockwave_radius := 54.0
 @export var player_knockback_distance := 28.0
 @export var player_knockback_duration := 0.20
+@export var landed_spear_shockwave_displacement := 20.0
 @export var enemy_shockwave_knockback_distance := 18.0
 @export var enemy_shockwave_knockback_duration := 0.16
 @export var shooter_shockwave_knockback_distance := 22.0
@@ -39,7 +45,7 @@ enum ExploderState {
 @export var fuse_pulse_color := Color8(255, 232, 176)
 @export var fuse_mark_color := Color8(123, 78, 55)
 
-var exploder_state: ExploderState = ExploderState.HOP_PREP
+var boomer_state: BoomerState = BoomerState.HOP_PREP
 var state_time_left := 0.0
 var hop_start_position := Vector2.ZERO
 var hop_target_position := Vector2.ZERO
@@ -74,7 +80,7 @@ func receive_combat_hit(
 	if hit_source != HIT_SOURCE_SPEAR:
 		return HitResponse.IGNORED
 
-	if exploder_state == ExploderState.FUSE:
+	if boomer_state == BoomerState.FUSE:
 		_start_detonation(hit_position, hit_direction)
 		return HitResponse.DAMAGED
 
@@ -90,14 +96,14 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if _can_run_behavior():
-		match exploder_state:
-			ExploderState.HOP_PREP:
+		match boomer_state:
+			BoomerState.HOP_PREP:
 				_process_hop_prep(delta)
-			ExploderState.HOPPING:
+			BoomerState.HOPPING:
 				_process_hopping(delta)
-			ExploderState.LAND_RECOVERY:
+			BoomerState.LAND_RECOVERY:
 				_process_land_recovery(delta)
-			ExploderState.FUSE:
+			BoomerState.FUSE:
 				_process_fuse(delta)
 	else:
 		velocity = Vector2.ZERO
@@ -167,14 +173,14 @@ func _finish_hop() -> void:
 
 
 func _enter_hop_prep_state() -> void:
-	exploder_state = ExploderState.HOP_PREP
+	boomer_state = BoomerState.HOP_PREP
 	state_time_left = hop_prep_duration
 	velocity = Vector2.ZERO
 	hop_prepared.emit()
 
 
 func _enter_hopping_state() -> void:
-	exploder_state = ExploderState.HOPPING
+	boomer_state = BoomerState.HOPPING
 	state_time_left = hop_duration
 	hop_start_position = global_position
 	hop_direction = _get_direction_to_player()
@@ -184,13 +190,13 @@ func _enter_hopping_state() -> void:
 
 
 func _enter_land_recovery_state() -> void:
-	exploder_state = ExploderState.LAND_RECOVERY
+	boomer_state = BoomerState.LAND_RECOVERY
 	state_time_left = landing_recovery_duration
 	velocity = Vector2.ZERO
 
 
 func _enter_fuse_state() -> void:
-	exploder_state = ExploderState.FUSE
+	boomer_state = BoomerState.FUSE
 	state_time_left = fuse_duration
 	velocity = Vector2.ZERO
 	emitted_fuse_pulse_count = 0
@@ -215,7 +221,12 @@ func _start_detonation(_hit_position: Vector2, hit_direction: Vector2) -> void:
 	collision_mask = 0
 	_clear_explosion_knockback()
 	_resolve_explosion(hit_direction)
-	detonated.emit(global_position, core_blast_radius, outer_shockwave_radius)
+	detonated.emit(
+		global_position,
+		core_blast_radius,
+		outer_shockwave_radius,
+		landed_spear_shockwave_displacement
+	)
 	queue_free()
 
 
@@ -258,6 +269,9 @@ func _resolve_player_core_blast(hit_direction: Vector2) -> void:
 		outward_direction = hop_direction
 	if outward_direction == Vector2.ZERO:
 		outward_direction = Vector2.RIGHT
+
+	if player.has_shove_damage_protection():
+		return
 
 	var damage_applied := player.take_damage(global_position, Player.DAMAGE_SOURCE_EXPLOSION)
 	if not damage_applied:
@@ -378,7 +392,7 @@ func _get_current_fill_color() -> Color:
 	var pulse_strength := _get_fuse_pulse_strength()
 	if pulse_strength > 0.0:
 		return fill_color.lerp(fuse_pulse_color, pulse_strength)
-	if exploder_state == ExploderState.FUSE:
+	if boomer_state == BoomerState.FUSE:
 		return fill_color.lerp(fuse_pulse_color, 0.18)
 	return fill_color
 
@@ -408,14 +422,14 @@ func _get_fuse_pulse_strength() -> float:
 func _get_visual_offset() -> Vector2:
 	var draw_offset := super._get_visual_offset()
 
-	match exploder_state:
-		ExploderState.HOP_PREP:
+	match boomer_state:
+		BoomerState.HOP_PREP:
 			draw_offset += Vector2(0.0, 1.0)
-		ExploderState.HOPPING:
+		BoomerState.HOPPING:
 			if hop_duration > 0.0:
 				var hop_progress := 1.0 - state_time_left / hop_duration
 				draw_offset.y -= roundf(sin(clampf(hop_progress, 0.0, 1.0) * PI) * 6.0)
-		ExploderState.LAND_RECOVERY:
+		BoomerState.LAND_RECOVERY:
 			if landing_recovery_duration > 0.0:
 				var recovery_progress := 1.0 - state_time_left / landing_recovery_duration
 				draw_offset.y += roundf(sin(clampf(recovery_progress, 0.0, 1.0) * PI) * 1.5)
@@ -424,14 +438,14 @@ func _get_visual_offset() -> Vector2:
 
 
 func _get_visual_scale() -> Vector2:
-	match exploder_state:
-		ExploderState.HOP_PREP:
+	match boomer_state:
+		BoomerState.HOP_PREP:
 			return Vector2(1.10, 0.88)
-		ExploderState.HOPPING:
+		BoomerState.HOPPING:
 			return Vector2(0.92, 1.08)
-		ExploderState.LAND_RECOVERY:
+		BoomerState.LAND_RECOVERY:
 			return Vector2(0.96, 1.04)
-		ExploderState.FUSE:
+		BoomerState.FUSE:
 			var pulse_strength := _get_fuse_pulse_strength()
 			return Vector2.ONE + Vector2.ONE * (pulse_strength * 0.06)
 

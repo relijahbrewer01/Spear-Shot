@@ -292,7 +292,7 @@ def generate_blowgun_shove() -> list[float]:
     return samples
 
 
-def generate_exploder_hop_prep() -> list[float]:
+def generate_boomer_hop_prep() -> list[float]:
     length = int(SAMPLE_RATE * 0.18)
     samples: list[float] = []
     body_resonance = 0.0
@@ -314,7 +314,7 @@ def generate_exploder_hop_prep() -> list[float]:
     return samples
 
 
-def generate_exploder_land() -> list[float]:
+def generate_boomer_land() -> list[float]:
     length = int(SAMPLE_RATE * 0.16)
     samples: list[float] = []
     body_resonance = 0.0
@@ -340,7 +340,7 @@ def generate_exploder_land() -> list[float]:
     return samples
 
 
-def generate_exploder_fuse() -> list[float]:
+def generate_boomer_fuse() -> list[float]:
     length = int(SAMPLE_RATE * 0.80)
     samples: list[float] = []
     body_noise = 0.0
@@ -367,7 +367,7 @@ def generate_exploder_fuse() -> list[float]:
     return samples
 
 
-def generate_exploder_explosion() -> list[float]:
+def generate_boomer_explosion() -> list[float]:
     length = int(SAMPLE_RATE * 0.28)
     samples: list[float] = []
     body_resonance = 0.0
@@ -410,10 +410,10 @@ def main() -> None:
         "blowgun_windup.wav": generate_blowgun_windup(),
         "blowgun_fire.wav": generate_blowgun_fire(),
         "blowgun_shove.wav": generate_blowgun_shove(),
-        "exploder_hop_prep.wav": generate_exploder_hop_prep(),
-        "exploder_land.wav": generate_exploder_land(),
-        "exploder_fuse.wav": generate_exploder_fuse(),
-        "exploder_explosion.wav": generate_exploder_explosion(),
+        "boomer_hop_prep.wav": generate_boomer_hop_prep(),
+        "boomer_land.wav": generate_boomer_land(),
+        "boomer_fuse.wav": generate_boomer_fuse(),
+        "boomer_explosion.wav": generate_boomer_explosion(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

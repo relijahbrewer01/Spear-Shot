@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tools/boomer_enemy_runtime_audit.gd" id="1"]
+
+[node name="BoomerEnemyRuntimeAudit" type="Node"]
+script = ExtResource("1")

@@ -96,7 +96,7 @@ def main() -> int:
     require("charger_hostile_cap := 2" in director, "Charger safety cap is tunable from two", failures)
     require("shielded_hostile_cap := 1" in director, "Shielded safety cap is tunable from one", failures)
     require("shooter_hostile_cap := 2" in director, "Shooter safety cap is tunable from two", failures)
-    require("exploder_hostile_cap := 1" in director, "Exploder safety cap is tunable from one", failures)
+    require("boomer_hostile_cap := 1" in director, "Boomer safety cap is tunable from one", failures)
     require(
         "first_minute_charger_cap := 1" in director,
         "First-minute Charger production is limited to one",
@@ -113,16 +113,16 @@ def main() -> int:
         failures,
     )
     require(
-        "get_exploder_hostile_count() < exploder_hostile_cap" in director,
-        "Exploder enemies use their own cap while still counting in total hostile cap",
+        "get_boomer_hostile_count() < boomer_hostile_cap" in director,
+        "Boomer enemies use their own cap while still counting in total hostile cap",
         failures,
     )
     require(
         "SpawnStep.new" in director
         and "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1]
         and "EnemyKind.SHOOTER" not in director.split("func _build_wave_definitions", 1)[1]
-        and "EnemyKind.EXPLODER" not in director.split("func _build_wave_definitions", 1)[1],
-        "Authored waves contain no Shielded, Shooter, or Exploder spawn steps",
+        and "EnemyKind.BOOMER" not in director.split("func _build_wave_definitions", 1)[1],
+        "Authored waves contain no Shielded, Shooter, or Boomer spawn steps",
         failures,
     )
 
@@ -218,19 +218,19 @@ def main() -> int:
         failures,
     )
     require(
-        "exploder_unlock_time := 65.0" in main_script
-        and "exploder_spawn_chance_at_unlock := 0.025" in main_script
-        and "exploder_spawn_chance_growth_per_second := 0.00035" in main_script
-        and "maximum_exploder_spawn_chance := 0.07" in main_script,
-        "Exploder ambient tuning arrives last and stays uncommon",
+        "boomer_unlock_time := 65.0" in main_script
+        and "boomer_spawn_chance_at_unlock := 0.025" in main_script
+        and "boomer_spawn_chance_growth_per_second := 0.00035" in main_script
+        and "maximum_boomer_spawn_chance := 0.07" in main_script,
+        "Boomer ambient tuning arrives last and stays uncommon",
         failures,
     )
     require(
-        "exploder_intro_target_time_min := 65.0" in main_script
-        and "exploder_intro_target_time_max := 78.0" in main_script
-        and "exploder_intro_seen" in main_script
-        and "exploder_intro_target_time = rng.randf_range" in main_script,
-        "Exploder first intro uses a randomized per-run target",
+        "boomer_intro_target_time_min := 65.0" in main_script
+        and "boomer_intro_target_time_max := 78.0" in main_script
+        and "boomer_intro_seen" in main_script
+        and "boomer_intro_target_time = rng.randf_range" in main_script,
+        "Boomer first intro uses a randomized per-run target",
         failures,
     )
     require(

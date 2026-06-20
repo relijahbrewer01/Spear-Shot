@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dge5y405nyj34"
-path="res://.godot/imported/exploder_comparison.png-1cddca254b3a1d4412451162e09ff71e.ctex"
+uid="uid://bt2r3644d0b0v"
+path="res://.godot/imported/boomer_comparison.png-85047fb8c0a303b1723f96d7c95e3333.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/dev/exploder_candidates/exploder_comparison.png"
-dest_files=["res://.godot/imported/exploder_comparison.png-1cddca254b3a1d4412451162e09ff71e.ctex"]
+source_file="res://art/dev/boomer_candidates/boomer_comparison.png"
+dest_files=["res://.godot/imported/boomer_comparison.png-85047fb8c0a303b1723f96d7c95e3333.ctex"]
 
 [params]
 

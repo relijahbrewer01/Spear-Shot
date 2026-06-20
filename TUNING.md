@@ -37,12 +37,12 @@
 | Shooter | `shooter_spawn_chance_growth_per_second` | `0.00045` | `scripts/main.gd` | Chance growth after unlock. |
 | Shooter | `maximum_shooter_spawn_chance` | `0.10` | `scripts/main.gd` | Long-run chance cap. |
 | Shooter | `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated active Shooter cap. |
-| Exploder | `exploder_unlock_time` | `65.0s` | `scripts/main.gd` | First time Exploder can appear through ambient selection. |
-| Exploder | `exploder_intro_target_time_min/max` | `65.0-78.0s` | `scripts/main.gd` | Per-run randomized first-introduction guarantee target. |
-| Exploder | `exploder_spawn_chance_at_unlock` | `0.025` | `scripts/main.gd` | Starting ambient weight once unlocked. |
-| Exploder | `exploder_spawn_chance_growth_per_second` | `0.00035` | `scripts/main.gd` | Chance growth after unlock. |
-| Exploder | `maximum_exploder_spawn_chance` | `0.07` | `scripts/main.gd` | Long-run chance cap. |
-| Exploder | `exploder_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Exploder cap. |
+| Boomer | `boomer_unlock_time` | `65.0s` | `scripts/main.gd` | First time Boomer can appear through ambient selection. |
+| Boomer | `boomer_intro_target_time_min/max` | `65.0-78.0s` | `scripts/main.gd` | Per-run randomized first-introduction guarantee target. |
+| Boomer | `boomer_spawn_chance_at_unlock` | `0.025` | `scripts/main.gd` | Starting ambient weight once unlocked. |
+| Boomer | `boomer_spawn_chance_growth_per_second` | `0.00035` | `scripts/main.gd` | Chance growth after unlock. |
+| Boomer | `maximum_boomer_spawn_chance` | `0.07` | `scripts/main.gd` | Long-run chance cap. |
+| Boomer | `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Boomer cap. |
 
 ## Encounter Director
 
@@ -60,7 +60,7 @@
 | `charger_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated Charger cap. |
 | `shielded_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Shielded cap. |
 | `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated Shooter cap. |
-| `exploder_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Exploder cap. |
+| `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Boomer cap. |
 | `spawn_safe_radius` | `72.0px` | `scripts/main.gd` | Safe distance from Akedra for enemy spawns. |
 | `landed_spear_spawn_safe_radius` | `36.0px` | `scripts/main.gd` | Safe distance from a landed spear for enemy spawns. |
 | `spawn_retry_interval` | `0.3s` | `scripts/encounter_director.gd` | Retry delay for blocked wave spawn steps. |
@@ -78,10 +78,10 @@
 | `destination_reach_distance` | `4.0px` | `scripts/player.gd` | Click-move arrival tolerance. |
 | `horizontal_facing_dead_zone` | `0.12` | `scripts/player.gd` | Left/right visual facing threshold. |
 | `DAMAGE_SOURCE_DART` | `&"dart"` | `scripts/player.gd` | Narrow dart damage-context identity. |
-| `DAMAGE_SOURCE_EXPLOSION` | `&"explosion"` | `scripts/player.gd` | Narrow explosion damage identity used by the Exploder core blast. |
+| `DAMAGE_SOURCE_EXPLOSION` | `&"explosion"` | `scripts/player.gd` | Narrow explosion damage identity used by the Boomer core blast. |
 | `ActionState.FORCED_MOVEMENT` | enabled | `scripts/player.gd` | Narrow authored knockback state used by Shooter shove. |
 | `try_start_forced_movement(direction, distance, duration, damage_protection_source)` | authored inputs | `scripts/player.gd` | Applies knockback without clearing move intent and can optionally attach narrow shove-only protection. |
-| `FORCED_MOVEMENT_PROTECTION_SHOVE` | enabled | `scripts/player.gd` | Successful Shooter shoves use this narrow protection instead of dodge or hurt invulnerability, but Exploder damage still bypasses it. |
+| `FORCED_MOVEMENT_PROTECTION_SHOVE` | enabled | `scripts/player.gd` | Successful Shooter shoves use this narrow protection instead of dodge or hurt invulnerability, and the Boomer core blast now respects it while that authored movement is still active. |
 
 ## Dodge
 
@@ -213,37 +213,38 @@
 | `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated active Shooter cap. |
 | Spawn and introduction values | `42s`, `42-52s`, `0.04`, `0.00045`, `0.10` | `scripts/main.gd` | Shooter unlock, intro target, starting chance, growth, and max chance. |
 
-## Exploder
+## Boomer
 
 | Setting | Current value | Source | Purpose / tuning effect |
 | --- | --- | --- | --- |
-| `score_value` | `2` safe kill | `ExploderEnemy.tscn` | Guaranteed score for a pre-fuse spear kill. |
-| Self-detonation direct score | none | `scripts/exploder_enemy.gd`, `scripts/main.gd` | Exploder self-destruction awards no direct points. |
-| Body sprite canvas dimensions | `16x18px` | `art/sprites/exploder_enemy.png`, `tools/generate_phase4_assets.py` | Small readable live canvas chosen from the local concept pass. |
-| Apparent silhouette bounds | About `13x13px` | `art/sprites/exploder_enemy.png`, `tools/generate_phase4_assets.py` | Compact spring-loaded hopper silhouette. |
-| `body_radius` | `8.0px` | `ExploderEnemy.tscn` | Fair body footprint. |
-| Collision radius | `8.0px` | `ExploderEnemy.tscn` | Physics shape size. |
-| `separation_distance` | `26.0px` | `ExploderEnemy.tscn` | Lightweight spawn/landing spacing radius. |
-| `separation_strength` | `48.0` | `ExploderEnemy.tscn` | Lightweight spawn/landing spacing force. |
-| Ordinary body contact damage | disabled | `scripts/exploder_enemy.gd` | Exploder body overlap never damages Akedra. |
-| `hop_prep_duration` | `0.18s` | `scripts/exploder_enemy.gd` | Stationary visible compression before takeoff. |
-| `hop_duration` | `0.24s` | `scripts/exploder_enemy.gd` | Committed leap travel time. |
-| `hop_distance` | `38.0px` | `scripts/exploder_enemy.gd` | One-hop travel distance. |
-| `landing_recovery_duration` | `0.20s` | `scripts/exploder_enemy.gd` | Stationary settle before the next hop when still out of range. |
-| Fuse start timing | immediate on landing inside range | `scripts/exploder_enemy.gd` | Landing checks the player distance before any recovery delay. |
-| `fuse_trigger_distance` | `36.0px` | `scripts/exploder_enemy.gd` | Center-distance threshold for starting the fuse. |
-| `fuse_duration` | `0.80s` | `scripts/exploder_enemy.gd` | Total reaction window from landing pulse to blast. |
-| `fuse_pulse_two_offset` | `0.32s` | `scripts/exploder_enemy.gd` | Second fuse pulse timing. |
-| `fuse_pulse_three_offset` | `0.57s` | `scripts/exploder_enemy.gd` | Third fuse pulse timing. |
-| `core_blast_radius` | `29.0px` | `scripts/exploder_enemy.gd` | Damaging core blast radius. |
-| `outer_shockwave_radius` | `54.0px` | `scripts/exploder_enemy.gd` | Non-damaging crowd-rearrangement radius. |
-| `player_knockback_distance/duration` | `28.0px / 0.20s` | `scripts/exploder_enemy.gd` | Authored player knockback when the core blast damage lands. |
-| `enemy_shockwave_knockback_distance/duration` | `18.0px / 0.16s` | `scripts/exploder_enemy.gd` | Default outer-ring enemy knockback. |
-| `shooter_shockwave_knockback_distance/duration` | `22.0px / 0.18s` | `scripts/exploder_enemy.gd` | Slightly stronger outer-ring Shooter knockback. |
-| `charger_core_knockback_distance/duration` | `30.0px / 0.20s` | `scripts/exploder_enemy.gd` | Core-blast Charger interruption and recovery setup. |
-| `charger_shockwave_knockback_distance/duration` | `20.0px / 0.16s` | `scripts/exploder_enemy.gd` | Outer-ring Charger knockback. |
-| `exploder_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Exploder cap. |
-| Spawn and introduction values | `65s`, `65-78s`, `0.025`, `0.00035`, `0.07` | `scripts/main.gd` | Exploder unlock, intro target, starting chance, growth, and max chance. |
+| `score_value` | `2` safe kill | `BoomerEnemy.tscn` | Guaranteed score for a pre-fuse spear kill. |
+| Self-detonation direct score | none | `scripts/boomer_enemy.gd`, `scripts/main.gd` | Boomer self-destruction awards no direct points. |
+| Body sprite canvas dimensions | `16x18px` | `art/sprites/boomer_enemy.png`, `tools/generate_phase4_assets.py` | Small readable live canvas chosen from the local concept pass. |
+| Apparent silhouette bounds | About `13x13px` | `art/sprites/boomer_enemy.png`, `tools/generate_phase4_assets.py` | Compact spring-loaded hopper silhouette. |
+| `body_radius` | `8.0px` | `BoomerEnemy.tscn` | Fair body footprint. |
+| Collision radius | `8.0px` | `BoomerEnemy.tscn` | Physics shape size. |
+| `separation_distance` | `26.0px` | `BoomerEnemy.tscn` | Lightweight spawn/landing spacing radius. |
+| `separation_strength` | `48.0` | `BoomerEnemy.tscn` | Lightweight spawn/landing spacing force. |
+| Ordinary body contact damage | disabled | `scripts/boomer_enemy.gd` | Boomer body overlap never damages Akedra. |
+| `hop_prep_duration` | `0.18s` | `scripts/boomer_enemy.gd` | Stationary visible compression before takeoff. |
+| `hop_duration` | `0.24s` | `scripts/boomer_enemy.gd` | Committed leap travel time. |
+| `hop_distance` | `38.0px` | `scripts/boomer_enemy.gd` | One-hop travel distance. |
+| `landing_recovery_duration` | `0.20s` | `scripts/boomer_enemy.gd` | Stationary settle before the next hop when still out of range. |
+| Fuse start timing | immediate on landing inside range | `scripts/boomer_enemy.gd` | Landing checks the player distance before any recovery delay. |
+| `fuse_trigger_distance` | `36.0px` | `scripts/boomer_enemy.gd` | Center-distance threshold for starting the fuse. |
+| `fuse_duration` | `0.80s` | `scripts/boomer_enemy.gd` | Total reaction window from landing pulse to blast. |
+| `fuse_pulse_two_offset` | `0.32s` | `scripts/boomer_enemy.gd` | Second fuse pulse timing. |
+| `fuse_pulse_three_offset` | `0.57s` | `scripts/boomer_enemy.gd` | Third fuse pulse timing. |
+| `core_blast_radius` | `29.0px` | `scripts/boomer_enemy.gd` | Damaging core blast radius. |
+| `outer_shockwave_radius` | `54.0px` | `scripts/boomer_enemy.gd` | Non-damaging crowd-rearrangement radius. |
+| `player_knockback_distance/duration` | `28.0px / 0.20s` | `scripts/boomer_enemy.gd` | Authored player knockback when the core blast damage lands. |
+| `landed_spear_shockwave_displacement` | `20.0px` | `scripts/boomer_enemy.gd` | One-time outward nudge applied to a spear that is already landed inside the Boomer outer shockwave. |
+| `enemy_shockwave_knockback_distance/duration` | `18.0px / 0.16s` | `scripts/boomer_enemy.gd` | Default outer-ring enemy knockback. |
+| `shooter_shockwave_knockback_distance/duration` | `22.0px / 0.18s` | `scripts/boomer_enemy.gd` | Slightly stronger outer-ring Shooter knockback. |
+| `charger_core_knockback_distance/duration` | `30.0px / 0.20s` | `scripts/boomer_enemy.gd` | Core-blast Charger interruption and recovery setup. |
+| `charger_shockwave_knockback_distance/duration` | `20.0px / 0.16s` | `scripts/boomer_enemy.gd` | Outer-ring Charger knockback. |
+| `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Boomer cap. |
+| Spawn and introduction values | `65s`, `65-78s`, `0.025`, `0.00035`, `0.07` | `scripts/main.gd` | Boomer unlock, intro target, starting chance, growth, and max chance. |
 
 ## Dart Projectile
 
@@ -283,6 +284,6 @@
 | Make Chargers appear earlier | `charger_unlock_time`, `charger_intro_target_time_min/max`, `charger_spawn_chance_at_unlock` | Preserve `first_minute_charger_cap` if early pressure must stay readable. |
 | Make the Shooter attack faster | `aim_duration`, `locked_duration`, `burst_interval`, `attack_cooldown`, `minimum_dart_interval` | Keep one visible lock cue and one locked direction for both darts. |
 | Make darts easier to avoid | `aim_duration`, `locked_duration`, `speed`, `burst_interval` | Dart speed currently stays at `145.0px/s`. |
-| Make Exploders less oppressive | `hop_distance`, `fuse_trigger_distance`, `fuse_duration`, `core_blast_radius`, `outer_shockwave_radius` | Preserve the discrete hop-and-stop rhythm and one-active cap while tuning fairness. |
+| Make Boomers less oppressive | `hop_distance`, `fuse_trigger_distance`, `fuse_duration`, `core_blast_radius`, `outer_shockwave_radius` | Preserve the discrete hop-and-stop rhythm and one-active cap while tuning fairness. |
 | Reduce Shielded retrieval pressure | `stopped_hit_landing_clearance`, `stagger_duration`, `knockback_distance` | These affect how safe spear recovery feels after a shield stop. |
 | Increase time between waves | `first_wave_time_min/max`, `inter_wave_interval_min/max`, `recovery_duration` | Wave composition is separate from wave cadence. |

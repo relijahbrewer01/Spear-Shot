@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cwmj7yqq8l1ha"
-path="res://.godot/imported/exploder_enemy.png-3a32893aa26492ea3a255345a9ff967b.ctex"
+uid="uid://bhuu56h27wqwr"
+path="res://.godot/imported/boomer_variant_3.png-2c9bee8f0bb053a5ba60dc91c089e280.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/sprites/exploder_enemy.png"
-dest_files=["res://.godot/imported/exploder_enemy.png-3a32893aa26492ea3a255345a9ff967b.ctex"]
+source_file="res://art/dev/boomer_candidates/boomer_variant_3.png"
+dest_files=["res://.godot/imported/boomer_variant_3.png-2c9bee8f0bb053a5ba60dc91c089e280.ctex"]
 
 [params]
 

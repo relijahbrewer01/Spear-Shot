@@ -20,18 +20,18 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Distinct darts in one Shooter burst can each damage Akedra through a narrow player-owned burst context; duplicate callbacks and unrelated damage still respect ordinary invulnerability.
 - Shooters die to one valid thrown-spear hit for `2` points, count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normal, Charger, or Shielded.
 - Phase 4.2.2 refines the Shooter into a final hooded-forager presentation on a small `16x18` canvas, locks the approved moss-hood palette cleanup, and adds the successful-shove follow-up behavior while keeping the live gameplay size intentionally small and fair.
-- Phase 4.3 adds the ambient-only Exploder as a late-run, cap-1 hopping battlefield weapon: it deals no ordinary contact damage, can be killed safely for `2` before fuse, and otherwise commits to an immediate landing-time three-pulse fuse followed by a damaging core blast and a non-damaging outer shockwave.
-- Exploder self-destruction awards no direct score, but enemies killed by the blast still use their normal death/scoring pathways.
+- Phase 4.3 adds the ambient-only Boomer as a late-run, cap-1 hopping battlefield weapon: it deals no ordinary contact damage, can be killed safely for `2` before fuse, and otherwise commits to an immediate landing-time three-pulse fuse followed by a damaging core blast and a non-damaging outer shockwave.
+- Boomer self-destruction awards no direct score, but enemies killed by the blast still use their normal death/scoring pathways.
 - The narrow Shooter follow-up correction in the same subphase makes `AIM` fully committed once it starts, so player distance changes no longer cancel the live wind-up.
-- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, Exploder authored waves, combo scoring, and broader combat frameworks are deferred.
+- Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, Boomer authored waves, combo scoring, and broader combat frameworks are deferred.
 
 ## Phase 4.6 Enemy Interaction And Formation Pass
 
-- Intact Shielded enemies should eventually intercept Shooter darts cleanly while exposed Shielded enemies stop doing so.
-- Shielded enemies should later learn clearer screening behavior near Akedra so the player can deliberately use them as mobile cover instead of treating interception as a random accident.
-- Shooters should later gain firing-lane repositioning around intact Shielded allies rather than blindly stacking behind them.
+- Shielded and Shooter cooperation should come from positioning rather than a projectile-blocking behavior.
+- The simplest stable model should be chosen during that pass: either Shielded screens between Akedra and Shooter, or Shooter tries to remain behind Shielded relative to Akedra.
+- Shooters should later gain firing-lane repositioning around Shielded allies rather than blindly stacking behind them.
+- Shooter darts should later stop when they hit a Boomer; the first dart to hit an unarmed Boomer should begin its normal fuse, while darts hitting an already fusing Boomer should stop without restarting, shortening, cancelling, or duplicating that fuse.
 - Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
-- Friendly shielding vs projectile conflicts should be resolved in one narrow pass so dart blocking, spear fairness, and enemy readability stay aligned.
 - Final interaction and population tuning should happen after those behaviors exist, not before.
 
 ## Future Polish

@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://c7qdsnlw5k8f0"
-path="res://.godot/imported/exploder_hop_prep.wav-8617ab6432942f7860d4b13e29ea20e9.sample"
+path="res://.godot/imported/boomer_hop_prep.wav-fed64ff31f482de9302d611f798b207e.sample"
 
 [deps]
 
-source_file="res://audio/exploder_hop_prep.wav"
-dest_files=["res://.godot/imported/exploder_hop_prep.wav-8617ab6432942f7860d4b13e29ea20e9.sample"]
+source_file="res://audio/boomer_hop_prep.wav"
+dest_files=["res://.godot/imported/boomer_hop_prep.wav-fed64ff31f482de9302d611f798b207e.sample"]
 
 [params]
 

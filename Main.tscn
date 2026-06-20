@@ -21,10 +21,10 @@
 [ext_resource type="AudioStream" uid="uid://bqjw7x77atx1b" path="res://audio/blowgun_windup.wav" id="19"]
 [ext_resource type="AudioStream" uid="uid://dalsfx5g5ytyy" path="res://audio/blowgun_fire.wav" id="20"]
 [ext_resource type="AudioStream" uid="uid://drdicc02ciac" path="res://audio/blowgun_shove.wav" id="21"]
-[ext_resource type="AudioStream" uid="uid://c7qdsnlw5k8f0" path="res://audio/exploder_hop_prep.wav" id="22"]
-[ext_resource type="AudioStream" uid="uid://bub78xhwt1lh3" path="res://audio/exploder_land.wav" id="23"]
-[ext_resource type="AudioStream" uid="uid://ceknmab17uguh" path="res://audio/exploder_fuse.wav" id="24"]
-[ext_resource type="AudioStream" uid="uid://chsiu7a6hddk8" path="res://audio/exploder_explosion.wav" id="25"]
+[ext_resource type="AudioStream" uid="uid://c7qdsnlw5k8f0" path="res://audio/boomer_hop_prep.wav" id="22"]
+[ext_resource type="AudioStream" uid="uid://bub78xhwt1lh3" path="res://audio/boomer_land.wav" id="23"]
+[ext_resource type="AudioStream" uid="uid://ceknmab17uguh" path="res://audio/boomer_fuse.wav" id="24"]
+[ext_resource type="AudioStream" uid="uid://chsiu7a6hddk8" path="res://audio/boomer_explosion.wav" id="25"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -125,24 +125,24 @@ volume_db = -7.0
 max_polyphony = 2
 bus = &"SFX"
 
-[node name="ExploderHopPrepPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=716822184]
+[node name="BoomerHopPrepPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=716822184]
 stream = ExtResource("22")
 volume_db = -6.0
 max_polyphony = 2
 bus = &"SFX"
 
-[node name="ExploderLandPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=663541792]
+[node name="BoomerLandPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=663541792]
 stream = ExtResource("23")
 volume_db = -5.0
 max_polyphony = 2
 bus = &"SFX"
 
-[node name="ExploderFusePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1153405225]
+[node name="BoomerFusePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1153405225]
 stream = ExtResource("24")
 volume_db = -8.0
 bus = &"SFX"
 
-[node name="ExploderExplosionPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624183]
+[node name="BoomerExplosionPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624183]
 stream = ExtResource("25")
 volume_db = -3.0
 max_polyphony = 2

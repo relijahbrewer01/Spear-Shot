@@ -1,5 +1,5 @@
 extends Node2D
-class_name ExploderBlastEffect
+class_name BoomerBlastEffect
 
 @export var duration := 0.24
 @export var core_flash_color := Color8(255, 230, 188)

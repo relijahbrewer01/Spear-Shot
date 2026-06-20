@@ -29,6 +29,7 @@
 [ext_resource type="AudioStream" path="res://audio/heart_pickup_spawn.wav" id="27"]
 [ext_resource type="AudioStream" path="res://audio/heart_pickup_collect.wav" id="28"]
 [ext_resource type="AudioStream" path="res://audio/heart_pickup_expire.wav" id="29"]
+[ext_resource type="AudioStream" path="res://audio/heart_runner_alarm.wav" id="30"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -157,6 +158,12 @@ bus = &"SFX"
 [node name="HeartRunnerAppearPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311112]
 stream = ExtResource("26")
 volume_db = -11.0
+max_polyphony = 2
+bus = &"SFX"
+
+[node name="HeartRunnerAlarmPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311116]
+stream = ExtResource("30")
+volume_db = -10.0
 max_polyphony = 2
 bus = &"SFX"
 

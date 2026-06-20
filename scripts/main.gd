@@ -141,6 +141,7 @@ var active_heart_pickup: HeartPickup
 @onready var boomer_fuse_player: AudioStreamPlayer = $AudioPlayers/BoomerFusePlayer
 @onready var boomer_explosion_player: AudioStreamPlayer = $AudioPlayers/BoomerExplosionPlayer
 @onready var heart_runner_appear_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAppearPlayer
+@onready var heart_runner_alarm_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAlarmPlayer
 @onready var heart_pickup_spawn_player: AudioStreamPlayer = $AudioPlayers/HeartPickupSpawnPlayer
 @onready var heart_pickup_collect_player: AudioStreamPlayer = $AudioPlayers/HeartPickupCollectPlayer
 @onready var heart_pickup_expire_player: AudioStreamPlayer = $AudioPlayers/HeartPickupExpirePlayer
@@ -487,13 +488,16 @@ func _try_spawn_heart_runner(is_debug_spawn: bool) -> bool:
 	heart_runner.setup(
 		play_rect,
 		spawn_setup["entry_position"],
-		spawn_setup["target_position"],
-		int(spawn_setup["exit_edge"]),
+		int(spawn_setup["spawn_edge"]),
 		heart_runner_speed,
-		is_debug_spawn
+		player,
+		spear,
+		is_debug_spawn,
+		rng.randi()
 	)
 	heart_runner.defeated.connect(_on_heart_runner_defeated)
 	heart_runner.escaped.connect(_on_heart_runner_escaped)
+	heart_runner.startled_started.connect(_on_heart_runner_startled)
 	heart_runner.tree_exited.connect(_on_heart_runner_tree_exited.bind(heart_runner))
 	active_heart_runner = heart_runner
 	_play_sfx(heart_runner_appear_player)
@@ -514,12 +518,10 @@ func _find_heart_runner_spawn_setup() -> Dictionary:
 		if not entry_position.is_finite():
 			continue
 
-		var exit_edge := Arena.get_opposite_spawn_edge(spawn_edge)
 		return {
 			"valid": true,
 			"entry_position": entry_position,
-			"exit_edge": exit_edge,
-			"target_position": _get_heart_runner_edge_point(exit_edge),
+			"spawn_edge": spawn_edge,
 		}
 
 	return {
@@ -535,32 +537,6 @@ func _find_safe_heart_runner_entry_position(spawn_edge: int) -> Vector2:
 		avoid_radii.append(heart_runner_landed_spear_safe_radius)
 
 	return arena.find_safe_spawn_position(spawn_edge, avoid_positions, avoid_radii)
-
-
-func _get_heart_runner_edge_point(edge: int) -> Vector2:
-	var play_rect := arena.get_play_rect()
-	var edge_padding := 8.0
-	match edge:
-		Arena.SpawnEdge.TOP:
-			return Vector2(
-				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
-				play_rect.position.y + edge_padding
-			)
-		Arena.SpawnEdge.BOTTOM:
-			return Vector2(
-				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
-				play_rect.end.y - edge_padding
-			)
-		Arena.SpawnEdge.LEFT:
-			return Vector2(
-				play_rect.position.x + edge_padding,
-				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
-			)
-		_:
-			return Vector2(
-				play_rect.end.x - edge_padding,
-				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
-			)
 
 
 func _spawn_heart_pickup(spawn_position: Vector2, spawned_by_debug: bool) -> bool:
@@ -1008,6 +984,13 @@ func _on_heart_runner_escaped(spawned_by_debug: bool) -> void:
 		_start_heart_runner_resolution_cooldown()
 
 
+func _on_heart_runner_startled() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(heart_runner_alarm_player)
+
+
 func _on_heart_runner_tree_exited(heart_runner: HeartRunner) -> void:
 	if active_heart_runner == heart_runner:
 		active_heart_runner = null
@@ -1349,6 +1332,7 @@ func _stop_all_audio() -> void:
 		boomer_fuse_player,
 		boomer_explosion_player,
 		heart_runner_appear_player,
+		heart_runner_alarm_player,
 		heart_pickup_spawn_player,
 		heart_pickup_collect_player,
 		heart_pickup_expire_player,
@@ -1377,6 +1361,7 @@ func _stop_gameplay_sfx() -> void:
 		boomer_fuse_player,
 		boomer_explosion_player,
 		heart_runner_appear_player,
+		heart_runner_alarm_player,
 		heart_pickup_spawn_player,
 		heart_pickup_collect_player,
 		heart_pickup_expire_player,

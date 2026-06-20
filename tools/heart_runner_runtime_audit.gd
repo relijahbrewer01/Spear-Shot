@@ -6,6 +6,7 @@ const SpearScene := preload("res://Spear.tscn")
 const HeartRunnerScene := preload("res://HeartRunner.tscn")
 const HeartPickupScene := preload("res://HeartPickup.tscn")
 const TEST_ARENA := Rect2(Vector2(16.0, 16.0), Vector2(352.0, 184.0))
+const TEST_SEED := 424242
 
 var failures: Array[String] = []
 
@@ -16,10 +17,12 @@ func _ready() -> void:
 
 func _run_audit() -> void:
 	await _audit_spawn_rules_and_debug_behavior()
-	await _audit_spear_contract_and_exit_plane_cleanup()
+	await _audit_entry_and_calm_wander_behavior()
+	await _audit_spear_held_reactions()
+	await _audit_flee_route_selection_and_exit_cleanup()
 	await _audit_main_escape_cleanup_and_repeat_spawns()
 	await _audit_pickup_heal_and_cooldown_flow()
-	await _audit_pickup_warning_pause_and_cleanup()
+	await _audit_boomer_displacement_and_pause_cleanup()
 
 	for failure in failures:
 		push_error("HEART RUNNER RUNTIME AUDIT: %s" % failure)
@@ -64,7 +67,7 @@ func _audit_spawn_rules_and_debug_behavior() -> void:
 	player.health = 4
 	_require(
 		is_equal_approx(float(main.call("_get_current_heart_runner_spawn_chance")), 0.0),
-		"Heart Runner does not roll while the player already has four health."
+		"Heart Runner does not roll while Akedra already has four health."
 	)
 
 	player.health = 1
@@ -91,9 +94,17 @@ func _audit_spawn_rules_and_debug_behavior() -> void:
 	var debug_runner := main.get("active_heart_runner") as HeartRunner
 	_require(debug_runner != null, "Debug Heart Runner becomes the tracked active opportunity.")
 	if debug_runner != null:
-		debug_runner.global_position = Vector2(TEST_ARENA.end.x - debug_runner.body_radius - 2.0, TEST_ARENA.get_center().y)
-		await _advance_physics(0.18)
-	_require(main.get("active_heart_runner") == null, "Debug Heart Runner escape clears Main's active Runner reference.")
+		debug_runner.debug_force_locked_exit(
+			Arena.SpawnEdge.RIGHT,
+			Vector2(TEST_ARENA.end.x - debug_runner.body_radius, TEST_ARENA.get_center().y),
+			true
+		)
+		debug_runner.global_position = _get_pre_exit_test_position(Arena.SpawnEdge.RIGHT, debug_runner.body_radius)
+	var escaped_debug_runner := await _advance_until(
+		func() -> bool: return main.get("active_heart_runner") == null,
+		0.35
+	)
+	_require(escaped_debug_runner, "Debug Heart Runner escape clears Main's active Runner reference.")
 	_require(
 		is_equal_approx(float(main.get("heart_runner_next_eligible_time")), cooldown_before),
 		"Debug Heart Runner escape does not alter future organic cooldown timing."
@@ -119,110 +130,232 @@ func _audit_spawn_rules_and_debug_behavior() -> void:
 	await _free_audit_main(main)
 
 
-func _audit_spear_contract_and_exit_plane_cleanup() -> void:
-	var contract_root := Node2D.new()
-	add_child(contract_root)
+func _audit_entry_and_calm_wander_behavior() -> void:
+	var root := Node2D.new()
+	add_child(root)
 
-	var player := _spawn_player(contract_root, Vector2(96.0, 108.0))
-	var spear := SpearScene.instantiate() as Spear
-	contract_root.add_child(spear)
-	spear.setup(player, TEST_ARENA)
-	spear.reset_for_new_run(player, TEST_ARENA)
+	var player := _spawn_player(root, Vector2(220.0, 108.0))
+	var spear := _spawn_spear(root, player)
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
 
-	var runner := HeartRunnerScene.instantiate() as HeartRunner
-	contract_root.add_child(runner)
-	runner.setup(
-		TEST_ARENA,
-		Vector2(150.0, 108.0),
-		Vector2(320.0, 108.0),
-		Arena.SpawnEdge.RIGHT,
-		140.0
+	var runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, TEST_ARENA.get_center().y),
+		Arena.SpawnEdge.LEFT
 	)
-
-	var pickup := HeartPickupScene.instantiate() as HeartPickup
-	contract_root.add_child(pickup)
-	pickup.setup(player, TEST_ARENA, TEST_ARENA.get_center())
-
+	await _advance_physics(0.22)
 	_require(
-		bool(spear.call("_is_valid_spear_hittable_body", runner)),
-		"Spear recognizes Heart Runner through the explicit spear_hittable contract."
+		int(runner.motion_state) == int(HeartRunner.MotionState.ENTERING),
+		"Heart Runner stays in ENTERING until the visible entry requirement is satisfied."
 	)
+	var reached_wandering := await _advance_until(
+		func() -> bool:
+			return int(runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	_require(reached_wandering, "Unarmed Heart Runner transitions from ENTERING into WANDERING after moving visibly into the arena.")
 	_require(
-		not bool(spear.call("_is_valid_spear_hittable_body", pickup)),
-		"Heart pickups are not treated as spear-hittable combat targets."
+		runner._get_entry_progress() >= runner.entry_distance and runner.entry_elapsed >= runner.entry_min_duration,
+		"Heart Runner only finishes entry after the configured distance and minimum visible time."
 	)
 
-	_require(spear.try_throw(Vector2(320.0, 108.0)), "Spear can enter flight for the Heart Runner hit contract audit.")
-	var hit_response := int(spear.call("_hit_enemy_if_needed", runner))
-	_require(hit_response == Enemy.HitResponse.DAMAGED, "Heart Runner hit returns DAMAGED rather than STOPPED.")
-	_require(int(spear.state) == int(Spear.State.FLYING), "Heart Runner hit does not stop spear flight.")
-	await _advance_frames(2)
+	var inner_rect := runner._get_inner_wander_rect()
+	var direction_changes := 0
+	var previous_direction := runner.travel_direction
+	for _index in range(8):
+		await _advance_physics(0.30)
+		_require(
+			runner.global_position.x >= inner_rect.position.x + runner.body_radius
+			and runner.global_position.x <= inner_rect.end.x - runner.body_radius
+			and runner.global_position.y >= inner_rect.position.y + runner.body_radius
+			and runner.global_position.y <= inner_rect.end.y - runner.body_radius,
+			"Heart Runner wandering stays inside the safe inner wander rectangle."
+		)
+		if previous_direction != Vector2.ZERO and runner.travel_direction != Vector2.ZERO:
+			if previous_direction.angle_to(runner.travel_direction) > 0.35:
+				direction_changes += 1
+		previous_direction = runner.travel_direction
+	_require(direction_changes >= 2, "Heart Runner calm wandering uses multiple readable targets instead of one permanent crossing line.")
+	_require(
+		int(runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		"Heart Runner remains in calm wandering while Akedra stays unarmed and the calm timer has not expired."
+	)
 
-	contract_root.queue_free()
+	runner.wander_time_left = 0.01
+	var reached_casual_exit := await _advance_until(
+		func() -> bool:
+			return int(runner.motion_state) == int(HeartRunner.MotionState.CASUAL_EXIT),
+		0.5
+	)
+	_require(reached_casual_exit, "Heart Runner transitions into CASUAL_EXIT when the calm timer expires while Akedra is unarmed.")
+	_require(
+		runner.current_route_length >= runner.casual_exit_min_route_length,
+		"Heart Runner casual exit keeps a meaningful remaining route instead of vanishing almost immediately."
+	)
+
+	root.queue_free()
 	await get_tree().process_frame
 
-	var motion_root := Node2D.new()
-	add_child(motion_root)
 
-	await _audit_boundary_crossing_case(
-		motion_root,
-		Vector2(TEST_ARENA.position.x + 24.0, TEST_ARENA.get_center().y),
-		Vector2(TEST_ARENA.end.x - 24.0, TEST_ARENA.get_center().y),
-		Arena.SpawnEdge.RIGHT,
-		"right"
-	)
-	await _audit_boundary_crossing_case(
-		motion_root,
-		Vector2(TEST_ARENA.end.x - 24.0, TEST_ARENA.get_center().y),
-		Vector2(TEST_ARENA.position.x + 24.0, TEST_ARENA.get_center().y),
+func _audit_spear_held_reactions() -> void:
+	var root := Node2D.new()
+	add_child(root)
+
+	var player := _spawn_player(root, Vector2(220.0, 108.0))
+	var spear := _spawn_spear(root, player)
+
+	var armed_spawn_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 88.0),
 		Arena.SpawnEdge.LEFT,
-		"left"
+		7001
 	)
-	await _audit_boundary_crossing_case(
-		motion_root,
-		Vector2(TEST_ARENA.get_center().x, TEST_ARENA.position.y + 24.0),
-		Vector2(TEST_ARENA.get_center().x, TEST_ARENA.end.y - 24.0),
-		Arena.SpawnEdge.BOTTOM,
-		"bottom"
-	)
-	await _audit_boundary_crossing_case(
-		motion_root,
-		Vector2(TEST_ARENA.get_center().x, TEST_ARENA.end.y - 24.0),
-		Vector2(TEST_ARENA.get_center().x, TEST_ARENA.position.y + 24.0),
-		Arena.SpawnEdge.TOP,
-		"top"
-	)
-
-	var side_runner := HeartRunnerScene.instantiate() as HeartRunner
-	motion_root.add_child(side_runner)
-	side_runner.setup(
-		TEST_ARENA,
-		Vector2(24.0, 108.0),
-		Vector2(340.0, 108.0),
-		Arena.SpawnEdge.RIGHT,
-		140.0
-	)
-	var side_escape_count := 0
-	side_runner.escaped.connect(func(_spawned_by_debug: bool) -> void:
-		side_escape_count += 1
-	)
-	side_runner.global_position = Vector2(72.0, TEST_ARENA.position.y + side_runner.body_radius + 1.0)
-	_require(
-		side_runner.apply_authored_displacement(Vector2.UP, 18.0, 0.16),
-		"Heart Runner accepts authored displacement from external effects."
+	var armed_spawn_alarm_count := 0
+	armed_spawn_runner.startled_started.connect(func() -> void:
+		armed_spawn_alarm_count += 1
 	)
 	await _advance_physics(0.20)
-	_require(side_escape_count == 0, "Heart Runner does not despawn just by touching a non-exit arena side during authored displacement.")
-	var x_before_resume := side_runner.global_position.x
-	await _advance_physics(0.10)
-	_require(side_runner.global_position.x > x_before_resume + 1.0, "Heart Runner resumes its original edge-to-edge travel after authored displacement ends.")
-	var resumed_escape := await _advance_until(
-		func() -> bool: return side_escape_count == 1,
-		3.2
+	_require(
+		armed_spawn_alarm_count == 0 and int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.ENTERING),
+		"Armed-at-spawn Heart Runner does not trigger the startled reaction while it is still mostly entering from offscreen."
 	)
-	_require(resumed_escape and side_escape_count == 1, "After Boomer displacement, Heart Runner still exits through its assigned destination plane exactly once.")
+	var armed_spawn_startled := await _advance_until(
+		func() -> bool:
+			return int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
+				or int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		1.0
+	)
+	_require(armed_spawn_startled and armed_spawn_alarm_count == 1, "Armed-at-spawn Heart Runner startles exactly once after entry is complete.")
+	var armed_spawn_flee := await _advance_until(
+		func() -> bool:
+			return int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.6
+	)
+	_require(armed_spawn_flee, "Heart Runner enters FLEEING after the short startled hop completes.")
+	armed_spawn_runner.queue_free()
+	await get_tree().process_frame
 
-	motion_root.queue_free()
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	var wandering_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 108.0),
+		Arena.SpawnEdge.LEFT,
+		7002
+	)
+	var wandering_alarm_count := 0
+	wandering_runner.startled_started.connect(func() -> void:
+		wandering_alarm_count += 1
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	var startled_from_wander := await _advance_until(
+		func() -> bool:
+			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.STARTLED),
+		0.3
+	)
+	_require(startled_from_wander and wandering_alarm_count == 1, "Spear retrieval during calm wandering triggers exactly one startled reaction.")
+	await _advance_until(
+		func() -> bool:
+			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.6
+	)
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	await _advance_physics(0.20)
+	_require(
+		int(wandering_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		"Throwing the spear again after panic does not return the Heart Runner to a calm state."
+	)
+	wandering_runner.queue_free()
+	await get_tree().process_frame
+
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	var casual_exit_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 132.0),
+		Arena.SpawnEdge.LEFT,
+		7003
+	)
+	var casual_alarm_count := 0
+	casual_exit_runner.startled_started.connect(func() -> void:
+		casual_alarm_count += 1
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	casual_exit_runner.wander_time_left = 0.01
+	await _advance_until(
+		func() -> bool:
+			return int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.CASUAL_EXIT),
+		0.5
+	)
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	var startled_from_casual_exit := await _advance_until(
+		func() -> bool:
+			return int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
+				or int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.3
+	)
+	_require(startled_from_casual_exit and casual_alarm_count == 1, "Spear retrieval during CASUAL_EXIT interrupts into exactly one startled reaction.")
+
+	root.queue_free()
+	await get_tree().process_frame
+
+
+func _audit_flee_route_selection_and_exit_cleanup() -> void:
+	var root := Node2D.new()
+	add_child(root)
+
+	var player := _spawn_player(root, Vector2(244.0, 108.0))
+	var spear := _spawn_spear(root, player)
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+
+	var route_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, TEST_ARENA.get_center().y),
+		Arena.SpawnEdge.LEFT,
+		7101
+	)
+	route_runner.debug_force_wandering()
+	route_runner.global_position = Vector2(TEST_ARENA.position.x + route_runner.body_radius + 2.0, TEST_ARENA.get_center().y)
+	route_runner.debug_trigger_spear_held()
+	_require(
+		route_runner.current_route_length >= route_runner.flee_min_route_length,
+		"Heart Runner flee-route selection rejects unfair near-edge instant exits when longer routes exist."
+	)
+	_require(
+		int(route_runner.exit_edge) != int(Arena.SpawnEdge.LEFT),
+		"Heart Runner normally avoids fleeing straight back through the wall it is already standing beside."
+	)
+	var away_from_player := (route_runner.global_position - player.global_position).normalized()
+	_require(
+		route_runner.travel_direction.dot(away_from_player) > 0.25,
+		"Heart Runner flee direction generally points away from Akedra instead of choosing a fully random route."
+	)
+	route_runner.queue_free()
+	await get_tree().process_frame
+
+	await _audit_locked_exit_case(root, Arena.SpawnEdge.RIGHT, "right")
+	await _audit_locked_exit_case(root, Arena.SpawnEdge.LEFT, "left")
+	await _audit_locked_exit_case(root, Arena.SpawnEdge.BOTTOM, "bottom")
+	await _audit_locked_exit_case(root, Arena.SpawnEdge.TOP, "top")
+
+	root.queue_free()
 	await get_tree().process_frame
 
 
@@ -240,10 +373,15 @@ func _audit_main_escape_cleanup_and_repeat_spawns() -> void:
 	var first_runner := main.get("active_heart_runner") as HeartRunner
 	_require(first_runner != null, "Main tracks the organically spawned Heart Runner before escape.")
 	if first_runner != null:
-		first_runner.global_position = _get_pre_exit_test_position(int(first_runner.exit_edge), first_runner.body_radius)
+		first_runner.debug_force_locked_exit(
+			Arena.SpawnEdge.RIGHT,
+			Vector2(TEST_ARENA.end.x - first_runner.body_radius, TEST_ARENA.get_center().y),
+			true
+		)
+		first_runner.global_position = _get_pre_exit_test_position(Arena.SpawnEdge.RIGHT, first_runner.body_radius)
 	var first_escape_cleared := await _advance_until(
 		func() -> bool: return main.get("active_heart_runner") == null,
-		0.25
+		0.35
 	)
 	_require(first_escape_cleared, "Main clears its active Runner reference after a natural organic escape.")
 	_require(opportunity_container.get_child_count() == 0, "Natural escape leaves no lingering Runner nodes behind.")
@@ -269,10 +407,15 @@ func _audit_main_escape_cleanup_and_repeat_spawns() -> void:
 	var second_runner := main.get("active_heart_runner") as HeartRunner
 	_require(second_runner != null, "A later Heart Runner can spawn again after the cooldown expires.")
 	if second_runner != null:
-		second_runner.global_position = _get_pre_exit_test_position(int(second_runner.exit_edge), second_runner.body_radius)
+		second_runner.debug_force_locked_exit(
+			Arena.SpawnEdge.LEFT,
+			Vector2(TEST_ARENA.position.x + second_runner.body_radius, TEST_ARENA.get_center().y),
+			true
+		)
+		second_runner.global_position = _get_pre_exit_test_position(Arena.SpawnEdge.LEFT, second_runner.body_radius)
 	var second_escape_cleared := await _advance_until(
 		func() -> bool: return main.get("active_heart_runner") == null,
-		0.25
+		0.35
 	)
 	_require(second_escape_cleared, "Repeated later Heart Runner escapes also clear Main's active Runner reference.")
 	_require(opportunity_container.get_child_count() == 0, "Repeated Heart Runner opportunities do not accumulate hidden offscreen nodes.")
@@ -348,87 +491,211 @@ func _audit_pickup_heal_and_cooldown_flow() -> void:
 	await _free_audit_main(main)
 
 
-func _audit_pickup_warning_pause_and_cleanup() -> void:
-	var main := await _spawn_main_for_audit()
-	var opportunity_timer := main.get_node("OpportunityTimer") as Timer
-	var player := main.get_node("Player") as Player
-	player.health = 2
-	main.set("survival_time", 50.0)
+func _audit_boomer_displacement_and_pause_cleanup() -> void:
+	var root := Node2D.new()
+	add_child(root)
 
-	_require(
-		bool(main.call("_try_spawn_heart_runner", false)),
-		"Organic Heart Runner spawn succeeds for the expiration-path audit."
+	var player := _spawn_player(root, Vector2(220.0, 108.0))
+	var spear := _spawn_spear(root, player)
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+
+	var wander_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 108.0),
+		Arena.SpawnEdge.LEFT,
+		7201
 	)
-	var runner := main.get("active_heart_runner") as HeartRunner
-	if runner != null:
-		runner.global_position = TEST_ARENA.get_center()
-		runner.receive_combat_hit(Enemy.HIT_SOURCE_SPEAR, runner.global_position, Vector2.RIGHT)
+	await _advance_until(
+		func() -> bool:
+			return int(wander_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	var wander_position_before := wander_runner.global_position
+	_require(
+		wander_runner.apply_authored_displacement(Vector2.UP, 18.0, 0.16),
+		"Heart Runner accepts Boomer-authored displacement during wandering."
+	)
+	await _advance_physics(0.20)
+	_require(
+		int(wander_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		"Heart Runner remains in WANDERING after authored displacement instead of changing to an incorrect state."
+	)
+	await _advance_physics(0.14)
+	_require(
+		wander_runner.global_position.distance_to(wander_position_before) > 6.0,
+		"Heart Runner resumes normal calm movement after a wandering-state Boomer displacement."
+	)
+
+	var casual_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 132.0),
+		Arena.SpawnEdge.LEFT,
+		7202
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(casual_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	casual_runner.debug_force_locked_exit(
+		Arena.SpawnEdge.RIGHT,
+		_get_exit_target_point(Arena.SpawnEdge.RIGHT),
+		false
+	)
+	casual_runner.global_position = Vector2(92.0, TEST_ARENA.position.y + casual_runner.body_radius + 1.0)
+	_require(
+		casual_runner.apply_authored_displacement(Vector2.UP, 18.0, 0.16),
+		"Heart Runner accepts Boomer-authored displacement during CASUAL_EXIT."
+	)
+	await _advance_physics(0.20)
+	_require(
+		not casual_runner.is_resolved,
+		"Sideways Boomer displacement does not trigger premature cleanup through a non-exit side during CASUAL_EXIT."
+	)
+	var x_before_resume := casual_runner.global_position.x
+	await _advance_physics(0.12)
+	_require(
+		casual_runner.global_position.x > x_before_resume + 1.0,
+		"Heart Runner resumes its locked casual exit route after displacement ends."
+	)
+
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	var startled_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 84.0),
+		Arena.SpawnEdge.LEFT,
+		7203
+	)
+	var startled_alarm_count := 0
+	startled_runner.startled_started.connect(func() -> void:
+		startled_alarm_count += 1
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(startled_runner.motion_state) == int(HeartRunner.MotionState.STARTLED),
+		1.0
+	)
+	var startled_time_before_pause := startled_runner.startled_time_left
+	var visual_time_before_pause := startled_runner.visual_time
+	var startled_position_before_pause := startled_runner.global_position
+	_require(
+		startled_runner.apply_authored_displacement(Vector2.UP, 18.0, 0.16),
+		"Heart Runner accepts Boomer-authored displacement during the startled hop."
+	)
+	get_tree().paused = true
+	await get_tree().create_timer(0.12, true, false, true).timeout
+	_require(
+		is_equal_approx(startled_runner.startled_time_left, startled_time_before_pause)
+		and is_equal_approx(startled_runner.visual_time, visual_time_before_pause)
+		and startled_runner.global_position == startled_position_before_pause,
+		"Pause freezes Heart Runner state timers, animation timing, and movement during the approval-gate behavior pass."
+	)
+	get_tree().paused = false
+	var reached_flee_after_pause := await _advance_until(
+		func() -> bool:
+			return int(startled_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.8
+	)
+	_require(reached_flee_after_pause and startled_alarm_count == 1, "Heart Runner resumes the startled reaction correctly after pause and still enters FLEEING exactly once.")
+	_require(
+		startled_runner.apply_authored_displacement(Vector2.UP, 18.0, 0.16),
+		"Heart Runner accepts Boomer-authored displacement during FLEEING."
+	)
+	var flee_x_before_resume := startled_runner.global_position.x
+	await _advance_physics(0.22)
+	_require(
+		int(startled_runner.motion_state) == int(HeartRunner.MotionState.FLEEING)
+		and startled_runner.global_position.x > flee_x_before_resume - 1.0,
+		"Heart Runner resumes its locked flee route after a fleeing-state Boomer displacement."
+	)
+
+	root.queue_free()
 	await get_tree().process_frame
 
-	var pickup := main.get("active_heart_pickup") as HeartPickup
-	var warning_count := 0
-	if pickup != null:
-		pickup.warning_started.connect(func() -> void:
-			warning_count += 1
-		)
-		pickup.lifetime_left = 0.08
-	await _advance_physics(0.04)
-	_require(warning_count == 1, "Heart pickup emits one restrained warning during the final expiration window.")
-	await _advance_physics(0.10)
-	var expected_expire_cooldown := 50.0 + float(main.get("heart_runner_post_resolution_cooldown"))
-	_require(main.get("active_heart_pickup") == null, "Heart pickup expires cleanly after its warning window ends.")
-	_require(
-		is_equal_approx(float(main.get("heart_runner_next_eligible_time")), expected_expire_cooldown),
-		"Pickup expiration also stamps the Heart Runner cooldown exactly once."
-	)
-
-	main.set("heart_runner_next_eligible_time", 0.0)
+	var main := await _spawn_main_for_audit()
+	var main_player := main.get_node("Player") as Player
+	var main_spear := main.get_node("Spear") as Spear
+	_set_spear_state_for_audit(main_spear, Spear.State.FLYING)
+	main_player.health = 1
+	main.set("survival_time", 30.0)
 	_require(
 		bool(main.call("_try_spawn_heart_runner", true)),
-		"Debug Heart Runner spawn is available for pause and cleanup checks."
+		"Debug Heart Runner spawn is available for restart/game-over cleanup coverage."
 	)
-	var debug_runner := main.get("active_heart_runner") as HeartRunner
-	var runner_position_before_pause := debug_runner.global_position if debug_runner != null else Vector2.ZERO
+	var pause_runner := main.get("active_heart_runner") as HeartRunner
+	var pause_runner_timer := pause_runner.wander_time_left if pause_runner != null else 0.0
+	var pause_runner_visual := pause_runner.visual_time if pause_runner != null else 0.0
 	get_tree().paused = true
 	await get_tree().create_timer(0.12, true, false, true).timeout
-	if debug_runner != null:
-		_require(debug_runner.global_position == runner_position_before_pause, "Pause freezes Heart Runner movement.")
+	if pause_runner != null:
+		_require(
+			is_equal_approx(pause_runner.wander_time_left, pause_runner_timer)
+			and is_equal_approx(pause_runner.visual_time, pause_runner_visual),
+			"Pause also freezes the calm wandering timer and animation timing on the Main scene path."
+		)
 	get_tree().paused = false
-	await _advance_physics(0.10)
-	if debug_runner != null:
-		_require(debug_runner.global_position.distance_to(runner_position_before_pause) > 1.0, "Heart Runner movement resumes after pause.")
-
-	main.call("_clear_opportunities")
-	_require(
-		bool(main.call("_spawn_heart_pickup", TEST_ARENA.get_center(), true)),
-		"Heart pickup can be spawned in isolation for pause timing checks."
-	)
-	var pause_pickup := main.get("active_heart_pickup") as HeartPickup
-	var lifetime_before_pause := pause_pickup.lifetime_left if pause_pickup != null else 0.0
-	get_tree().paused = true
-	await get_tree().create_timer(0.12, true, false, true).timeout
-	if pause_pickup != null:
-		_require(is_equal_approx(pause_pickup.lifetime_left, lifetime_before_pause), "Pause freezes Heart pickup lifetime and warning timing.")
-	get_tree().paused = false
-	await _advance_physics(0.05)
-	if pause_pickup != null:
-		_require(pause_pickup.lifetime_left < lifetime_before_pause, "Heart pickup timing resumes after pause.")
-
 	main.call("_restart_run")
 	await get_tree().process_frame
-	_require(main.get("active_heart_runner") == null and main.get("active_heart_pickup") == null, "Restart clears active Heart Runner opportunities and pickups.")
-	_require(opportunity_timer.time_left > 0.0, "Restart restarts the separate Heart Runner opportunity timer.")
+	_require(main.get("active_heart_runner") == null and main.get("active_heart_pickup") == null, "Restart clears active Heart Runner opportunities and pickups cleanly.")
 
 	_require(
-		bool(main.call("_spawn_heart_pickup", TEST_ARENA.get_center(), true)),
-		"Heart pickup can be recreated for the game-over cleanup check."
+		bool(main.call("_try_spawn_heart_runner", true)),
+		"Heart Runner can be recreated for the game-over cleanup check."
 	)
 	main.call("_on_player_died")
 	await get_tree().process_frame
-	_require(main.get("active_heart_runner") == null and main.get("active_heart_pickup") == null, "Game over clears active Heart Runner opportunities and pickups.")
-	_require(opportunity_timer.is_stopped(), "Game over stops the separate Heart Runner opportunity timer.")
+	_require(main.get("active_heart_runner") == null and main.get("active_heart_pickup") == null, "Game over clears active Heart Runner opportunities and pickups cleanly.")
 
 	await _free_audit_main(main)
+
+
+func _audit_locked_exit_case(parent: Node, exit_edge: int, label: String) -> void:
+	var player := _spawn_player(parent, TEST_ARENA.get_center())
+	var spear := _spawn_spear(parent, player)
+	var entry_edge := Arena.get_opposite_spawn_edge(exit_edge)
+	var runner := _spawn_runner(
+		parent,
+		player,
+		spear,
+		_get_entry_position_for_edge(entry_edge),
+		entry_edge,
+		7300 + exit_edge
+	)
+	var exit_target_point := _get_exit_target_point(exit_edge)
+	runner.debug_force_locked_exit(exit_edge, exit_target_point, true)
+
+	var escape_count := 0
+	runner.escaped.connect(func(_spawned_by_debug: bool) -> void:
+		escape_count += 1
+	)
+	runner.global_position = _get_pre_exit_test_position(exit_edge, runner.body_radius)
+	var crossed_boundary := false
+	var kept_speed := false
+	for _frame in range(int(ceil(1.5 * 60.0))):
+		await get_tree().physics_frame
+		if not is_instance_valid(runner):
+			break
+		if not crossed_boundary and _is_beyond_destination_boundary(runner.global_position, exit_edge, runner.body_radius):
+			crossed_boundary = true
+			kept_speed = absf(runner.velocity.length() - runner.move_speed) <= 0.25
+		if escape_count > 0:
+			break
+
+	await get_tree().process_frame
+	_require(crossed_boundary, "Heart Runner can physically pass through the %s assigned exit boundary during the refined cleanup flow." % label)
+	_require(kept_speed, "Heart Runner does not stop or lose speed at the %s destination-side boundary during locked escape cleanup." % label)
+	_require(escape_count == 1, "Heart Runner escape emits exactly once through the %s assigned exit." % label)
+	_require(not is_instance_valid(runner), "Heart Runner frees itself immediately after the %s escape resolves." % label)
+
+	player.queue_free()
+	spear.queue_free()
+	await get_tree().process_frame
 
 
 func _spawn_main_for_audit() -> Node:
@@ -441,39 +708,72 @@ func _spawn_main_for_audit() -> Node:
 	return main
 
 
-func _audit_boundary_crossing_case(
+func _spawn_player(parent: Node, position: Vector2) -> Player:
+	var player := PlayerScene.instantiate() as Player
+	parent.add_child(player)
+	player.set_arena_rect(TEST_ARENA)
+	player.reset_for_new_run(position, TEST_ARENA)
+	return player
+
+
+func _spawn_spear(parent: Node, player: Player) -> Spear:
+	var spear := SpearScene.instantiate() as Spear
+	parent.add_child(spear)
+	spear.setup(player, TEST_ARENA)
+	spear.reset_for_new_run(player, TEST_ARENA)
+	return spear
+
+
+func _spawn_runner(
 	parent: Node,
+	player: Player,
+	spear: Spear,
 	entry_position: Vector2,
-	target_position: Vector2,
-	exit_edge: int,
-	label: String
-) -> void:
+	spawn_edge: int,
+	random_seed: int = TEST_SEED
+) -> HeartRunner:
 	var runner := HeartRunnerScene.instantiate() as HeartRunner
 	parent.add_child(runner)
-	runner.setup(TEST_ARENA, entry_position, target_position, exit_edge, 140.0)
-
-	var escape_count := 0
-	runner.escaped.connect(func(_spawned_by_debug: bool) -> void:
-		escape_count += 1
+	runner.setup(
+		TEST_ARENA,
+		entry_position,
+		spawn_edge,
+		140.0,
+		player,
+		spear,
+		false,
+		random_seed
 	)
+	return runner
 
-	var crossed_boundary := false
-	var kept_speed := false
-	for _frame in range(int(ceil(4.0 * 60.0))):
-		await get_tree().physics_frame
-		if not is_instance_valid(runner):
-			break
-		if not crossed_boundary and _is_beyond_destination_boundary(runner.global_position, exit_edge, runner.body_radius):
-			crossed_boundary = true
-			kept_speed = absf(runner.velocity.length() - runner.move_speed) <= 0.25
-		if escape_count > 0:
-			break
 
-	await get_tree().process_frame
-	_require(crossed_boundary, "Heart Runner can physically pass through the %s destination-side arena boundary." % label)
-	_require(kept_speed, "Heart Runner does not stop or lose speed at the %s destination-side boundary." % label)
-	_require(escape_count == 1, "Heart Runner escape emits exactly once through the %s assigned exit." % label)
-	_require(not is_instance_valid(runner), "Heart Runner frees itself immediately after the %s escape resolves." % label)
+func _set_spear_state_for_audit(spear: Spear, new_state: int) -> void:
+	spear.set_active(false)
+	spear.call("_set_state", new_state)
+
+
+func _get_entry_position_for_edge(edge: int) -> Vector2:
+	match edge:
+		Arena.SpawnEdge.TOP:
+			return Vector2(TEST_ARENA.get_center().x, TEST_ARENA.position.y + 8.0)
+		Arena.SpawnEdge.BOTTOM:
+			return Vector2(TEST_ARENA.get_center().x, TEST_ARENA.end.y - 8.0)
+		Arena.SpawnEdge.LEFT:
+			return Vector2(TEST_ARENA.position.x + 8.0, TEST_ARENA.get_center().y)
+		_:
+			return Vector2(TEST_ARENA.end.x - 8.0, TEST_ARENA.get_center().y)
+
+
+func _get_exit_target_point(edge: int) -> Vector2:
+	match edge:
+		Arena.SpawnEdge.TOP:
+			return Vector2(TEST_ARENA.get_center().x, TEST_ARENA.position.y + 6.0)
+		Arena.SpawnEdge.BOTTOM:
+			return Vector2(TEST_ARENA.get_center().x, TEST_ARENA.end.y - 6.0)
+		Arena.SpawnEdge.LEFT:
+			return Vector2(TEST_ARENA.position.x + 6.0, TEST_ARENA.get_center().y)
+		_:
+			return Vector2(TEST_ARENA.end.x - 6.0, TEST_ARENA.get_center().y)
 
 
 func _is_beyond_destination_boundary(position: Vector2, exit_edge: int, body_radius: float) -> bool:
@@ -504,19 +804,6 @@ func _free_audit_main(main: Node) -> void:
 	main.call("_stop_all_audio")
 	main.queue_free()
 	await get_tree().process_frame
-
-
-func _spawn_player(parent: Node, position: Vector2) -> Player:
-	var player := PlayerScene.instantiate() as Player
-	parent.add_child(player)
-	player.set_arena_rect(TEST_ARENA)
-	player.reset_for_new_run(position, TEST_ARENA)
-	return player
-
-
-func _advance_frames(frame_count: int) -> void:
-	for _index in range(maxi(frame_count, 1)):
-		await get_tree().process_frame
 
 
 func _advance_until(condition: Callable, timeout: float) -> bool:

@@ -407,6 +407,30 @@ def generate_heart_runner_appear() -> list[float]:
     return samples
 
 
+def generate_heart_runner_alarm() -> list[float]:
+    length = int(SAMPLE_RATE * 0.12)
+    samples: list[float] = []
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        chirp_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        chirp_frequency = 760.0 + progress * 220.0
+        chirp = math.sin(2.0 * math.pi * chirp_frequency * index / SAMPLE_RATE)
+        gasp = math.sin(2.0 * math.pi * (320.0 + progress * 40.0) * index / SAMPLE_RATE)
+        scramble_curve = math.exp(-((progress - 0.28) / 0.18) ** 2)
+        samples.append(
+            (
+                chirp * 0.28
+                + gasp * 0.14 * (1.0 - progress)
+                + chirp_noise * 0.18 * scramble_curve
+            )
+            * envelope(progress, 0.008, 0.54)
+        )
+    return samples
+
+
 def generate_heart_pickup_spawn() -> list[float]:
     length = int(SAMPLE_RATE * 0.16)
     samples: list[float] = []
@@ -468,6 +492,7 @@ def main() -> None:
         "heart_pickup_spawn.wav": generate_heart_pickup_spawn(),
         "heart_pickup_collect.wav": generate_heart_pickup_collect(),
         "heart_pickup_expire.wav": generate_heart_pickup_expire(),
+        "heart_runner_alarm.wav": generate_heart_runner_alarm(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

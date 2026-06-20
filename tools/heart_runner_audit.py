@@ -93,8 +93,11 @@ def main() -> int:
         "art/sprites/heart_pickup.png.import",
         "art/dev/heart_runner_candidates/heart_runner_comparison.png",
         "art/dev/heart_runner_candidates/heart_runner_manifest.json",
+        "art/dev/heart_runner_animation/heart_runner_animation_board.png",
+        "art/dev/heart_runner_animation/heart_runner_animation_manifest.json",
         "audio/heart_runner_appear.wav",
         "audio/heart_runner_appear.wav.import",
+        "audio/heart_runner_alarm.wav",
         "audio/heart_pickup_spawn.wav",
         "audio/heart_pickup_spawn.wav.import",
         "audio/heart_pickup_collect.wav",
@@ -107,8 +110,15 @@ def main() -> int:
     require("class_name HeartRunner" in runner_script and "extends CharacterBody2D" in runner_script, "HeartRunner is a dedicated CharacterBody2D opportunity scene", failures)
     require('add_to_group("spear_hittable")' in runner_script, "HeartRunner joins the explicit spear_hittable group", failures)
     require('add_to_group("heart_runner")' in runner_script, "HeartRunner has its own opportunity group", failures)
+    require("enum MotionState" in runner_script and "ENTERING" in runner_script and "WANDERING" in runner_script and "CASUAL_EXIT" in runner_script and "STARTLED" in runner_script and "FLEEING" in runner_script, "HeartRunner uses the approved explicit calm/startled state model", failures)
+    require("signal startled_started" in runner_script and "signal state_changed" in runner_script, "HeartRunner exposes narrow startled/state-change seams for focused testing and alarm playback", failures)
     require("receive_combat_hit" in runner_script and "Enemy.HIT_SOURCE_SPEAR" in runner_script, "HeartRunner exposes the narrow combat-hit seam for spear hits", failures)
     require("return Enemy.HitResponse.DAMAGED" in runner_script, "HeartRunner spear hits use DAMAGED so the spear keeps flying", failures)
+    require("tracked_spear" in runner_script and "_on_tracked_spear_state_changed" in runner_script and "new_state != Spear.State.HELD" in runner_script, "HeartRunner reacts to the actual spear transition into HELD without broad polling", failures)
+    require("calm_move_speed := 70.0" in runner_script, "HeartRunner calm strolling speed is 70", failures)
+    require("entry_distance := 20.0" in runner_script and "entry_min_duration := 0.45" in runner_script, "HeartRunner requires visible entry before reacting", failures)
+    require("wander_duration := 8.0" in runner_script, "HeartRunner calm wandering lasts 8 seconds before casual exit", failures)
+    require("startled_duration := 0.30" in runner_script, "HeartRunner startled hop duration is 0.30 seconds", failures)
     require("_has_crossed_exit_plane" in runner_script and "exit_edge" in runner_script and "exit_threshold" in runner_script, "HeartRunner cleanup uses its assigned exit plane", failures)
     require(
         "_clamp_inside_play_rect_except_exit_edge" in runner_script
@@ -117,7 +127,7 @@ def main() -> int:
         "HeartRunner keeps only non-exit boundary clamps and includes a bounded failsafe lifecycle guard",
         failures,
     )
-    require("apply_authored_displacement" in runner_script, "HeartRunner preserves authored displacement support", failures)
+    require("apply_authored_displacement" in runner_script and "debug_force_locked_exit" in runner_script, "HeartRunner preserves authored displacement support and narrow audit hooks for exit cleanup coverage", failures)
     require("collision_layer = 2" in runner_scene and "collision_mask = 0" in runner_scene, "HeartRunner is spear-detectable but has no ordinary collision mask", failures)
     require("score_value = 1" in runner_script or "score_value := 1" in runner_script, "HeartRunner defeat score is 1", failures)
     require(
@@ -153,8 +163,8 @@ def main() -> int:
     require("_find_safe_heart_runner_entry_position" in main_script and '"valid": false' in main_script, "Heart Runner entry search defers instead of using an unsafe fallback", failures)
     require("debug_set_heart_runner_roll_sequence" in main_script and "debug_set_heart_runner_interval_sequence" in main_script, "Heart Runner opportunity rolls have deterministic audit hooks", failures)
     require("OpportunityContainer" in main_scene and "OpportunityTimer" in main_scene, "Main scene contains dedicated opportunity nodes", failures)
-    require("HeartRunnerAppearPlayer" in main_scene and "HeartPickupSpawnPlayer" in main_scene and "HeartPickupCollectPlayer" in main_scene and "HeartPickupExpirePlayer" in main_scene, "Main scene contains Heart Runner audio players", failures)
-    require('path="res://audio/heart_runner_appear.wav"' in main_scene and 'path="res://audio/heart_pickup_spawn.wav"' in main_scene and 'path="res://audio/heart_pickup_collect.wav"' in main_scene and 'path="res://audio/heart_pickup_expire.wav"' in main_scene, "Heart Runner and pickup streams are assigned explicitly in Main", failures)
+    require("HeartRunnerAppearPlayer" in main_scene and "HeartRunnerAlarmPlayer" in main_scene and "HeartPickupSpawnPlayer" in main_scene and "HeartPickupCollectPlayer" in main_scene and "HeartPickupExpirePlayer" in main_scene, "Main scene contains Heart Runner audio players", failures)
+    require('path="res://audio/heart_runner_appear.wav"' in main_scene and 'path="res://audio/heart_runner_alarm.wav"' in main_scene and 'path="res://audio/heart_pickup_spawn.wav"' in main_scene and 'path="res://audio/heart_pickup_collect.wav"' in main_scene and 'path="res://audio/heart_pickup_expire.wav"' in main_scene, "Heart Runner and pickup streams are assigned explicitly in Main", failures)
     require('bus = &"SFX"' in main_scene, "Heart Runner audio routes through the SFX bus", failures)
 
     require("_start_heart_runner_resolution_cooldown()" not in defeated_block, "Defeating a Runner does not stamp the opportunity cooldown before pickup resolution", failures)
@@ -164,9 +174,10 @@ def main() -> int:
 
     require("HEART_RUNNER" not in director, "EncounterDirector does not treat Heart Runner as a hostile enemy kind", failures)
 
-    require("generate_heart_runner_appear" in generator and "generate_heart_pickup_spawn" in generator and "generate_heart_pickup_collect" in generator and "generate_heart_pickup_expire" in generator, "Heart Runner audio is reproducible locally", failures)
-    require("draw_heart_runner" in asset_generator and "draw_heart_pickup" in asset_generator and "generate_heart_runner_candidate_assets" in asset_generator, "Heart Runner visuals and comparison outputs are reproducible locally", failures)
+    require("generate_heart_runner_appear" in generator and "generate_heart_runner_alarm" in generator and "generate_heart_pickup_spawn" in generator and "generate_heart_pickup_collect" in generator and "generate_heart_pickup_expire" in generator, "Heart Runner audio is reproducible locally, including the startled alarm cue", failures)
+    require("draw_heart_runner" in asset_generator and "draw_heart_pickup" in asset_generator and "generate_heart_runner_candidate_assets" in asset_generator and "generate_heart_runner_animation_preview" in asset_generator, "Heart Runner visuals, comparison outputs, and animation approval-board outputs are reproducible locally", failures)
     require("--generate-dev-heart-runner-concepts" in asset_generator, "Heart Runner concept generation remains behind an explicit workflow flag", failures)
+    require("--generate-dev-heart-runner-animations" in asset_generator, "Heart Runner animation preview generation remains behind an explicit approval-gate workflow flag", failures)
 
     for import_text, label in [
         (runner_import, "Heart Runner sprite import disables mipmaps"),
@@ -193,12 +204,18 @@ def main() -> int:
     require(manifest.get("comparison_path") == str(ROOT / "art/dev/heart_runner_candidates/heart_runner_comparison.png"), "Heart Runner manifest points to the comparison board", failures)
     require(manifest.get("active_reference_path") == str(ROOT / "art/sprites/heart_runner.png"), "Heart Runner manifest points to the live sprite", failures)
     require(manifest.get("pickup_reference_path") == str(ROOT / "art/sprites/heart_pickup.png"), "Heart Runner manifest points to the pickup sprite", failures)
+    animation_manifest = json.loads((ROOT / "art/dev/heart_runner_animation/heart_runner_animation_manifest.json").read_text(encoding="utf-8"))
+    require(animation_manifest.get("board_path") == str(ROOT / "art/dev/heart_runner_animation/heart_runner_animation_board.png"), "Heart Runner animation manifest points to the approval-board output", failures)
+    require(animation_manifest.get("active_reference_path") == str(ROOT / "art/sprites/heart_runner.png"), "Heart Runner animation manifest points to the unchanged live Runner sprite", failures)
+    require(animation_manifest.get("sequence_count") == 3, "Heart Runner animation manifest records the three required preview treatments", failures)
+    require(set(animation_manifest.get("sequences", {}).keys()) == {"casual_strut", "panicked_sprint", "startled_hop"}, "Heart Runner animation manifest names the casual, panic, and startled preview sets", failures)
 
     require("Heart Runner" in readme and "Heart Runner" in tuning and "Heart Runner" in roadmap, "README, TUNING, and ROADMAP all document Heart Runner", failures)
     require("debug-spawns one Heart Runner" in readme, "README documents the key 4 debug spawn", failures)
     require("future heart runner" not in roadmap.lower(), "ROADMAP no longer describes Heart Runner as deferred future work", failures)
 
     audit_wav("audio/heart_runner_appear.wav", 0.12, 0.18, failures)
+    audit_wav("audio/heart_runner_alarm.wav", 0.10, 0.14, failures)
     audit_wav("audio/heart_pickup_spawn.wav", 0.14, 0.20, failures)
     audit_wav("audio/heart_pickup_collect.wav", 0.16, 0.22, failures)
     audit_wav("audio/heart_pickup_expire.wav", 0.10, 0.14, failures)

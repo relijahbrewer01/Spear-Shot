@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://ceknmab17uguh"
-path="res://.godot/imported/exploder_fuse.wav-8d76b21c7bf803d75757d56124c2e91c.sample"
+path="res://.godot/imported/exploder_fuse.wav-6c43f5662a5a655a69edfddecb31c761.sample"
 
 [deps]
 
 source_file="res://audio/exploder_fuse.wav"
-dest_files=["res://.godot/imported/exploder_fuse.wav-8d76b21c7bf803d75757d56124c2e91c.sample"]
+dest_files=["res://.godot/imported/exploder_fuse.wav-6c43f5662a5a655a69edfddecb31c761.sample"]
 
 [params]
 

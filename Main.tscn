@@ -21,10 +21,10 @@
 [ext_resource type="AudioStream" uid="uid://bqjw7x77atx1b" path="res://audio/blowgun_windup.wav" id="19"]
 [ext_resource type="AudioStream" uid="uid://dalsfx5g5ytyy" path="res://audio/blowgun_fire.wav" id="20"]
 [ext_resource type="AudioStream" uid="uid://drdicc02ciac" path="res://audio/blowgun_shove.wav" id="21"]
-[ext_resource type="AudioStream" path="res://audio/exploder_hop_prep.wav" id="22"]
-[ext_resource type="AudioStream" path="res://audio/exploder_land.wav" id="23"]
-[ext_resource type="AudioStream" path="res://audio/exploder_fuse.wav" id="24"]
-[ext_resource type="AudioStream" path="res://audio/exploder_explosion.wav" id="25"]
+[ext_resource type="AudioStream" uid="uid://c7qdsnlw5k8f0" path="res://audio/exploder_hop_prep.wav" id="22"]
+[ext_resource type="AudioStream" uid="uid://bub78xhwt1lh3" path="res://audio/exploder_land.wav" id="23"]
+[ext_resource type="AudioStream" uid="uid://ceknmab17uguh" path="res://audio/exploder_fuse.wav" id="24"]
+[ext_resource type="AudioStream" uid="uid://chsiu7a6hddk8" path="res://audio/exploder_explosion.wav" id="25"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")

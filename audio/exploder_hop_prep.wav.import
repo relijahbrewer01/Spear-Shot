@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://c7qdsnlw5k8f0"
-path="res://.godot/imported/exploder_hop_prep.wav-f2854b82405c578d934fe659bc71f3ae.sample"
+path="res://.godot/imported/exploder_hop_prep.wav-8617ab6432942f7860d4b13e29ea20e9.sample"
 
 [deps]
 
 source_file="res://audio/exploder_hop_prep.wav"
-dest_files=["res://.godot/imported/exploder_hop_prep.wav-f2854b82405c578d934fe659bc71f3ae.sample"]
+dest_files=["res://.godot/imported/exploder_hop_prep.wav-8617ab6432942f7860d4b13e29ea20e9.sample"]
 
 [params]
 

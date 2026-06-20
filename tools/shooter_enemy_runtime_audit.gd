@@ -19,7 +19,7 @@ func _ready() -> void:
 func _run_audit() -> void:
 	_ensure_input_actions()
 	await _audit_movement_ranges()
-	await _audit_cancel_reposition_and_shove()
+	await _audit_committed_aim_and_shove()
 	await _audit_attack_state_machine()
 	await _audit_two_shooter_readability_and_cap()
 	await _audit_burst_pause_and_cancellation()
@@ -101,7 +101,7 @@ func _audit_movement_ranges() -> void:
 	await get_tree().process_frame
 
 
-func _audit_cancel_reposition_and_shove() -> void:
+func _audit_committed_aim_and_shove() -> void:
 	var cancel_root := Node2D.new()
 	add_child(cancel_root)
 
@@ -117,33 +117,30 @@ func _audit_cancel_reposition_and_shove() -> void:
 	await _advance_physics(0.05)
 	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM, "Shooter begins aiming once inside firing range.")
 	player.global_position = Vector2(40.0, 108.0)
-	var cancel_start := shooter.global_position
-	await _advance_physics(0.05)
-	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM_CANCEL_REPOSITION, "Too-far pre-lock movement cancels AIM into committed reposition.")
-	await _advance_physics(0.25)
-	var cancel_displacement := shooter.global_position - cancel_start
-	_require(int(cancelled_dart_counter["count"]) == 0, "Cancelled AIM fires zero darts.")
-	_require(shooter.shooter_state == ShooterEnemy.ShooterState.AIM_CANCEL_REPOSITION, "Shooter cannot re-enter AIM during cancellation reposition.")
-	_require(absf(cancel_displacement.y) > 4.0 and absf(cancel_displacement.y) > absf(cancel_displacement.x), "Too-far cancellation repositions laterally instead of immediately sprinting straight back into AIM.")
-	await _advance_physics(shooter.aim_cancel_reposition_duration + 0.10)
-	_require(shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Cancelled AIM ends in ordinary reposition after the committed travel finishes.")
-	await _free_test_root(cancel_root)
-
-	var retreat_root := Node2D.new()
-	add_child(retreat_root)
-	var retreat_player := _spawn_player(retreat_root, Vector2(130.0, 108.0))
-	var retreat_shooter := _spawn_shooter(retreat_root, retreat_player, Vector2(220.0, 108.0))
-	retreat_shooter.first_attack_delay_left = 0.0
-	retreat_shooter.attack_cooldown_left = 0.0
-	retreat_shooter.minimum_dart_interval_left = 0.0
-	await _advance_physics(0.05)
-	retreat_player.global_position = retreat_shooter.global_position - Vector2.RIGHT * 30.0
-	retreat_shooter.shove_cooldown_left = 1.0
-	var retreat_start_x := retreat_shooter.global_position.x
+	var committed_start := shooter.global_position
 	await _advance_physics(0.08)
-	_require(retreat_shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION, "Too-close AIM cancellation returns to ordinary retreat when shove is unavailable.")
-	_require(retreat_shooter.global_position.x > retreat_start_x + 1.0, "Too-close AIM cancellation immediately creates space.")
-	await _free_test_root(retreat_root)
+	_require(
+		shooter.shooter_state == ShooterEnemy.ShooterState.AIM
+		or shooter.shooter_state == ShooterEnemy.ShooterState.LOCKED,
+		"Player distance changes do not cancel a committed Shooter AIM."
+	)
+	player.global_position = shooter.global_position - Vector2.RIGHT * 12.0
+	await _advance_physics(0.08)
+	_require(
+		shooter.shooter_state != ShooterEnemy.ShooterState.SHOVE_WINDUP
+		and shooter.shooter_state != ShooterEnemy.ShooterState.REPOSITION,
+		"Committed AIM does not switch into shove or retreat when Akedra crowds the Shooter before lock."
+	)
+	var committed_burst_completed := await _advance_until(
+		func() -> bool: return int(cancelled_dart_counter["count"]) == 2,
+		1.20,
+		"committed aim burst",
+		func() -> String:
+			return _describe_shooter_context(shooter, player, int(cancelled_dart_counter["count"]))
+	)
+	_require(committed_burst_completed and int(cancelled_dart_counter["count"]) == 2, "Committed AIM still produces the full two-dart burst.")
+	_require(shooter.global_position.distance_to(committed_start) < 2.0, "Committed AIM, LOCKED, and FIRE stay planted instead of drifting into a cancel path.")
+	await _free_test_root(cancel_root)
 
 	var overlap_root := Node2D.new()
 	add_child(overlap_root)
@@ -166,8 +163,6 @@ func _audit_cancel_reposition_and_shove() -> void:
 	shove_shooter.preferred_distance_min = 60.0
 	shove_shooter.preferred_distance_max = 140.0
 	shove_shooter.attack_range_max = 160.0
-	shove_shooter.aim_cancel_min_distance = 60.0
-	shove_shooter.aim_cancel_max_distance = 160.0
 	var shove_counter := {"count": 0}
 	shove_shooter.shove_used.connect(func() -> void:
 		shove_counter["count"] += 1
@@ -975,8 +970,6 @@ func _get_shooter_state_name(state: int) -> String:
 			return "ARC_REPOSITION"
 		ShooterEnemy.ShooterState.POST_SHOVE_REPOSITION:
 			return "POST_SHOVE_REPOSITION"
-		ShooterEnemy.ShooterState.AIM_CANCEL_REPOSITION:
-			return "AIM_CANCEL_REPOSITION"
 		ShooterEnemy.ShooterState.SHOVE_WINDUP:
 			return "SHOVE_WINDUP"
 		ShooterEnemy.ShooterState.SHOVE_ACTIVE:

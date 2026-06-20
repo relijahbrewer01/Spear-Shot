@@ -204,6 +204,30 @@ func _enter_landed_state(final_position: Vector2) -> void:
 	landed.emit()
 
 
+func apply_landed_shockwave_nudge(
+	blast_center: Vector2,
+	effect_radius: float,
+	displacement: float
+) -> bool:
+	if state != State.LANDED:
+		return false
+	if effect_radius <= 0.0 or displacement <= 0.0:
+		return false
+	if global_position.distance_to(blast_center) > effect_radius:
+		return false
+
+	var outward_direction := (global_position - blast_center).normalized()
+	if outward_direction == Vector2.ZERO:
+		outward_direction = throw_direction.normalized()
+	if outward_direction == Vector2.ZERO:
+		outward_direction = Vector2.RIGHT
+
+	global_position = _clamp_to_arena(global_position + outward_direction * displacement)
+	_schedule_landed_pickup_overlap_check()
+	queue_redraw()
+	return true
+
+
 func _pickup() -> void:
 	if state != State.LANDED or pickup_in_progress or owner_player == null:
 		return

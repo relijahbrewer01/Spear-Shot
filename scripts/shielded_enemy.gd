@@ -70,6 +70,8 @@ func _physics_process(delta: float) -> void:
 	if _can_run_behavior():
 		if is_staggering():
 			_process_stagger(delta)
+		elif _process_explosion_knockback(delta):
+			pass
 		else:
 			_process_alive_behavior(delta)
 
@@ -122,6 +124,13 @@ func _process_stagger(delta: float) -> void:
 		return
 
 	velocity = Vector2.ZERO
+
+
+func apply_explosion_knockback(direction: Vector2, distance: float, duration: float) -> void:
+	if is_staggering():
+		return
+
+	super.apply_explosion_knockback(direction, distance, duration)
 
 
 func _try_contact_damage() -> void:

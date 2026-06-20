@@ -72,6 +72,7 @@ def main() -> int:
     shove_import = read_optional_text("audio/blowgun_shove.wav.import")
     generator = read_text("tools/generate_sfx.py")
     asset_generator = read_text("tools/generate_phase4_assets.py")
+    aim_state_block = shooter.split("func _process_aim_state", 1)[1].split("func _process_locked_state", 1)[0]
 
     for relative_path in [
         "ShooterEnemy.tscn",
@@ -105,11 +106,10 @@ def main() -> int:
         and "LOCKED" in shooter
         and "ARC_REPOSITION" in shooter
         and "POST_SHOVE_REPOSITION" in shooter
-        and "AIM_CANCEL_REPOSITION" in shooter
         and "SHOVE_WINDUP" in shooter
         and "SHOVE_ACTIVE" in shooter
         and "SHOVE_RECOVER" in shooter,
-        "Shooter uses explicit attack, reposition, follow-up, and shove states",
+        "Shooter uses explicit attack, reposition, follow-up, and shove states without the retired AIM-cancel state",
         failures,
     )
     require("aim_duration := 0.48" in shooter and "locked_duration := 0.24" in shooter, "Shooter refined telegraph timing is explicit", failures)
@@ -117,9 +117,10 @@ def main() -> int:
     require("recover_duration := 0.16" in shooter, "Shooter post-burst recovery is short", failures)
     require("attack_cooldown := 0.95" in shooter, "Shooter attack cooldown is refined to 0.95 seconds", failures)
     require("aim_retry_delay := 0.18" in shooter, "Shooter keeps an explicit aim retry safeguard", failures)
-    require("aim_cancel_min_distance := 74.0" in shooter and "aim_cancel_max_distance := 134.0" in shooter, "Shooter has explicit pre-lock cancel thresholds", failures)
-    require("aim_cancel_reposition_duration := 0.55" in shooter and "aim_cancel_reposition_speed_scale := 1.12" in shooter, "Shooter has a committed cancel-reposition", failures)
-    require("aim_cancel_reposition_sample_distance := 40.0" in shooter and "aim_cancel_reposition_radial_correction_strength := 0.22" in shooter, "Shooter cancel-reposition has dedicated side sampling and radial correction", failures)
+    require("AIM_CANCEL_REPOSITION" not in shooter, "Shooter retires the old AIM-cancel state from the live implementation", failures)
+    require("aim_cancel_" not in shooter, "Shooter no longer exports pre-lock AIM-cancel tuning values", failures)
+    require("_should_start_shove" not in aim_state_block and "_enter_reposition_state" not in aim_state_block, "Committed AIM no longer branches into shove or ordinary reposition", failures)
+    require("_enter_locked_state()" in aim_state_block and "state_time_left = maxf(state_time_left - delta, 0.0)" in aim_state_block, "Committed AIM only tracks, counts down, and advances into LOCKED", failures)
     require("arc_reposition_duration := 1.10" in shooter, "Shooter has a longer post-burst arc reposition duration", failures)
     require("arc_reposition_speed_scale := 1.35" in shooter and "arc_reposition_side_sample_distance := 60.0" in shooter, "Shooter arc reposition has dedicated travel and side-sampling values", failures)
     require("arc_radial_correction_strength := 0.28" in shooter, "Shooter has updated arc radial correction", failures)

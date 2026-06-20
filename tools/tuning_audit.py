@@ -40,6 +40,7 @@ def main() -> int:
         "## Charger",
         "## Shielded",
         "## Blowgun Shooter",
+        "## Boomer",
         "## Dart Projectile",
         "## HUD And Feedback",
         "## Common Tuning Requests",
@@ -55,6 +56,7 @@ def main() -> int:
         "charger_unlock_time",
         "shielded_unlock_time",
         "shooter_unlock_time",
+        "boomer_unlock_time",
         "first_wave_time_min/max",
         "inter_wave_interval_min/max",
         "rush_start_population_threshold",
@@ -73,7 +75,6 @@ def main() -> int:
         "locked_duration",
         "burst_interval",
         "aim_retry_delay",
-        "aim_cancel_reposition_duration",
         "arc_reposition_duration",
         "arc_reposition_speed_scale",
         "arc_radial_correction_strength",
@@ -81,6 +82,15 @@ def main() -> int:
         "post_shove_side_sample_distance",
         "post_shove_follow_up_delay",
         "shove_cooldown",
+        "hop_prep_duration",
+        "hop_duration",
+        "hop_distance",
+        "landing_recovery_duration",
+        "fuse_trigger_distance",
+        "core_blast_radius",
+        "outer_shockwave_radius",
+        "landed_spear_shockwave_displacement",
+        "DAMAGE_SOURCE_EXPLOSION",
         "PROJECTILE_KIND_DART",
         "DAMAGE_SOURCE_DART",
         "FORCED_MOVEMENT_PROTECTION_SHOVE",
@@ -96,7 +106,6 @@ def main() -> int:
         "`locked_duration` | `0.24s`",
         "`burst_interval` | `0.17s`",
         "`attack_cooldown` | `0.95s`",
-        "`aim_cancel_reposition_duration` | `0.55s`",
         "`arc_reposition_duration` | `1.10s`",
         "`arc_reposition_speed_scale` | `1.35`",
         "`arc_reposition_side_sample_distance` | `60.0px`",
@@ -104,6 +113,12 @@ def main() -> int:
         "`post_shove_reposition_duration` | `0.42s`",
         "`shove_knockback_distance/duration` | `52.0px / 0.24s`",
         "`shove_cooldown` | `2.10s`",
+        "`boomer_unlock_time` | `65.0s`",
+        "`hop_distance` | `38.0px`",
+        "`fuse_duration` | `0.80s`",
+        "`core_blast_radius` | `29.0px`",
+        "`outer_shockwave_radius` | `54.0px`",
+        "`landed_spear_shockwave_displacement` | `20.0px`",
         "Two distinct dart indices from one `burst_id` may both damage",
     ]:
         require(approved_value in tuning, f"TUNING.md represents Shooter value {approved_value}", failures)
@@ -111,6 +126,8 @@ def main() -> int:
     require("[`TUNING.md`](TUNING.md)" in readme, "README links to TUNING.md", failures)
     require("[`TUNING.md`](TUNING.md)" in roadmap, "ROADMAP links to TUNING.md", failures)
     require("## Phase 4.6 Enemy Interaction And Formation Pass" in roadmap, "ROADMAP documents Phase 4.6 design direction", failures)
+    require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
+    require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)
 
     if failures:
         print(f"\nTuning audit failed with {len(failures)} issue(s).")

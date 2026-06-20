@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.6.0-alpha.2.2 - Shooter Visual & Behavior Refinement`
+Current milestone: `Spear Shot v0.6.0-alpha.3 - Boomer`
 
 ## Game concept
 
@@ -39,6 +39,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 
 - Temporary Shielded live-test hook: `1` debug-spawns one Shielded enemy while `DEBUG_SHIELDED_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - Temporary Shooter live-test hook: `2` debug-spawns one Blowgun Shooter while `DEBUG_SHOOTER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
+- Temporary Boomer live-test hook: `3` debug-spawns one Boomer while `DEBUG_BOOMER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - These are intentionally separate from normal player controls and can be disabled by setting their constants to `false`
 
 ## HUD layout
@@ -80,6 +81,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/charger_beast.png`: Charger sprite
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
+- `art/sprites/boomer_enemy.png`: active Boomer sprite chosen from the local concept pass and kept on the same small readable scale as the rest of the special roster
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
@@ -87,8 +89,12 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/blowgun_windup.wav`: local reed/breath cue for Blowgun Shooter aiming
 - `audio/blowgun_fire.wav`: local dry puff/snap cue for Blowgun Shooter dart release
 - `audio/blowgun_shove.wav`: local reed/wood swish-thump cue for Blowgun Shooter shove
+- `audio/boomer_hop_prep.wav`: local compressed hop-prep cue for the Boomer
+- `audio/boomer_land.wav`: local physical landing cue for the Boomer
+- `audio/boomer_fuse.wav`: local three-pulse fuse escalation cue for the Boomer
+- `audio/boomer_explosion.wav`: local physical blast cue for the Boomer
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded enemy sprite, the approved final Shooter sprite, and temporary Shooter palette-comparison outputs locally
+- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, and Boomer sprites plus the temporary local comparison outputs for the Phase 4 concept passes
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -104,7 +110,9 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
-- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, aim/lock/two-dart burst, committed aim-cancel reposition, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
+- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
+- `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
+- `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
 - `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
@@ -124,6 +132,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/shooter_enemy_audit.py`: static Phase 4.2 Shooter and dart contract audit
 - `tools/shooter_visual_concept_audit.py`: verifies the temporary Shooter palette-variant outputs and native-scale comparison image
 - `tools/ShooterEnemyRuntimeAudit.tscn`: runtime audit for Shooter movement, aim locking, darts, damage rules, cleanup, and intro integration
+- `tools/boomer_enemy_audit.py`: static Phase 4.3 Boomer contract audit
+- `tools/BoomerEnemyRuntimeAudit.tscn`: runtime audit for Boomer movement, fuse, detonation, scoring, cleanup, and intro integration
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
@@ -135,12 +145,17 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
 - Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, visibly aims before locking one dart direction, fires a two-dart straight player-only burst, then performs a longer tangential relocation around Akedra, and dies to one spear hit for `2` points
 - The two darts use the same locked direction with a deterministic `0.17` second burst interval, so one successful sidestep can avoid the whole committed volley
-- If Akedra crowds a Shooter before lock, the Shooter now lowers the blowgun and commits to a short lateral cancel-reposition instead of instantly re-aiming
+- Once a Shooter begins `AIM`, that wind-up is committed through the ordinary `AIM -> LOCKED -> FIRE -> RECOVER` sequence unless the Shooter dies or is cleaned up
 - Shooter body overlap no longer deals ordinary enemy contact damage
 - At very close range, the Shooter can use a short non-damaging shove that knocks Akedra back through the existing movement authority, grants shove-only temporary damage protection while that authored displacement resolves, and then quickly repositions into a normal readable follow-up shot
 - Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by active dodge or dodge exit grace
 - A narrow burst context lets two distinct darts from the same Shooter volley each deal one damage, while duplicate callbacks from either individual dart and unrelated damage sources still respect normal invulnerability
-- Darts currently do not collide with the spear, enemies, or Shielded shields; intact Shielded dart blocking remains deferred to the later Phase 4.6 interaction pass
+- Darts currently do not collide with the spear, enemies, or Shielded enemies; Phase 4.6 cooperation is planned around positioning-based Shielded/Shooter screening rather than projectile blocking
+- Boomer: ambient-only late-run hopping hazard with no ordinary contact damage, one active cap, safe pre-fuse spear kill for `2`, and a committed three-pulse fuse that starts immediately when it lands inside range
+- The Boomer only translates during its hop; hop prep, landing recovery, and fuse stay positionally stationary apart from visual-only squash, settle, and pulse cues
+- An armed Boomer detonates into a damaging core blast plus a non-damaging outer shockwave, can be triggered early by a valid thrown-spear hit during fuse, and awards no direct score for self-destruction
+- If Akedra is currently in shove-protected forced movement from a successful Shooter shove, the Boomer core blast deals no health damage and does not replace that authored movement with a second knockback impulse
+- A Boomer outer shockwave can lightly nudge an already landed spear by `20` pixels, keeping it in `LANDED`/`FETCH`, clamping it inside the arena, and preserving normal retrieval behavior
 
 ## Encounter director
 
@@ -156,10 +171,12 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
 - Shooter enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals, Chargers, or Shielded
+- Boomers count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals, Chargers, Shielded, or Shooters
 - Charger ambient spawns unlock around `15` seconds with a small capped weight
 - Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - Shooter ambient spawns unlock around `42` seconds with an even smaller capped weight, and capped/locked Shooter candidates are removed before choosing among remaining ambient types
-- Each run also rolls first-introduction targets: Charger between `15-21` seconds, Shielded between `25-30` seconds, and Shooter between `42-52` seconds
+- Boomer ambient spawns unlock around `65` seconds with the smallest capped weight, and capped/locked Boomer candidates are removed before choosing among remaining ambient types
+- Each run also rolls first-introduction targets: Charger between `15-21` seconds, Shielded between `25-30` seconds, Shooter between `42-52` seconds, and Boomer between `65-78` seconds
 - Before a target, specials can appear naturally through the existing weights; after an unseen target is overdue, the next valid ambient opportunity prioritizes that enemy until it successfully appears
 - After each special enemy has appeared once through organic play, it permanently returns to its ordinary long-term weighted selection for that run
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
@@ -172,6 +189,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Normal enemy score: `1`
 - Shielded score: `2`
 - Blowgun Shooter score: `2`
+- Boomer safe kill score: `2`
+- Boomer self-detonation score: `0` direct points; any enemies killed by the blast still use their ordinary score values
 - Charger score: `3`
 - High score is saved locally in `user://highscore.save`
 - Invalid or missing save data falls back safely to `0`
@@ -257,6 +276,12 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `maximum_shooter_spawn_chance`
   - `shooter_intro_target_time_min`
   - `shooter_intro_target_time_max`
+  - `boomer_unlock_time`
+  - `boomer_spawn_chance_at_unlock`
+  - `boomer_spawn_chance_growth_per_second`
+  - `maximum_boomer_spawn_chance`
+  - `boomer_intro_target_time_min`
+  - `boomer_intro_target_time_max`
   - `landed_spear_spawn_safe_radius`
   - `blocked_spawn_retry_interval`
   - `default_window_scale`
@@ -273,6 +298,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `charger_hostile_cap`
   - `shielded_hostile_cap`
   - `shooter_hostile_cap`
+  - `boomer_hostile_cap`
   - `first_minute_charger_cap`
   - `spawn_retry_interval`
 - `scripts/shooter_enemy.gd`
@@ -292,12 +318,6 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `attack_cooldown`
   - `minimum_dart_interval`
   - `aim_retry_delay`
-  - `aim_cancel_min_distance`
-  - `aim_cancel_max_distance`
-  - `aim_cancel_reposition_duration`
-  - `aim_cancel_reposition_speed_scale`
-  - `aim_cancel_reposition_sample_distance`
-  - `aim_cancel_reposition_radial_correction_strength`
   - `arc_reposition_duration`
   - `arc_reposition_speed_scale`
   - `arc_reposition_side_sample_distance`
@@ -311,6 +331,26 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `shove_cooldown`
   - `shove_hit_radius`
   - `shove_hit_offset`
+- `scripts/boomer_enemy.gd`
+  - `hop_prep_duration`
+  - `hop_duration`
+  - `hop_distance`
+  - `landing_recovery_duration`
+  - `fuse_trigger_distance`
+  - `fuse_duration`
+  - `core_blast_radius`
+  - `outer_shockwave_radius`
+  - `player_knockback_distance`
+  - `player_knockback_duration`
+  - `landed_spear_shockwave_displacement`
+  - `enemy_shockwave_knockback_distance`
+  - `enemy_shockwave_knockback_duration`
+  - `shooter_shockwave_knockback_distance`
+  - `shooter_shockwave_knockback_duration`
+  - `charger_core_knockback_distance`
+  - `charger_core_knockback_duration`
+  - `charger_shockwave_knockback_distance`
+  - `charger_shockwave_knockback_duration`
 - `scripts/dart_projectile.gd`
   - `speed`
   - `max_lifetime`
@@ -333,14 +373,14 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 
 ## Known limitations
 
-- There are currently four enemy types, all using intentionally simple movement logic
+- There are currently five enemy types, all using intentionally simple movement logic
 - Art and music are intentionally simple local placeholder assets rather than a full content pipeline
 - Enemy avoidance is intentionally lightweight and not full pathfinding
 
 ## Features intentionally left for later
 
 - More enemy types
-- Phase 4.6 enemy interaction work, including Shielded dart interception and coordinated ranged/melee screening behavior
+- Phase 4.6 enemy interaction work focused on positioning-based Shielded/Shooter cooperation and Shooter-dart/Boomer interactions
 - Ring encounter formations
 - Opportunity encounters such as a Heart Runner, kept separate from hostile population slots
 - Wave reward selection driven by encounter completion signals

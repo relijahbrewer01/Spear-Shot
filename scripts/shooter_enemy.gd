@@ -13,7 +13,6 @@ enum ShooterState {
 	RECOVER,
 	ARC_REPOSITION,
 	POST_SHOVE_REPOSITION,
-	AIM_CANCEL_REPOSITION,
 	SHOVE_WINDUP,
 	SHOVE_ACTIVE,
 	SHOVE_RECOVER,
@@ -40,12 +39,6 @@ enum ShooterState {
 @export var attack_cooldown := 0.95
 @export var minimum_dart_interval := 2.4
 @export var aim_retry_delay := 0.18
-@export var aim_cancel_min_distance := 74.0
-@export var aim_cancel_max_distance := 134.0
-@export var aim_cancel_reposition_duration := 0.55
-@export var aim_cancel_reposition_speed_scale := 1.12
-@export var aim_cancel_reposition_sample_distance := 40.0
-@export var aim_cancel_reposition_radial_correction_strength := 0.22
 @export var arc_reposition_duration := 1.10
 @export var arc_reposition_speed_scale := 1.35
 @export var arc_reposition_side_sample_distance := 60.0
@@ -91,9 +84,6 @@ var post_shove_reposition_side := 1
 var post_shove_reposition_reversed_for_wall := false
 var last_blocked_post_shove_side := 0
 var post_shove_follow_up_left := 0.0
-var aim_cancel_reposition_side := 1
-var aim_cancel_reposition_reversed_for_wall := false
-var last_blocked_cancel_side := 0
 var aim_direction := Vector2.RIGHT
 var locked_direction := Vector2.RIGHT
 var shove_direction := Vector2.RIGHT
@@ -133,29 +123,28 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if _can_run_behavior():
-		match shooter_state:
-			ShooterState.REPOSITION:
-				_process_reposition_state(delta)
-			ShooterState.AIM:
-				_process_aim_state(delta)
-			ShooterState.LOCKED:
-				_process_locked_state(delta)
-			ShooterState.FIRE:
-				_process_fire_state(delta)
-			ShooterState.RECOVER:
-				_process_recover_state(delta)
-			ShooterState.ARC_REPOSITION:
-				_process_arc_reposition_state(delta)
-			ShooterState.POST_SHOVE_REPOSITION:
-				_process_post_shove_reposition_state(delta)
-			ShooterState.AIM_CANCEL_REPOSITION:
-				_process_aim_cancel_reposition_state(delta)
-			ShooterState.SHOVE_WINDUP:
-				_process_shove_windup_state(delta)
-			ShooterState.SHOVE_ACTIVE:
-				_process_shove_active_state(delta)
-			ShooterState.SHOVE_RECOVER:
-				_process_shove_recover_state(delta)
+		if not _process_explosion_knockback(delta):
+			match shooter_state:
+				ShooterState.REPOSITION:
+					_process_reposition_state(delta)
+				ShooterState.AIM:
+					_process_aim_state(delta)
+				ShooterState.LOCKED:
+					_process_locked_state(delta)
+				ShooterState.FIRE:
+					_process_fire_state(delta)
+				ShooterState.RECOVER:
+					_process_recover_state(delta)
+				ShooterState.ARC_REPOSITION:
+					_process_arc_reposition_state(delta)
+				ShooterState.POST_SHOVE_REPOSITION:
+					_process_post_shove_reposition_state(delta)
+				ShooterState.SHOVE_WINDUP:
+					_process_shove_windup_state(delta)
+				ShooterState.SHOVE_ACTIVE:
+					_process_shove_active_state(delta)
+				ShooterState.SHOVE_RECOVER:
+					_process_shove_recover_state(delta)
 
 		_try_contact_damage()
 	else:
@@ -190,26 +179,10 @@ func _process_reposition_state(delta: float) -> void:
 
 
 func _process_aim_state(delta: float) -> void:
-	var distance_to_player := _get_distance_to_player()
-	if _should_start_shove(distance_to_player):
-		_enter_shove_windup_state()
-		return
-	if distance_to_player < aim_cancel_min_distance:
-		aim_retry_left = maxf(aim_retry_left, aim_retry_delay)
-		_enter_reposition_state(false)
-		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
-		return
-	if distance_to_player > aim_cancel_max_distance:
-		_enter_aim_cancel_reposition_state()
-		return
-
 	var current_direction := _get_direction_to_player()
-	if current_direction == Vector2.ZERO:
-		_enter_aim_cancel_reposition_state()
-		return
-
-	aim_direction = current_direction
-	_update_facing_from_direction(aim_direction)
+	if current_direction != Vector2.ZERO:
+		aim_direction = current_direction
+		_update_facing_from_direction(aim_direction)
 	state_time_left = maxf(state_time_left - delta, 0.0)
 	velocity = Vector2.ZERO
 	if state_time_left == 0.0:
@@ -265,22 +238,6 @@ func _process_post_shove_reposition_state(delta: float) -> void:
 		_enter_aim_state()
 		return
 
-	if state_time_left == 0.0:
-		_enter_reposition_state(false)
-
-
-func _process_aim_cancel_reposition_state(delta: float) -> void:
-	var distance_to_player := _get_distance_to_player()
-	if _should_start_shove(distance_to_player):
-		_enter_shove_windup_state()
-		return
-	if distance_to_player <= retreat_distance:
-		_enter_reposition_state(false)
-		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
-		return
-
-	state_time_left = maxf(state_time_left - delta, 0.0)
-	_move_with_velocity(_get_aim_cancel_reposition_velocity(delta, distance_to_player))
 	if state_time_left == 0.0:
 		_enter_reposition_state(false)
 
@@ -440,46 +397,6 @@ func _get_post_shove_reposition_velocity(delta: float, distance_to_player: float
 	return desired_velocity
 
 
-func _get_aim_cancel_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
-	if player == null:
-		return Vector2.ZERO
-
-	var from_player := global_position - player.global_position
-	if from_player.length_squared() <= 0.001:
-		from_player = Vector2.RIGHT
-
-	var radial_direction := from_player.normalized()
-	var tangent_direction := Vector2(-radial_direction.y, radial_direction.x).normalized()
-	tangent_direction *= float(aim_cancel_reposition_side)
-
-	var radial_correction := _get_radial_correction(
-		distance_to_player,
-		radial_direction,
-		aim_cancel_reposition_radial_correction_strength
-	)
-	var desired_direction := (tangent_direction + radial_correction).normalized()
-	var desired_velocity := desired_direction * move_speed * aim_cancel_reposition_speed_scale
-
-	if _motion_would_leave_arena(desired_velocity, delta) and not aim_cancel_reposition_reversed_for_wall:
-		last_blocked_cancel_side = aim_cancel_reposition_side
-		aim_cancel_reposition_side *= -1
-		aim_cancel_reposition_reversed_for_wall = true
-		tangent_direction = -tangent_direction
-		desired_direction = (tangent_direction + radial_correction).normalized()
-		desired_velocity = desired_direction * move_speed * aim_cancel_reposition_speed_scale
-
-	desired_velocity += _get_separation_push() * 0.15
-	var cancel_peak_scale := maxf(approach_speed_scale, aim_cancel_reposition_speed_scale)
-	var speed_limit := move_speed * maxf(retreat_speed_scale, cancel_peak_scale)
-	if desired_velocity.length() > speed_limit:
-		desired_velocity = desired_velocity.normalized() * speed_limit
-
-	if desired_velocity.length_squared() > 0.01:
-		_update_facing_from_direction(desired_velocity.normalized())
-
-	return desired_velocity
-
-
 func _get_radial_correction(distance_to_player: float, radial_direction: Vector2, correction_strength: float) -> Vector2:
 	if distance_to_player < preferred_distance_min:
 		return radial_direction * correction_strength
@@ -623,15 +540,6 @@ func _enter_post_shove_reposition_state() -> void:
 	velocity = Vector2.ZERO
 
 
-func _enter_aim_cancel_reposition_state() -> void:
-	shooter_state = ShooterState.AIM_CANCEL_REPOSITION
-	state_time_left = aim_cancel_reposition_duration
-	aim_retry_left = maxf(aim_retry_left, aim_retry_delay)
-	aim_cancel_reposition_reversed_for_wall = false
-	aim_cancel_reposition_side = _choose_cancel_reposition_side()
-	velocity = Vector2.ZERO
-
-
 func _enter_shove_windup_state() -> void:
 	shooter_state = ShooterState.SHOVE_WINDUP
 	state_time_left = shove_windup_duration
@@ -748,30 +656,6 @@ func _score_post_shove_side(side: int) -> float:
 	return _score_lateral_direction(tangent, post_shove_side_sample_distance)
 
 
-func _choose_cancel_reposition_side() -> int:
-	var random_side := 1 if rng.randf() >= 0.5 else -1
-	var alternate_side := -random_side
-	if random_side == last_blocked_cancel_side:
-		random_side = alternate_side
-
-	var random_score := _score_cancel_side(random_side)
-	var alternate_score := _score_cancel_side(alternate_side)
-	if alternate_score > random_score + 4.0:
-		return alternate_side
-	return random_side
-
-
-func _score_cancel_side(side: int) -> float:
-	if player == null:
-		return 0.0
-
-	var from_player := global_position - player.global_position
-	if from_player.length_squared() <= 0.001:
-		from_player = Vector2.RIGHT
-	var tangent := Vector2(-from_player.y, from_player.x).normalized() * float(side)
-	return _score_lateral_direction(tangent, aim_cancel_reposition_sample_distance)
-
-
 func _clear_attack_state() -> void:
 	shooter_state = ShooterState.REPOSITION
 	state_time_left = 0.0
@@ -787,14 +671,29 @@ func _clear_attack_state() -> void:
 	post_shove_reposition_side = 1
 	post_shove_reposition_reversed_for_wall = false
 	post_shove_follow_up_left = 0.0
-	aim_cancel_reposition_side = 1
-	aim_cancel_reposition_reversed_for_wall = false
 	burst_shots_fired = 0
 	active_burst_id = 0
 	shove_has_attempted_hit = false
 	shove_connected = false
 	velocity = Vector2.ZERO
 	queue_redraw()
+
+
+func apply_explosion_knockback(direction: Vector2, distance: float, duration: float) -> void:
+	_interrupt_for_explosion_knockback()
+	super.apply_explosion_knockback(direction, distance, duration)
+
+
+func _interrupt_for_explosion_knockback() -> void:
+	shooter_state = ShooterState.REPOSITION
+	state_time_left = 0.0
+	arc_reposition_left = 0.0
+	post_shove_follow_up_left = 0.0
+	burst_shots_fired = 0
+	active_burst_id = 0
+	shove_has_attempted_hit = false
+	shove_connected = false
+	velocity = Vector2.ZERO
 
 
 func _get_distance_to_player() -> float:

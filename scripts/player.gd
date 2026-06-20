@@ -5,6 +5,7 @@ const SPRITE_BASE_OFFSET := Vector2(0.0, -2.0)
 const BODY_VISUAL_Z_INDEX := 10
 const DAMAGE_SOURCE_CONTACT := &"contact"
 const DAMAGE_SOURCE_DART := &"dart"
+const DAMAGE_SOURCE_EXPLOSION := &"explosion"
 const FORCED_MOVEMENT_PROTECTION_NONE := &"none"
 const FORCED_MOVEMENT_PROTECTION_SHOVE := &"shove"
 const INVALID_DART_BURST_ID := -1
@@ -207,7 +208,7 @@ func can_take_damage(
 ) -> bool:
 	if not is_alive():
 		return false
-	if has_shove_damage_protection():
+	if has_shove_damage_protection() and damage_source != DAMAGE_SOURCE_EXPLOSION:
 		return false
 	if is_dodging() or dodge_exit_invulnerability_left > 0.0:
 		return false

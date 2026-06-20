@@ -238,7 +238,11 @@ def main() -> int:
     require('resume_countdown_step_duration := 0.7' in hud_script, "HUD countdown step duration is shortened", failures)
     require('COUNTDOWN_STEP_COUNT := 3' in hud_script, "HUD preserves the 3 2 1 countdown sequence", failures)
     require('Time.get_ticks_msec()' in hud_script, "HUD countdown uses real-time ticking", failures)
-    require('health_pips.set_health_values(health, max_health)' in player_script, "Player updates health pip values", failures)
+    require(
+        'health_pips.set_health_values(health, max_health, _get_bonus_health_count())' in player_script,
+        "Player updates health pip values",
+        failures,
+    )
     require('health_pips.sync_to_player(self)' in player_script, "Player keeps health pips synced under the sprite", failures)
     require(
         '_hit_enemies_in_launch_sweep' in spear_script,

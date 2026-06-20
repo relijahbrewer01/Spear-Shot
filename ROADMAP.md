@@ -9,7 +9,6 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Wave telegraphs use readable world-space edge markers plus one restrained locally generated warning cue.
 - Wave ownership uses strict death/tree-exit cleanup, tunable population caps, wave-specific start thresholds, and safe spawn deferral.
 - Ring formations remain deferred until the first three patterns have been tuned through live play.
-- A future Heart Runner belongs to a separate opportunity system and should not consume hostile population slots.
 
 ## Phase 4 Enemy Expansion
 
@@ -24,6 +23,14 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Boomer self-destruction awards no direct score, but enemies killed by the blast still use their normal death/scoring pathways.
 - The narrow Shooter follow-up correction in the same subphase makes `AIM` fully committed once it starts, so player distance changes no longer cancel the live wind-up.
 - Rush, Pincer, and Charger Hunt remain unchanged; Shielded authored waves, Shooter authored waves, Boomer authored waves, combo scoring, and broader combat frameworks are deferred.
+
+## Phase 4.4 Heart Runner Opportunity
+
+- Heart Runner is now implemented as a separate opportunity system rather than a hostile enemy kind, so it does not consume EncounterDirector hostile population slots, per-type caps, or wave thresholds.
+- The Runner unlocks around `20s`, rolls on its own `8-12s` timer, becomes more likely at lower player health, and still respects one-active Runner-or-pickup pressure for readability.
+- Natural cleanup is based on crossing the Runner's originally assigned opposite-edge exit plane, preventing side-boundary despawns from Boomer shockwaves or other authored displacement.
+- A valid thrown-spear hit defeats the Runner for `1` point without stopping spear flight and spawns one temporary heart pickup clamped inside the arena.
+- Pickup resolution applies the opportunity cooldown exactly once, either on unharmed escape or after the defeated Runner's pickup is collected or expires.
 
 ## Phase 4.6 Enemy Interaction And Formation Pass
 

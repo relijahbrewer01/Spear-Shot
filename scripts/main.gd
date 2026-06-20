@@ -5,6 +5,8 @@ const ChargerScene := preload("res://Charger.tscn")
 const ShieldedScene := preload("res://ShieldedEnemy.tscn")
 const ShooterScene := preload("res://ShooterEnemy.tscn")
 const BoomerScene := preload("res://BoomerEnemy.tscn")
+const HeartRunnerScene := preload("res://HeartRunner.tscn")
+const HeartPickupScene := preload("res://HeartPickup.tscn")
 const BoomerBlastEffectScene := preload("res://BoomerBlastEffect.tscn")
 const DartProjectileScene := preload("res://DartProjectile.tscn")
 const HighScoreStore := preload("res://scripts/high_score_store.gd")
@@ -12,6 +14,7 @@ const NO_AMBIENT_ENEMY_KIND := -1
 const DEBUG_SHIELDED_SPAWN_ENABLED := true
 const DEBUG_SHOOTER_SPAWN_ENABLED := true
 const DEBUG_BOOMER_SPAWN_ENABLED := true
+const DEBUG_HEART_RUNNER_SPAWN_ENABLED := true
 
 enum RunState {
 	RUNNING,
@@ -65,6 +68,18 @@ enum SpawnSource {
 @export var maximum_boomer_spawn_chance := 0.07
 @export var boomer_intro_target_time_min := 65.0
 @export var boomer_intro_target_time_max := 78.0
+@export var heart_runner_unlock_time := 20.0
+@export var heart_runner_roll_interval_min := 8.0
+@export var heart_runner_roll_interval_max := 12.0
+@export var heart_runner_health_3_spawn_chance := 0.01
+@export var heart_runner_health_2_spawn_chance := 0.04
+@export var heart_runner_health_1_spawn_chance := 0.10
+@export var heart_runner_speed := 140.0
+@export var heart_runner_spawn_safe_radius := 56.0
+@export var heart_runner_landed_spear_safe_radius := 24.0
+@export var heart_runner_post_resolution_cooldown := 18.0
+@export var heart_pickup_lifetime := 7.0
+@export var heart_pickup_warning_duration := 1.5
 
 var score := 0
 var high_score := 0
@@ -88,6 +103,11 @@ var hit_stop_previous_time_scale := 1.0
 var rng := RandomNumberGenerator.new()
 var debug_intro_target_sequence: Array = []
 var debug_ambient_roll_sequence: Array = []
+var debug_heart_runner_roll_sequence: Array = []
+var debug_heart_runner_interval_sequence: Array = []
+var heart_runner_next_eligible_time := 0.0
+var active_heart_runner: HeartRunner
+var active_heart_pickup: HeartPickup
 
 @onready var arena: Arena = $Arena
 @onready var player: Player = $Player
@@ -96,9 +116,11 @@ var debug_ambient_roll_sequence: Array = []
 @onready var encounter_telegraph: EncounterTelegraph = $EncounterTelegraph
 @onready var encounter_director: EncounterDirector = $EncounterDirector
 @onready var enemy_container: Node2D = $EnemyContainer
+@onready var opportunity_container: Node2D = $OpportunityContainer
 @onready var effect_container: Node2D = $EffectContainer
 @onready var projectile_container: Node2D = $ProjectileContainer
 @onready var spawn_timer: Timer = $SpawnTimer
+@onready var opportunity_timer: Timer = $OpportunityTimer
 @onready var camera: Camera2D = $Camera2D
 @onready var hud: HUD = $HUD
 @onready var music_player: AudioStreamPlayer = $AudioPlayers/MusicPlayer
@@ -118,6 +140,10 @@ var debug_ambient_roll_sequence: Array = []
 @onready var boomer_land_player: AudioStreamPlayer = $AudioPlayers/BoomerLandPlayer
 @onready var boomer_fuse_player: AudioStreamPlayer = $AudioPlayers/BoomerFusePlayer
 @onready var boomer_explosion_player: AudioStreamPlayer = $AudioPlayers/BoomerExplosionPlayer
+@onready var heart_runner_appear_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAppearPlayer
+@onready var heart_pickup_spawn_player: AudioStreamPlayer = $AudioPlayers/HeartPickupSpawnPlayer
+@onready var heart_pickup_collect_player: AudioStreamPlayer = $AudioPlayers/HeartPickupCollectPlayer
+@onready var heart_pickup_expire_player: AudioStreamPlayer = $AudioPlayers/HeartPickupExpirePlayer
 
 
 func _ready() -> void:
@@ -142,6 +168,7 @@ func _ready() -> void:
 	spear.picked_up.connect(_on_spear_picked_up)
 	spear.thrown.connect(_on_spear_thrown)
 	spawn_timer.timeout.connect(_on_spawn_timer_timeout)
+	opportunity_timer.timeout.connect(_on_opportunity_timer_timeout)
 	encounter_director.spawn_requested.connect(_on_director_spawn_requested)
 	encounter_director.telegraph_started.connect(_on_wave_telegraph_started)
 	encounter_director.telegraph_finished.connect(_on_wave_telegraph_finished)
@@ -181,6 +208,7 @@ func _reset_runtime_state() -> void:
 
 	for child in enemy_container.get_children():
 		child.queue_free()
+	_clear_opportunities()
 	_clear_transient_effects()
 	_clear_projectiles()
 
@@ -190,6 +218,8 @@ func _reset_runtime_state() -> void:
 	spear.reset_for_new_run(player, play_rect)
 	spawn_timer.wait_time = base_spawn_interval
 	spawn_timer.start()
+	heart_runner_next_eligible_time = 0.0
+	_start_opportunity_timer()
 	destination_marker.clear_marker()
 	_stop_gameplay_sfx()
 
@@ -225,6 +255,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if DEBUG_BOOMER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_boomer"):
 		_debug_spawn_boomer_enemy()
+		return
+	if DEBUG_HEART_RUNNER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_heart_runner"):
+		_debug_spawn_heart_runner()
 		return
 
 	if event.is_action_pressed("dodge_aim"):
@@ -351,6 +384,204 @@ func _debug_spawn_boomer_enemy() -> void:
 		print("DEBUG: spawned Boomer enemy with key 3.")
 	else:
 		print("DEBUG: Boomer enemy spawn failed; cap or safe spawn search blocked it.")
+
+
+func _debug_spawn_heart_runner() -> void:
+	var spawned := _try_spawn_heart_runner(true)
+	if spawned:
+		print("DEBUG: spawned Heart Runner with key 4.")
+	else:
+		print("DEBUG: Heart Runner spawn failed; an active Runner/pickup or safe entry search blocked it.")
+
+
+func _on_opportunity_timer_timeout() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_run_heart_runner_opportunity_check()
+
+
+func _run_heart_runner_opportunity_check() -> void:
+	if not _is_heart_runner_opportunity_eligible_for_roll():
+		_start_opportunity_timer()
+		return
+
+	var spawn_chance := _get_current_heart_runner_spawn_chance()
+	if spawn_chance > 0.0 and _get_heart_runner_roll() < spawn_chance:
+		_try_spawn_heart_runner(false)
+
+	_start_opportunity_timer()
+
+
+func _is_heart_runner_opportunity_eligible_for_roll() -> bool:
+	if run_state != RunState.RUNNING:
+		return false
+	if player == null or not player.is_alive():
+		return false
+	if active_heart_runner != null or active_heart_pickup != null:
+		return false
+	if survival_time < heart_runner_unlock_time:
+		return false
+	if survival_time < heart_runner_next_eligible_time:
+		return false
+	return true
+
+
+func _start_opportunity_timer() -> void:
+	if opportunity_timer == null:
+		return
+
+	opportunity_timer.wait_time = _get_next_heart_runner_roll_interval()
+	opportunity_timer.start()
+
+
+func _get_next_heart_runner_roll_interval() -> float:
+	if not debug_heart_runner_interval_sequence.is_empty():
+		return maxf(float(debug_heart_runner_interval_sequence.pop_front()), 0.01)
+
+	return rng.randf_range(heart_runner_roll_interval_min, heart_runner_roll_interval_max)
+
+
+func _get_heart_runner_roll() -> float:
+	if not debug_heart_runner_roll_sequence.is_empty():
+		return float(debug_heart_runner_roll_sequence.pop_front())
+
+	return rng.randf()
+
+
+func _get_current_heart_runner_spawn_chance() -> float:
+	if player == null:
+		return 0.0
+
+	match player.health:
+		4:
+			return 0.0
+		3:
+			return heart_runner_health_3_spawn_chance
+		2:
+			return heart_runner_health_2_spawn_chance
+		1:
+			return heart_runner_health_1_spawn_chance
+
+	return 0.0
+
+
+func _try_spawn_heart_runner(is_debug_spawn: bool) -> bool:
+	if active_heart_runner != null or active_heart_pickup != null:
+		return false
+	if player == null or not player.is_alive():
+		return false
+	if not is_debug_spawn and survival_time < heart_runner_unlock_time:
+		return false
+
+	var spawn_setup := _find_heart_runner_spawn_setup()
+	if not spawn_setup.get("valid", false):
+		return false
+
+	var heart_runner := HeartRunnerScene.instantiate() as HeartRunner
+	if heart_runner == null:
+		return false
+
+	var play_rect := arena.get_play_rect()
+	opportunity_container.add_child(heart_runner)
+	heart_runner.setup(
+		play_rect,
+		spawn_setup["entry_position"],
+		spawn_setup["target_position"],
+		int(spawn_setup["exit_edge"]),
+		heart_runner_speed,
+		is_debug_spawn
+	)
+	heart_runner.defeated.connect(_on_heart_runner_defeated)
+	heart_runner.escaped.connect(_on_heart_runner_escaped)
+	heart_runner.tree_exited.connect(_on_heart_runner_tree_exited.bind(heart_runner))
+	active_heart_runner = heart_runner
+	_play_sfx(heart_runner_appear_player)
+	return true
+
+
+func _find_heart_runner_spawn_setup() -> Dictionary:
+	var shuffled_edges := [
+		Arena.SpawnEdge.TOP,
+		Arena.SpawnEdge.BOTTOM,
+		Arena.SpawnEdge.LEFT,
+		Arena.SpawnEdge.RIGHT,
+	]
+	shuffled_edges.shuffle()
+
+	for spawn_edge in shuffled_edges:
+		var entry_position := _find_safe_heart_runner_entry_position(spawn_edge)
+		if not entry_position.is_finite():
+			continue
+
+		var exit_edge := Arena.get_opposite_spawn_edge(spawn_edge)
+		return {
+			"valid": true,
+			"entry_position": entry_position,
+			"exit_edge": exit_edge,
+			"target_position": _get_heart_runner_edge_point(exit_edge),
+		}
+
+	return {
+		"valid": false,
+	}
+
+
+func _find_safe_heart_runner_entry_position(spawn_edge: int) -> Vector2:
+	var avoid_positions: Array[Vector2] = [player.global_position]
+	var avoid_radii: Array[float] = [heart_runner_spawn_safe_radius]
+	if spear.is_landed():
+		avoid_positions.append(spear.global_position)
+		avoid_radii.append(heart_runner_landed_spear_safe_radius)
+
+	return arena.find_safe_spawn_position(spawn_edge, avoid_positions, avoid_radii)
+
+
+func _get_heart_runner_edge_point(edge: int) -> Vector2:
+	var play_rect := arena.get_play_rect()
+	var edge_padding := 8.0
+	match edge:
+		Arena.SpawnEdge.TOP:
+			return Vector2(
+				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
+				play_rect.position.y + edge_padding
+			)
+		Arena.SpawnEdge.BOTTOM:
+			return Vector2(
+				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
+				play_rect.end.y - edge_padding
+			)
+		Arena.SpawnEdge.LEFT:
+			return Vector2(
+				play_rect.position.x + edge_padding,
+				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
+			)
+		_:
+			return Vector2(
+				play_rect.end.x - edge_padding,
+				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
+			)
+
+
+func _spawn_heart_pickup(spawn_position: Vector2, spawned_by_debug: bool) -> bool:
+	if active_heart_pickup != null:
+		return false
+
+	var heart_pickup := HeartPickupScene.instantiate() as HeartPickup
+	if heart_pickup == null:
+		return false
+
+	opportunity_container.add_child(heart_pickup)
+	heart_pickup.lifetime = heart_pickup_lifetime
+	heart_pickup.warning_duration = heart_pickup_warning_duration
+	heart_pickup.setup(player, arena.get_play_rect(), spawn_position)
+	heart_pickup.collected.connect(_on_heart_pickup_collected.bind(spawned_by_debug))
+	heart_pickup.expired.connect(_on_heart_pickup_expired.bind(spawned_by_debug))
+	heart_pickup.warning_started.connect(_on_heart_pickup_warning_started)
+	heart_pickup.tree_exited.connect(_on_heart_pickup_tree_exited.bind(heart_pickup))
+	active_heart_pickup = heart_pickup
+	_play_sfx(heart_pickup_spawn_player)
+	return true
 
 
 func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
@@ -710,6 +941,14 @@ func debug_set_ambient_roll_sequence(new_ambient_roll_sequence: Array) -> void:
 	debug_ambient_roll_sequence = new_ambient_roll_sequence.duplicate()
 
 
+func debug_set_heart_runner_roll_sequence(new_roll_sequence: Array) -> void:
+	debug_heart_runner_roll_sequence = new_roll_sequence.duplicate()
+
+
+func debug_set_heart_runner_interval_sequence(new_interval_sequence: Array) -> void:
+	debug_heart_runner_interval_sequence = new_interval_sequence.duplicate()
+
+
 func _on_spawn_timer_timeout() -> void:
 	if run_state != RunState.RUNNING:
 		return
@@ -752,6 +991,57 @@ func _on_enemy_tree_exited(enemy_id: int, run_generation: int) -> void:
 	encounter_director.notify_enemy_removed(enemy_id, run_generation)
 
 
+func _on_heart_runner_defeated(
+	defeat_position: Vector2,
+	score_value: int,
+	spawned_by_debug: bool
+) -> void:
+	active_heart_runner = null
+	score += score_value
+	hud.set_score(score)
+	_spawn_heart_pickup(defeat_position, spawned_by_debug)
+
+
+func _on_heart_runner_escaped(spawned_by_debug: bool) -> void:
+	active_heart_runner = null
+	if not spawned_by_debug:
+		_start_heart_runner_resolution_cooldown()
+
+
+func _on_heart_runner_tree_exited(heart_runner: HeartRunner) -> void:
+	if active_heart_runner == heart_runner:
+		active_heart_runner = null
+
+
+func _on_heart_pickup_collected(spawned_by_debug: bool) -> void:
+	active_heart_pickup = null
+	_play_sfx(heart_pickup_collect_player)
+	if not spawned_by_debug:
+		_start_heart_runner_resolution_cooldown()
+
+
+func _on_heart_pickup_expired(spawned_by_debug: bool) -> void:
+	active_heart_pickup = null
+	if not spawned_by_debug:
+		_start_heart_runner_resolution_cooldown()
+
+
+func _on_heart_pickup_warning_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(heart_pickup_expire_player)
+
+
+func _on_heart_pickup_tree_exited(heart_pickup: HeartPickup) -> void:
+	if active_heart_pickup == heart_pickup:
+		active_heart_pickup = null
+
+
+func _start_heart_runner_resolution_cooldown() -> void:
+	heart_runner_next_eligible_time = survival_time + heart_runner_post_resolution_cooldown
+
+
 func _on_player_damaged(_new_health: int) -> void:
 	_play_sfx(player_hurt_player)
 	_start_screen_shake(damage_shake_duration, damage_shake_strength)
@@ -764,6 +1054,7 @@ func _on_player_died() -> void:
 	_cancel_hit_stop()
 	run_state = RunState.GAME_OVER
 	spawn_timer.stop()
+	opportunity_timer.stop()
 	encounter_director.stop_for_game_over()
 	player.set_active(false)
 	spear.set_active(false)
@@ -771,6 +1062,7 @@ func _on_player_died() -> void:
 	for child in enemy_container.get_children():
 		if child.has_method("set_active"):
 			child.set_active(false)
+	_clear_opportunities()
 	_clear_projectiles()
 	if blowgun_windup_player != null:
 		blowgun_windup_player.stop()
@@ -866,6 +1158,15 @@ func _on_boomer_enemy_detonated(
 			outer_radius,
 			landed_spear_shockwave_displacement
 		)
+	if active_heart_runner != null:
+		var distance_to_runner := active_heart_runner.global_position.distance_to(position)
+		if distance_to_runner <= outer_radius + active_heart_runner.body_radius:
+			var outward_direction := (active_heart_runner.global_position - position).normalized()
+			if outward_direction == Vector2.ZERO:
+				outward_direction = active_heart_runner.travel_direction
+			if outward_direction == Vector2.ZERO:
+				outward_direction = Vector2.RIGHT
+			active_heart_runner.apply_authored_displacement(outward_direction, 18.0, 0.16)
 	_spawn_boomer_blast_effect(position, core_radius, outer_radius)
 
 
@@ -893,6 +1194,23 @@ func _clear_projectiles() -> void:
 			projectile.call("destroy_projectile", DartProjectile.DESTROY_REASON_CLEARED)
 		else:
 			projectile.queue_free()
+
+
+func _clear_opportunities() -> void:
+	if opportunity_timer != null:
+		opportunity_timer.stop()
+	if opportunity_container != null:
+		for child in opportunity_container.get_children():
+			if child.has_method("destroy_pickup"):
+				child.call("destroy_pickup", HeartPickup.DESTROY_REASON_CLEARED)
+			elif child.has_method("set_active"):
+				child.set_active(false)
+				child.queue_free()
+			else:
+				child.queue_free()
+
+	active_heart_runner = null
+	active_heart_pickup = null
 
 
 func _clear_transient_effects() -> void:
@@ -1030,6 +1348,10 @@ func _stop_all_audio() -> void:
 		boomer_land_player,
 		boomer_fuse_player,
 		boomer_explosion_player,
+		heart_runner_appear_player,
+		heart_pickup_spawn_player,
+		heart_pickup_collect_player,
+		heart_pickup_expire_player,
 	]:
 		if audio_player == null:
 			continue
@@ -1054,6 +1376,10 @@ func _stop_gameplay_sfx() -> void:
 		boomer_land_player,
 		boomer_fuse_player,
 		boomer_explosion_player,
+		heart_runner_appear_player,
+		heart_pickup_spawn_player,
+		heart_pickup_collect_player,
+		heart_pickup_expire_player,
 	]:
 		if audio_player == null:
 			continue
@@ -1165,6 +1491,7 @@ func _ensure_input_actions() -> void:
 	_add_key_action("debug_spawn_shielded", KEY_1)
 	_add_key_action("debug_spawn_shooter", KEY_2)
 	_add_key_action("debug_spawn_boomer", KEY_3)
+	_add_key_action("debug_spawn_heart_runner", KEY_4)
 	_remove_mouse_button_action("throw_spear", MOUSE_BUTTON_RIGHT)
 	_add_mouse_button_action("throw_spear", MOUSE_BUTTON_LEFT)
 	_add_mouse_button_action("move_to_cursor", MOUSE_BUTTON_RIGHT)

@@ -395,6 +395,56 @@ def generate_boomer_explosion() -> list[float]:
     return samples
 
 
+def generate_heart_runner_appear() -> list[float]:
+    length = int(SAMPLE_RATE * 0.14)
+    samples: list[float] = []
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        frequency = 540.0 + progress * 180.0
+        tone = math.sin(2.0 * math.pi * frequency * index / SAMPLE_RATE)
+        body = math.sin(2.0 * math.pi * 210.0 * index / SAMPLE_RATE) * 0.18
+        samples.append((tone * 0.34 + body * (1.0 - progress)) * envelope(progress, 0.01, 0.52))
+    return samples
+
+
+def generate_heart_pickup_spawn() -> list[float]:
+    length = int(SAMPLE_RATE * 0.16)
+    samples: list[float] = []
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        frequency = 360.0 + progress * 220.0
+        tone = math.sin(2.0 * math.pi * frequency * index / SAMPLE_RATE)
+        harmonic = math.sin(2.0 * math.pi * frequency * 2.0 * index / SAMPLE_RATE) * 0.18
+        samples.append((tone * 0.38 + harmonic) * envelope(progress, 0.01, 0.44))
+    return samples
+
+
+def generate_heart_pickup_collect() -> list[float]:
+    length = int(SAMPLE_RATE * 0.18)
+    samples: list[float] = []
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        frequency = 480.0 + progress * 300.0
+        tone = math.sin(2.0 * math.pi * frequency * index / SAMPLE_RATE)
+        sparkle = math.sin(2.0 * math.pi * frequency * 2.5 * index / SAMPLE_RATE) * 0.16
+        samples.append((tone * 0.42 + sparkle) * envelope(progress, 0.01, 0.38))
+    return samples
+
+
+def generate_heart_pickup_expire() -> list[float]:
+    length = int(SAMPLE_RATE * 0.12)
+    samples: list[float] = []
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        whisper = raw_noise - previous_noise
+        previous_noise = raw_noise
+        tone = math.sin(2.0 * math.pi * (410.0 - progress * 120.0) * index / SAMPLE_RATE)
+        samples.append((tone * 0.18 + whisper * 0.16) * envelope(progress, 0.01, 0.60))
+    return samples
+
+
 def main() -> None:
     random.seed(42)
     sounds = {
@@ -414,6 +464,10 @@ def main() -> None:
         "boomer_land.wav": generate_boomer_land(),
         "boomer_fuse.wav": generate_boomer_fuse(),
         "boomer_explosion.wav": generate_boomer_explosion(),
+        "heart_runner_appear.wav": generate_heart_runner_appear(),
+        "heart_pickup_spawn.wav": generate_heart_pickup_spawn(),
+        "heart_pickup_collect.wav": generate_heart_pickup_collect(),
+        "heart_pickup_expire.wav": generate_heart_pickup_expire(),
     }
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)

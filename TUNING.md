@@ -82,6 +82,7 @@
 | `ActionState.FORCED_MOVEMENT` | enabled | `scripts/player.gd` | Narrow authored knockback state used by Shooter shove. |
 | `try_start_forced_movement(direction, distance, duration, damage_protection_source)` | authored inputs | `scripts/player.gd` | Applies knockback without clearing move intent and can optionally attach narrow shove-only protection. |
 | `FORCED_MOVEMENT_PROTECTION_SHOVE` | enabled | `scripts/player.gd` | Successful Shooter shoves use this narrow protection instead of dodge or hurt invulnerability, and the Boomer core blast now respects it while that authored movement is still active. |
+| Heart Runner bonus heal cap | `max_health + 1` | `scripts/player.gd` | A collected heart pickup can temporarily raise Akedra from `3` to `4` health. |
 
 ## Dodge
 
@@ -246,6 +247,27 @@
 | `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Boomer cap. |
 | Spawn and introduction values | `65s`, `65-78s`, `0.025`, `0.00035`, `0.07` | `scripts/main.gd` | Boomer unlock, intro target, starting chance, growth, and max chance. |
 
+## Heart Runner Opportunity
+
+| Setting | Current value | Source | Purpose / tuning effect |
+| --- | --- | --- | --- |
+| `heart_runner_unlock_time` | `20.0s` | `scripts/main.gd` | First time the separate Heart Runner opportunity may roll. |
+| `heart_runner_roll_interval_min/max` | `8.0-12.0s` | `scripts/main.gd` | Time between Heart Runner opportunity checks. |
+| `heart_runner_health_3_spawn_chance` | `0.01` | `scripts/main.gd` | Runner chance while Akedra still has `3` health. |
+| `heart_runner_health_2_spawn_chance` | `0.04` | `scripts/main.gd` | Runner chance while Akedra is at `2` health. |
+| `heart_runner_health_1_spawn_chance` | `0.10` | `scripts/main.gd` | Runner chance while Akedra is at `1` health. |
+| `heart_runner_speed` | `140.0px/s` | `scripts/main.gd`, `scripts/heart_runner.gd` | Straight cross-arena run speed. |
+| `heart_runner_spawn_safe_radius` | `56.0px` | `scripts/main.gd` | Minimum safe distance from Akedra for edge entry. |
+| `heart_runner_landed_spear_safe_radius` | `24.0px` | `scripts/main.gd` | Extra safe-entry clearance from a landed spear. |
+| `heart_runner_post_resolution_cooldown` | `18.0s` | `scripts/main.gd` | Cooldown applied once after escape or pickup resolution. |
+| `score_value` | `1` | `HeartRunner.tscn`, `scripts/heart_runner.gd` | Score for defeating the Runner before it escapes. |
+| `body_radius` | `6.0px` | `HeartRunner.tscn`, `scripts/heart_runner.gd` | Small readable Runner footprint. |
+| Collision radius | `6.0px` | `HeartRunner.tscn` | Heart Runner collision shape size. |
+| `cleanup_margin` | `12.0px` | `scripts/heart_runner.gd` | Extra distance beyond the assigned exit plane before natural cleanup. |
+| `pickup_radius` | `10.0px` | `HeartPickup.tscn`, `scripts/heart_pickup.gd` | Pickup body radius used for overlap collection and arena clamping. |
+| `heart_pickup_lifetime` | `7.0s` | `scripts/main.gd`, `scripts/heart_pickup.gd` | Time before an uncollected heart pickup expires. |
+| `heart_pickup_warning_duration` | `1.5s` | `scripts/main.gd`, `scripts/heart_pickup.gd` | Final warning pulse/flicker window before expiration. |
+
 ## Dart Projectile
 
 | Setting | Current value | Source | Purpose / tuning effect |
@@ -266,6 +288,8 @@
 | --- | --- | --- | --- |
 | `pip_spacing` | `6.0px` | `scripts/player_health_pips.gd` | Health pip spacing. |
 | `vertical_offset` | `14.0px` | `scripts/player_health_pips.gd` | Health pip position below Akedra. |
+| `bonus_vertical_offset` | `6.0px` | `scripts/player_health_pips.gd` | Offset for the temporary fourth heart pip. |
+| `bonus_filled_color` | `Color8(226, 112, 96)` | `scripts/player_health_pips.gd` | Distinct color for the temporary bonus heart pip. |
 | `display_duration` | `0.38s` | `scripts/destination_marker.gd` | Right-click marker lifetime. |
 | `base_radius` | `4.0px` | `scripts/destination_marker.gd` | Right-click marker size. |
 | `pulse_distance` | `1.3px` | `scripts/destination_marker.gd` | Right-click marker pulse. |
@@ -285,5 +309,6 @@
 | Make the Shooter attack faster | `aim_duration`, `locked_duration`, `burst_interval`, `attack_cooldown`, `minimum_dart_interval` | Keep one visible lock cue and one locked direction for both darts. |
 | Make darts easier to avoid | `aim_duration`, `locked_duration`, `speed`, `burst_interval` | Dart speed currently stays at `145.0px/s`. |
 | Make Boomers less oppressive | `hop_distance`, `fuse_trigger_distance`, `fuse_duration`, `core_blast_radius`, `outer_shockwave_radius` | Preserve the discrete hop-and-stop rhythm and one-active cap while tuning fairness. |
+| Make Heart Runner opportunities more generous or rarer | `heart_runner_roll_interval_min/max`, `heart_runner_health_3_spawn_chance`, `heart_runner_health_2_spawn_chance`, `heart_runner_health_1_spawn_chance`, `heart_runner_post_resolution_cooldown` | The opportunity system is separate from hostile caps and wave timing. |
 | Reduce Shielded retrieval pressure | `stopped_hit_landing_clearance`, `stagger_duration`, `knockback_distance` | These affect how safe spear recovery feels after a shield stop. |
 | Increase time between waves | `first_wave_time_min/max`, `inter_wave_interval_min/max`, `recovery_duration` | Wave composition is separate from wave cadence. |

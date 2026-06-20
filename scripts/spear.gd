@@ -289,7 +289,7 @@ func _on_flying_damage_body_entered(body: Node) -> void:
 	if state != State.FLYING:
 		return
 
-	if body.is_in_group("enemy"):
+	if _is_valid_spear_hittable_body(body):
 		_hit_enemy_if_needed(body)
 	elif body.is_in_group("arena_wall"):
 		_land(global_position - throw_direction * 2.0)
@@ -394,7 +394,7 @@ func _collect_sorted_launch_sweep_candidates(results: Array[Dictionary]) -> Arra
 			continue
 
 		var collider := collider_variant as Node
-		if collider == null or not collider.is_in_group("enemy"):
+		if not _is_valid_spear_hittable_body(collider):
 			continue
 
 		var enemy_id := collider.get_instance_id()
@@ -501,8 +501,19 @@ func _get_enemy_body_radius(enemy_body: Node) -> float:
 	if enemy_body is Enemy:
 		var enemy := enemy_body as Enemy
 		return enemy.body_radius
+	var body_radius_variant: Variant = enemy_body.get("body_radius")
+	if body_radius_variant is float or body_radius_variant is int:
+		return float(body_radius_variant)
 
 	return 8.0
+
+
+func _is_valid_spear_hittable_body(body: Node) -> bool:
+	return (
+		body != null
+		and body.is_in_group("spear_hittable")
+		and body.has_method("receive_combat_hit")
+	)
 
 
 func _apply_collision_activity() -> void:

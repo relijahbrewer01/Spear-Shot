@@ -47,6 +47,13 @@ def main() -> int:
     require("launch_sweep_start_offset := 0.0" in spear_script, "Release sweep begins near Akedra", failures)
     require("launch_sweep_end_offset := 18.0" in spear_script, "Release sweep reaches the full visible spear length", failures)
     require(
+        "_is_valid_spear_hittable_body" in spear_script
+        and 'body.is_in_group("spear_hittable")' in spear_script
+        and 'body.has_method("receive_combat_hit")' in spear_script,
+        "Spear uses the narrow spear_hittable combat-hit contract instead of a broad hostile-layer assumption",
+        failures,
+    )
+    require(
         'flying_damage_area.set_deferred("monitoring", is_flying_active)' in spear_script,
         "Flying damage area is active only while flying",
         failures,

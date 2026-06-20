@@ -97,6 +97,7 @@ def main() -> int:
     require("shielded_hostile_cap := 1" in director, "Shielded safety cap is tunable from one", failures)
     require("shooter_hostile_cap := 2" in director, "Shooter safety cap is tunable from two", failures)
     require("boomer_hostile_cap := 1" in director, "Boomer safety cap is tunable from one", failures)
+    require("HEART_RUNNER" not in director, "Heart Runner remains outside EncounterDirector hostile accounting", failures)
     require(
         "first_minute_charger_cap := 1" in director,
         "First-minute Charger production is limited to one",

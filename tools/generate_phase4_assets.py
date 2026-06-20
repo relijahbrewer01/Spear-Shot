@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SPRITE_DIR = ROOT / "art" / "sprites"
 DEV_SHOOTER_DIR = ROOT / "art" / "dev" / "shooter_candidates"
 DEV_BOOMER_DIR = ROOT / "art" / "dev" / "boomer_candidates"
+DEV_HEART_RUNNER_DIR = ROOT / "art" / "dev" / "heart_runner_candidates"
 ARENA_TEXTURE_PATH = ROOT / "art" / "arena" / "arena_floor.png"
 ARENA_SIZE = (384, 216)
 PLAY_RECT = (16, 16, 368, 200)
@@ -19,6 +20,8 @@ LABEL_TEXT_COLOR = (239, 242, 230, 255)
 LABEL_SHADOW_COLOR = (17, 20, 18, 220)
 SHOOTER_CANVAS_SIZE = (16, 18)
 BOOMER_CANVAS_SIZE = (16, 18)
+HEART_RUNNER_CANVAS_SIZE = (16, 16)
+HEART_PICKUP_CANVAS_SIZE = (10, 10)
 SHOOTER_BLOWGUN_LENGTH = 14
 SHOOTER_BLOWGUN_WIDTH = 1
 SHOOTER_BLOWGUN_ORIGIN = (10, 7)
@@ -68,6 +71,23 @@ class BoomerVariantSpec:
     apparent_body_height: int = 0
 
 
+@dataclass(frozen=True)
+class HeartRunnerVariantSpec:
+    key: str
+    title: str
+    file_name: str
+    palette_summary: str
+    silhouette_summary: str
+    body_color: tuple[int, int, int, int]
+    accent_color: tuple[int, int, int, int]
+    eye_color: tuple[int, int, int, int]
+    shadow_color: tuple[int, int, int, int]
+    canvas_width: int = HEART_RUNNER_CANVAS_SIZE[0]
+    canvas_height: int = HEART_RUNNER_CANVAS_SIZE[1]
+    apparent_body_width: int = 0
+    apparent_body_height: int = 0
+
+
 def draw_boomer_enemy(path: Path) -> None:
     image = Image.new("RGBA", BOOMER_CANVAS_SIZE, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -101,6 +121,28 @@ def draw_shooter_enemy(path: Path) -> None:
     # Final approved live Shooter palette: Variant 2 from the palette cleanup
     # pass. The silhouette stays identical to the approval board.
     _draw_palette_variant_silhouette(draw, build_shooter_palette_variant_specs()[1])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def draw_heart_runner(path: Path) -> None:
+    image = Image.new("RGBA", HEART_RUNNER_CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    _draw_heart_runner_variant_silhouette(draw, build_heart_runner_variant_specs()[1])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def draw_heart_pickup(path: Path) -> None:
+    image = Image.new("RGBA", HEART_PICKUP_CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((2, 2, 7, 7), fill=(181, 62, 64, 255))
+    draw.ellipse((3, 1, 6, 4), fill=(224, 146, 128, 255))
+    draw.point((4, 4), fill=(255, 228, 190, 255))
+    draw.line((4, 1, 5, 0), fill=(126, 152, 98, 255), width=1)
+    draw.line((5, 0, 6, 1), fill=(167, 183, 124, 255), width=1)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -188,6 +230,44 @@ def build_shooter_palette_variant_specs() -> list[ShooterPaletteVariantSpec]:
     ]
 
 
+def build_heart_runner_variant_specs() -> list[HeartRunnerVariantSpec]:
+    return [
+        HeartRunnerVariantSpec(
+            key="1",
+            title="Seedling",
+            file_name="heart_runner_variant_1.png",
+            palette_summary="deep berry seed body, pale sprout accent, dark bark legs",
+            silhouette_summary="Compact seed-creature with a forward lean, one visible sprout flick, and short quick legs.",
+            body_color=(157, 54, 57, 255),
+            accent_color=(232, 168, 138, 255),
+            eye_color=(253, 236, 198, 255),
+            shadow_color=(76, 40, 35, 255),
+        ),
+        HeartRunnerVariantSpec(
+            key="2",
+            title="Pulse Beast",
+            file_name="heart_runner_variant_2.png",
+            palette_summary="crimson core body, warm peach chest pulse, umber legs and back ridge",
+            silhouette_summary="Tiny quick beast with a rounded pulse-sac torso, narrow head, and clear sprint posture.",
+            body_color=(166, 60, 58, 255),
+            accent_color=(235, 154, 122, 255),
+            eye_color=(253, 241, 203, 255),
+            shadow_color=(70, 38, 34, 255),
+        ),
+        HeartRunnerVariantSpec(
+            key="3",
+            title="Fruit Skitter",
+            file_name="heart_runner_variant_3.png",
+            palette_summary="muted cherry body, pale gold underside, root-brown feet and tail",
+            silhouette_summary="Small fruit-bodied runner with a longer rear counterbalance and sharper nose.",
+            body_color=(148, 63, 66, 255),
+            accent_color=(225, 180, 128, 255),
+            eye_color=(251, 238, 200, 255),
+            shadow_color=(73, 45, 34, 255),
+        ),
+    ]
+
+
 def draw_boomer_variant(spec: BoomerVariantSpec, path: Path) -> BoomerVariantSpec:
     image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -208,6 +288,22 @@ def draw_shooter_palette_variant(spec: ShooterPaletteVariantSpec, path: Path) ->
     image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     _draw_palette_variant_silhouette(draw, spec)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+    apparent_body_width, apparent_body_height = _measure_nontransparent_bounds(image)
+    return replace(
+        spec,
+        apparent_body_width=apparent_body_width,
+        apparent_body_height=apparent_body_height,
+    )
+
+
+def draw_heart_runner_variant(spec: HeartRunnerVariantSpec, path: Path) -> HeartRunnerVariantSpec:
+    image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    _draw_heart_runner_variant_silhouette(draw, spec)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -274,6 +370,43 @@ def _draw_palette_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ShooterPal
     draw.rectangle((4, 12, 5, 15), fill=spec.pouch_color)
 
 
+def _draw_heart_runner_variant_silhouette(draw: ImageDraw.ImageDraw, spec: HeartRunnerVariantSpec) -> None:
+    if spec.key == "1":
+        draw.ellipse((5, 6, 11, 11), fill=spec.body_color)
+        draw.ellipse((8, 5, 12, 9), fill=spec.body_color)
+        draw.ellipse((6, 7, 10, 10), fill=spec.accent_color)
+        draw.line((8, 4, 9, 2), fill=spec.accent_color, width=1)
+        draw.line((9, 2, 10, 3), fill=spec.accent_color, width=1)
+        draw.point((10, 7), fill=spec.eye_color)
+        draw.line((6, 11, 5, 14), fill=spec.shadow_color, width=1)
+        draw.line((9, 11, 10, 14), fill=spec.shadow_color, width=1)
+        draw.line((4, 9, 2, 10), fill=spec.shadow_color, width=1)
+        return
+
+    if spec.key == "2":
+        draw.ellipse((5, 6, 11, 11), fill=spec.body_color)
+        draw.ellipse((8, 5, 12, 8), fill=spec.body_color)
+        draw.ellipse((6, 8, 10, 11), fill=spec.accent_color)
+        draw.line((7, 5, 8, 4), fill=spec.shadow_color, width=1)
+        draw.point((10, 7), fill=spec.eye_color)
+        draw.point((9, 9), fill=spec.accent_color)
+        draw.line((6, 11, 5, 14), fill=spec.shadow_color, width=1)
+        draw.line((9, 11, 10, 14), fill=spec.shadow_color, width=1)
+        draw.line((4, 9, 2, 8), fill=spec.shadow_color, width=1)
+        draw.line((5, 8, 3, 6), fill=spec.shadow_color, width=1)
+        return
+
+    draw.ellipse((5, 6, 11, 11), fill=spec.body_color)
+    draw.ellipse((8, 6, 11, 9), fill=spec.body_color)
+    draw.ellipse((6, 8, 10, 10), fill=spec.accent_color)
+    draw.point((10, 8), fill=spec.eye_color)
+    draw.line((6, 11, 5, 14), fill=spec.shadow_color, width=1)
+    draw.line((9, 11, 10, 14), fill=spec.shadow_color, width=1)
+    draw.line((4, 9, 2, 11), fill=spec.shadow_color, width=1)
+    draw.line((5, 7, 3, 5), fill=spec.shadow_color, width=1)
+    draw.line((9, 6, 12, 4), fill=spec.shadow_color, width=1)
+
+
 def _measure_nontransparent_bounds(image: Image.Image) -> tuple[int, int]:
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -330,6 +463,37 @@ def generate_boomer_candidate_assets() -> dict[str, object]:
     manifest = {
         "comparison_path": str(comparison_path),
         "active_reference_path": str(SPRITE_DIR / "boomer_enemy.png"),
+        "candidates": manifest_candidates,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
+
+
+def generate_heart_runner_candidate_assets() -> dict[str, object]:
+    DEV_HEART_RUNNER_DIR.mkdir(parents=True, exist_ok=True)
+    comparison_path = DEV_HEART_RUNNER_DIR / "heart_runner_comparison.png"
+    manifest_path = DEV_HEART_RUNNER_DIR / "heart_runner_manifest.json"
+
+    if not (SPRITE_DIR / "heart_pickup.png").exists():
+        draw_heart_pickup(SPRITE_DIR / "heart_pickup.png")
+
+    variant_specs: list[HeartRunnerVariantSpec] = []
+    manifest_candidates: list[dict[str, object]] = []
+
+    for spec in build_heart_runner_variant_specs():
+        variant_path = DEV_HEART_RUNNER_DIR / spec.file_name
+        finalized_spec = draw_heart_runner_variant(spec, variant_path)
+        variant_specs.append(finalized_spec)
+        manifest_candidates.append({
+            **asdict(finalized_spec),
+            "path": str(variant_path),
+        })
+
+    draw_heart_runner_comparison(variant_specs, comparison_path)
+    manifest = {
+        "comparison_path": str(comparison_path),
+        "active_reference_path": str(SPRITE_DIR / "heart_runner.png"),
+        "pickup_reference_path": str(SPRITE_DIR / "heart_pickup.png"),
         "candidates": manifest_candidates,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -405,6 +569,45 @@ def draw_boomer_comparison(
     for label, sprite_path, feet_position in variant_row:
         _paste_grounded_sprite(background, sprite_path, feet_position)
         _draw_label(draw, (feet_position[0] - 22, feet_position[1] + 4), label, font)
+
+    comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    background.save(comparison_path)
+
+
+def draw_heart_runner_comparison(
+    variant_specs: list[HeartRunnerVariantSpec], comparison_path: Path
+) -> None:
+    background = _load_arena_background()
+    draw = ImageDraw.Draw(background)
+    font = ImageFont.load_default()
+
+    _draw_label(draw, (8, 8), "Heart Runner Candidate Comparison", font)
+    _draw_label(draw, (8, 20), "Small vitality-runner scale against the live arena and current roster", font)
+
+    benchmark_row = [
+        ("Akedra", ROOT / "art" / "sprites" / "player_hunter.png", (44, 116)),
+        ("Normal", ROOT / "art" / "sprites" / "enemy_creature.png", (96, 116)),
+        ("Shielded", ROOT / "art" / "sprites" / "shielded_enemy.png", (148, 116)),
+        ("Shooter", ROOT / "art" / "sprites" / "shooter_enemy.png", (200, 116)),
+        ("Boomer", ROOT / "art" / "sprites" / "boomer_enemy.png", (252, 116)),
+        ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (316, 116)),
+    ]
+    variant_row = [
+        ("Variant 1", DEV_HEART_RUNNER_DIR / variant_specs[0].file_name, (96, 194)),
+        ("Variant 2", DEV_HEART_RUNNER_DIR / variant_specs[1].file_name, (192, 194)),
+        ("Variant 3", DEV_HEART_RUNNER_DIR / variant_specs[2].file_name, (288, 194)),
+    ]
+
+    for label, sprite_path, feet_position in benchmark_row:
+        _paste_grounded_sprite(background, sprite_path, feet_position)
+        _draw_label(draw, (feet_position[0] - 18, feet_position[1] + 4), label, font)
+
+    for label, sprite_path, feet_position in variant_row:
+        _paste_grounded_sprite(background, sprite_path, feet_position)
+        _draw_label(draw, (feet_position[0] - 22, feet_position[1] + 4), label, font)
+
+    _paste_grounded_sprite(background, SPRITE_DIR / "heart_pickup.png", (344, 194))
+    _draw_label(draw, (322, 198), "Pickup", font)
 
     comparison_path.parent.mkdir(parents=True, exist_ok=True)
     background.save(comparison_path)
@@ -491,6 +694,8 @@ def draw_standard_assets() -> None:
     draw_shielded_enemy(SPRITE_DIR / "shielded_enemy.png")
     draw_shooter_enemy(SPRITE_DIR / "shooter_enemy.png")
     draw_boomer_enemy(SPRITE_DIR / "boomer_enemy.png")
+    draw_heart_runner(SPRITE_DIR / "heart_runner.png")
+    draw_heart_pickup(SPRITE_DIR / "heart_pickup.png")
 
 
 def parse_args() -> argparse.Namespace:
@@ -506,21 +711,32 @@ def parse_args() -> argparse.Namespace:
         help="Generate temporary Boomer candidate outputs and comparison board.",
     )
     parser.add_argument(
+        "--generate-dev-heart-runner-concepts",
+        action="store_true",
+        help="Generate temporary Heart Runner candidate outputs and comparison board.",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
-        help="Generate live assets plus the temporary Shooter and Boomer concept outputs.",
+        help="Generate live assets plus the temporary Shooter, Boomer, and Heart Runner concept outputs.",
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    if args.all or (not args.generate_dev_shooter_concepts and not args.generate_dev_boomer_concepts):
+    if args.all or (
+        not args.generate_dev_shooter_concepts
+        and not args.generate_dev_boomer_concepts
+        and not args.generate_dev_heart_runner_concepts
+    ):
         draw_standard_assets()
     if args.all or args.generate_dev_shooter_concepts:
         generate_shooter_candidate_assets()
     if args.all or args.generate_dev_boomer_concepts:
         generate_boomer_candidate_assets()
+    if args.all or args.generate_dev_heart_runner_concepts:
+        generate_heart_runner_candidate_assets()
 
 
 if __name__ == "__main__":

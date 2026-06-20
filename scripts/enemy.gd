@@ -40,6 +40,7 @@ var explosion_knockback_time_left := 0.0
 
 func _ready() -> void:
 	add_to_group("enemy")
+	add_to_group("spear_hittable")
 	if sprite != null:
 		sprite.top_level = true
 	_update_sprite_visuals()

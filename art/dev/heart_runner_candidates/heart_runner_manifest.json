@@ -1,0 +1,115 @@
+{
+  "comparison_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_candidates\\heart_runner_comparison.png",
+  "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\heart_runner.png",
+  "pickup_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\heart_pickup.png",
+  "candidates": [
+    {
+      "key": "1",
+      "title": "Seedling",
+      "file_name": "heart_runner_variant_1.png",
+      "palette_summary": "deep berry seed body, pale sprout accent, dark bark legs",
+      "silhouette_summary": "Compact seed-creature with a forward lean, one visible sprout flick, and short quick legs.",
+      "body_color": [
+        157,
+        54,
+        57,
+        255
+      ],
+      "accent_color": [
+        232,
+        168,
+        138,
+        255
+      ],
+      "eye_color": [
+        253,
+        236,
+        198,
+        255
+      ],
+      "shadow_color": [
+        76,
+        40,
+        35,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 16,
+      "apparent_body_width": 11,
+      "apparent_body_height": 13,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_candidates\\heart_runner_variant_1.png"
+    },
+    {
+      "key": "2",
+      "title": "Pulse Beast",
+      "file_name": "heart_runner_variant_2.png",
+      "palette_summary": "crimson core body, warm peach chest pulse, umber legs and back ridge",
+      "silhouette_summary": "Tiny quick beast with a rounded pulse-sac torso, narrow head, and clear sprint posture.",
+      "body_color": [
+        166,
+        60,
+        58,
+        255
+      ],
+      "accent_color": [
+        235,
+        154,
+        122,
+        255
+      ],
+      "eye_color": [
+        253,
+        241,
+        203,
+        255
+      ],
+      "shadow_color": [
+        70,
+        38,
+        34,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 16,
+      "apparent_body_width": 11,
+      "apparent_body_height": 11,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_candidates\\heart_runner_variant_2.png"
+    },
+    {
+      "key": "3",
+      "title": "Fruit Skitter",
+      "file_name": "heart_runner_variant_3.png",
+      "palette_summary": "muted cherry body, pale gold underside, root-brown feet and tail",
+      "silhouette_summary": "Small fruit-bodied runner with a longer rear counterbalance and sharper nose.",
+      "body_color": [
+        148,
+        63,
+        66,
+        255
+      ],
+      "accent_color": [
+        225,
+        180,
+        128,
+        255
+      ],
+      "eye_color": [
+        251,
+        238,
+        200,
+        255
+      ],
+      "shadow_color": [
+        73,
+        45,
+        34,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 16,
+      "apparent_body_width": 11,
+      "apparent_body_height": 11,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_candidates\\heart_runner_variant_3.png"
+    }
+  ]
+}

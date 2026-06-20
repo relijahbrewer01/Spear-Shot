@@ -7,6 +7,9 @@ const TEXTURE_PATHS := [
 	"res://art/sprites/charger_beast.png",
 	"res://art/sprites/shielded_enemy.png",
 	"res://art/sprites/shooter_enemy.png",
+	"res://art/sprites/boomer_enemy.png",
+	"res://art/sprites/heart_runner.png",
+	"res://art/sprites/heart_pickup.png",
 	"res://art/sprites/spear_hunter.png",
 ]
 
@@ -18,6 +21,14 @@ const AUDIO_PATHS := [
 	"res://audio/blowgun_windup.wav",
 	"res://audio/blowgun_fire.wav",
 	"res://audio/blowgun_shove.wav",
+	"res://audio/boomer_hop_prep.wav",
+	"res://audio/boomer_land.wav",
+	"res://audio/boomer_fuse.wav",
+	"res://audio/boomer_explosion.wav",
+	"res://audio/heart_runner_appear.wav",
+	"res://audio/heart_pickup_spawn.wav",
+	"res://audio/heart_pickup_collect.wav",
+	"res://audio/heart_pickup_expire.wav",
 ]
 
 const SCENE_SPRITES := {
@@ -26,6 +37,9 @@ const SCENE_SPRITES := {
 	"res://Charger.tscn": "Sprite2D",
 	"res://ShieldedEnemy.tscn": "Sprite2D",
 	"res://ShooterEnemy.tscn": "Sprite2D",
+	"res://BoomerEnemy.tscn": "Sprite2D",
+	"res://HeartRunner.tscn": "Sprite2D",
+	"res://HeartPickup.tscn": "Sprite2D",
 	"res://Spear.tscn": "Sprite2D",
 }
 
@@ -145,6 +159,14 @@ func _audit_main_scene_audio(report_lines: Array[String]) -> int:
 		"AudioPlayers/BlowgunWindupPlayer",
 		"AudioPlayers/BlowgunFirePlayer",
 		"AudioPlayers/BlowgunShovePlayer",
+		"AudioPlayers/BoomerHopPrepPlayer",
+		"AudioPlayers/BoomerLandPlayer",
+		"AudioPlayers/BoomerFusePlayer",
+		"AudioPlayers/BoomerExplosionPlayer",
+		"AudioPlayers/HeartRunnerAppearPlayer",
+		"AudioPlayers/HeartPickupSpawnPlayer",
+		"AudioPlayers/HeartPickupCollectPlayer",
+		"AudioPlayers/HeartPickupExpirePlayer",
 	]:
 		var player := main.get_node_or_null(player_path) as AudioStreamPlayer
 		if player == null:

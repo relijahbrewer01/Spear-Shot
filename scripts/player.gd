@@ -404,6 +404,21 @@ func take_damage(
 	return true
 
 
+func try_collect_heart_runner_pickup() -> bool:
+	if not active or not is_alive():
+		return false
+
+	var previous_health := health
+	health = mini(health + 1, max_health + 1)
+	if health == previous_health:
+		return true
+
+	_update_health_pips()
+	health_changed.emit(health)
+	queue_redraw()
+	return true
+
+
 func _can_accept_same_burst_dart_followup(
 	damage_source: StringName,
 	dart_burst_id: int,
@@ -667,7 +682,7 @@ func _update_health_pips() -> void:
 	if health_pips == null:
 		return
 
-	health_pips.set_health_values(health, max_health)
+	health_pips.set_health_values(health, max_health, _get_bonus_health_count())
 
 
 func _update_health_pips_transform() -> void:
@@ -675,6 +690,10 @@ func _update_health_pips_transform() -> void:
 		return
 
 	health_pips.sync_to_player(self)
+
+
+func _get_bonus_health_count() -> int:
+	return maxi(health - max_health, 0)
 
 
 func _update_cooldown_indicator(delta: float) -> void:

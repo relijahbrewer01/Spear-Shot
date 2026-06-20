@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.6.0-alpha.3 - Boomer`
+Current milestone: `Spear Shot v0.6.0-alpha.4 - Heart Runner`
 
 ## Game concept
 
@@ -40,12 +40,14 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Temporary Shielded live-test hook: `1` debug-spawns one Shielded enemy while `DEBUG_SHIELDED_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - Temporary Shooter live-test hook: `2` debug-spawns one Blowgun Shooter while `DEBUG_SHOOTER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - Temporary Boomer live-test hook: `3` debug-spawns one Boomer while `DEBUG_BOOMER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
+- Temporary Heart Runner live-test hook: `4` debug-spawns one Heart Runner opportunity while `DEBUG_HEART_RUNNER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - These are intentionally separate from normal player controls and can be disabled by setting their constants to `false`
 
 ## HUD layout
 
 - Active play keeps a small survival timer in the top-left corner and `SCORE` in the top-right corner
 - Health is shown as world-space pips under Akedra in a shallow arc instead of a boxed HUD panel
+- A temporary fourth heart from the Heart Runner pickup appears as a small centered bonus pip below the main arc instead of stretching the normal HUD
 - Pause uses a simple dark overlay with `PAUSED`, and game-over controls stay interactive after death
 
 ## Art direction
@@ -55,6 +57,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Shielded enemies use a compact broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow or boss-sized silhouette
 - Blowgun Shooters use a small wiry hooded-forager silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
 - The approved final Shooter body uses a coherent moss-hood palette with a pale face, charcoal-brown torso, and restrained rust pouch on the roomier `16x18` canvas, keeping it small, readable, and distinct from the melee cast at `384x216`
+- Heart Runner opportunities use a tiny red pulse-beast silhouette on a compact `16x16` canvas, keeping the body readable against the arena while clearly separating it from the hostile roster
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -82,6 +85,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
 - `art/sprites/boomer_enemy.png`: active Boomer sprite chosen from the local concept pass and kept on the same small readable scale as the rest of the special roster
+- `art/sprites/heart_runner.png`: active Heart Runner sprite chosen from the local three-variant comparison board
+- `art/sprites/heart_pickup.png`: temporary heart pickup sprite used after a Runner defeat
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
@@ -93,8 +98,12 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/boomer_land.wav`: local physical landing cue for the Boomer
 - `audio/boomer_fuse.wav`: local three-pulse fuse escalation cue for the Boomer
 - `audio/boomer_explosion.wav`: local physical blast cue for the Boomer
+- `audio/heart_runner_appear.wav`: local skittering arrival cue for the Heart Runner
+- `audio/heart_pickup_spawn.wav`: local reward-pop cue for a spawned heart pickup
+- `audio/heart_pickup_collect.wav`: local recovery cue for collecting the heart pickup
+- `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, and Boomer sprites plus the temporary local comparison outputs for the Phase 4 concept passes
+- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, and Heart Runner sprites plus the temporary local comparison outputs for the Phase 4 concept passes
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -113,6 +122,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
+- `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile edge-to-edge opportunity runner with explicit spear-hit handling, authored displacement support, and original-exit-plane cleanup
+- `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
 - `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
@@ -134,6 +145,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/ShooterEnemyRuntimeAudit.tscn`: runtime audit for Shooter movement, aim locking, darts, damage rules, cleanup, and intro integration
 - `tools/boomer_enemy_audit.py`: static Phase 4.3 Boomer contract audit
 - `tools/BoomerEnemyRuntimeAudit.tscn`: runtime audit for Boomer movement, fuse, detonation, scoring, cleanup, and intro integration
+- `tools/heart_runner_audit.py`: static Phase 4.4 opportunity-system, pickup, audio, and contract audit
+- `tools/HeartRunnerRuntimeAudit.tscn`: runtime audit for Heart Runner spawning, cleanup, pickup, cooldown, and pause/restart behavior
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
@@ -157,6 +170,14 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - If Akedra is currently in shove-protected forced movement from a successful Shooter shove, the Boomer core blast deals no health damage and does not replace that authored movement with a second knockback impulse
 - A Boomer outer shockwave can lightly nudge an already landed spear by `20` pixels, keeping it in `LANDED`/`FETCH`, clamping it inside the arena, and preserving normal retrieval behavior
 
+## Opportunity behavior
+
+- Heart Runner: separate from the hostile population system, unlocks around `20` seconds, rolls on its own `8-12` second opportunity timer, and becomes more likely at lower player health
+- It crosses the arena from one safe edge to the opposite side, cleans up only when it crosses its originally assigned exit plane, and does not despawn just because a Boomer shockwave pushes it into another boundary
+- A valid thrown-spear hit defeats it for `1` point without stopping spear flight
+- Defeating it spawns one temporary heart pickup clamped inside the playable arena, healing Akedra by `1` up to a temporary `4` health maximum
+- Only one Heart Runner or heart pickup may exist at a time, and the whole opportunity system stays outside hostile caps, wave thresholds, and encounter pressure bookkeeping
+
 ## Encounter director
 
 - Ambient survival spawning now gives way to temporary authored events after roughly `28-34` seconds
@@ -172,6 +193,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
 - Shooter enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals, Chargers, or Shielded
 - Boomers count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals, Chargers, Shielded, or Shooters
+- Heart Runner opportunities sit outside EncounterDirector hostile accounting and use their own unlock, roll, and resolution-cooldown system
 - Charger ambient spawns unlock around `15` seconds with a small capped weight
 - Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - Shooter ambient spawns unlock around `42` seconds with an even smaller capped weight, and capped/locked Shooter candidates are removed before choosing among remaining ambient types
@@ -191,6 +213,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Blowgun Shooter score: `2`
 - Boomer safe kill score: `2`
 - Boomer self-detonation score: `0` direct points; any enemies killed by the blast still use their ordinary score values
+- Heart Runner score: `1`, plus one temporary heart pickup on defeat
 - Charger score: `3`
 - High score is saved locally in `user://highscore.save`
 - Invalid or missing save data falls back safely to `0`
@@ -282,6 +305,18 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `maximum_boomer_spawn_chance`
   - `boomer_intro_target_time_min`
   - `boomer_intro_target_time_max`
+  - `heart_runner_unlock_time`
+  - `heart_runner_roll_interval_min`
+  - `heart_runner_roll_interval_max`
+  - `heart_runner_health_3_spawn_chance`
+  - `heart_runner_health_2_spawn_chance`
+  - `heart_runner_health_1_spawn_chance`
+  - `heart_runner_speed`
+  - `heart_runner_spawn_safe_radius`
+  - `heart_runner_landed_spear_safe_radius`
+  - `heart_runner_post_resolution_cooldown`
+  - `heart_pickup_lifetime`
+  - `heart_pickup_warning_duration`
   - `landed_spear_spawn_safe_radius`
   - `blocked_spawn_retry_interval`
   - `default_window_scale`
@@ -351,6 +386,18 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `charger_core_knockback_duration`
   - `charger_shockwave_knockback_distance`
   - `charger_shockwave_knockback_duration`
+- `scripts/heart_runner.gd`
+  - `move_speed`
+  - `score_value`
+  - `body_radius`
+  - `cleanup_margin`
+- `scripts/heart_pickup.gd`
+  - `pickup_radius`
+  - `lifetime`
+  - `warning_duration`
+  - `bob_amplitude`
+  - `bob_speed`
+  - `warning_pulse_speed`
 - `scripts/dart_projectile.gd`
   - `speed`
   - `max_lifetime`
@@ -359,6 +406,8 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `max_supported_pips`
   - `vertical_offset`
   - `pip_spacing`
+  - `bonus_vertical_offset`
+  - `bonus_filled_color`
 - `scripts/destination_marker.gd`
   - `display_duration`
   - `base_radius`
@@ -382,7 +431,6 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 - More enemy types
 - Phase 4.6 enemy interaction work focused on positioning-based Shielded/Shooter cooperation and Shooter-dart/Boomer interactions
 - Ring encounter formations
-- Opportunity encounters such as a Heart Runner, kept separate from hostile population slots
 - Wave reward selection driven by encounter completion signals
 - Upgrades or progression systems
 - Menus outside the in-game restart flow

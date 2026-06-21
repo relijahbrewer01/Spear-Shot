@@ -41,7 +41,6 @@ def main() -> int:
         "## Shielded",
         "## Blowgun Shooter",
         "## Boomer",
-        "## Heart Runner Opportunity",
         "## Dart Projectile",
         "## HUD And Feedback",
         "## Common Tuning Requests",
@@ -58,11 +57,14 @@ def main() -> int:
         "shielded_unlock_time",
         "shooter_unlock_time",
         "boomer_unlock_time",
+<<<<<<< Updated upstream
+=======
         "heart_runner_unlock_time",
         "heart_runner_roll_interval_min/max",
         "heart_runner_health_3_spawn_chance",
         "heart_runner_health_2_spawn_chance",
         "heart_runner_health_1_spawn_chance",
+        "heart_runner_one_health_grace_duration",
         "heart_runner_speed",
         "calm_move_speed",
         "entry_distance",
@@ -75,6 +77,7 @@ def main() -> int:
         "startled_duration",
         "heart_pickup_lifetime",
         "heart_pickup_warning_duration",
+>>>>>>> Stashed changes
         "first_wave_time_min/max",
         "inter_wave_interval_min/max",
         "rush_start_population_threshold",
@@ -137,11 +140,14 @@ def main() -> int:
         "`core_blast_radius` | `29.0px`",
         "`outer_shockwave_radius` | `54.0px`",
         "`landed_spear_shockwave_displacement` | `20.0px`",
+<<<<<<< Updated upstream
+=======
         "`heart_runner_unlock_time` | `20.0s`",
         "`heart_runner_roll_interval_min/max` | `8.0-12.0s`",
         "`heart_runner_health_3_spawn_chance` | `0.01`",
         "`heart_runner_health_2_spawn_chance` | `0.04`",
-        "`heart_runner_health_1_spawn_chance` | `0.10`",
+        "`heart_runner_health_1_spawn_chance` | `0.15`",
+        "`heart_runner_one_health_grace_duration` | `90.0s`",
         "`calm_move_speed` | `70.0px/s`",
         "`wander_duration` | `8.0s`",
         "`heart_runner_startle_range_margin` | `16.0px`",
@@ -151,14 +157,14 @@ def main() -> int:
         "`heart_runner_post_resolution_cooldown` | `18.0s`",
         "`heart_pickup_lifetime` | `7.0s`",
         "`heart_pickup_warning_duration` | `1.5s`",
+>>>>>>> Stashed changes
         "Two distinct dart indices from one `burst_id` may both damage",
     ]:
-        require(approved_value in tuning, f"TUNING.md documents approved value {approved_value}", failures)
+        require(approved_value in tuning, f"TUNING.md represents Shooter value {approved_value}", failures)
 
     require("[`TUNING.md`](TUNING.md)" in readme, "README links to TUNING.md", failures)
     require("[`TUNING.md`](TUNING.md)" in roadmap, "ROADMAP links to TUNING.md", failures)
     require("## Phase 4.6 Enemy Interaction And Formation Pass" in roadmap, "ROADMAP documents Phase 4.6 design direction", failures)
-    require("Heart Runner" in readme and "Heart Runner" in roadmap, "Docs mention the implemented Heart Runner opportunity", failures)
     require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
     require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)
 

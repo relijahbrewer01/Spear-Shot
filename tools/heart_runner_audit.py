@@ -68,6 +68,7 @@ def main() -> int:
     generator = read_text("tools/generate_sfx.py")
     asset_generator = read_text("tools/generate_phase4_assets.py")
     runner_import = read_text("art/sprites/heart_runner.png.import")
+    runner_sheet_import = read_text("art/sprites/heart_runner_sheet.png.import")
     pickup_import = read_text("art/sprites/heart_pickup.png.import")
     appear_import = read_text("audio/heart_runner_appear.wav.import")
     pickup_spawn_import = read_text("audio/heart_pickup_spawn.wav.import")
@@ -89,6 +90,8 @@ def main() -> int:
         "scripts/heart_pickup.gd",
         "art/sprites/heart_runner.png",
         "art/sprites/heart_runner.png.import",
+        "art/sprites/heart_runner_sheet.png",
+        "art/sprites/heart_runner_sheet.png.import",
         "art/sprites/heart_pickup.png",
         "art/sprites/heart_pickup.png.import",
         "art/dev/heart_runner_candidates/heart_runner_comparison.png",
@@ -114,11 +117,51 @@ def main() -> int:
     require("signal startled_started" in runner_script and "signal state_changed" in runner_script, "HeartRunner exposes narrow startled/state-change seams for focused testing and alarm playback", failures)
     require("receive_combat_hit" in runner_script and "Enemy.HIT_SOURCE_SPEAR" in runner_script, "HeartRunner exposes the narrow combat-hit seam for spear hits", failures)
     require("return Enemy.HitResponse.DAMAGED" in runner_script, "HeartRunner spear hits use DAMAGED so the spear keeps flying", failures)
-    require("tracked_spear" in runner_script and "_on_tracked_spear_state_changed" in runner_script and "new_state != Spear.State.HELD" in runner_script, "HeartRunner reacts to the actual spear transition into HELD without broad polling", failures)
+    require(
+        "tracked_spear" in runner_script
+        and "_on_tracked_spear_state_changed" in runner_script
+        and "armed_threat_active = new_state == Spear.State.HELD" in runner_script,
+        "HeartRunner tracks a narrow armed-threat state from the real spear HELD transition without broad polling",
+        failures,
+    )
     require("calm_move_speed := 70.0" in runner_script, "HeartRunner calm strolling speed is 70", failures)
     require("entry_distance := 20.0" in runner_script and "entry_min_duration := 0.45" in runner_script, "HeartRunner requires visible entry before reacting", failures)
     require("wander_duration := 8.0" in runner_script, "HeartRunner calm wandering lasts 8 seconds before casual exit", failures)
-    require("startled_duration := 0.30" in runner_script, "HeartRunner startled hop duration is 0.30 seconds", failures)
+    require("startled_duration := 0.40" in runner_script, "HeartRunner startled hop duration is 0.40 seconds", failures)
+    require(
+        "heart_runner_startle_range_margin := 16.0" in runner_script
+        and "func get_startle_radius()" in runner_script
+        and "tracked_spear.max_range" in runner_script,
+        "HeartRunner startled radius is derived from the live spear range minus the configured margin",
+        failures,
+    )
+    require(
+        "func is_inside_startle_radius()" in runner_script
+        and "_can_enter_startled_from_proximity" in runner_script
+        and "_try_enter_startled_from_proximity" in runner_script,
+        "HeartRunner keeps the proximity-gated panic trigger in narrow explicit helpers",
+        failures,
+    )
+    require(
+        "_try_enter_startled_from_proximity()" in runner_script and "MotionState.CASUAL_EXIT" in runner_script,
+        "HeartRunner can panic from wandering or casual exit only after entering the derived threat radius",
+        failures,
+    )
+    require(
+        "ANIMATION_ROW_CALM := 0" in runner_script
+        and "ANIMATION_ROW_STARTLED := 1" in runner_script
+        and "ANIMATION_ROW_FLEE := 2" in runner_script
+        and "CALM_FRAME_DURATION := 0.18" in runner_script
+        and "FLEE_FRAME_DURATION := 0.10" in runner_script,
+        "HeartRunner animation rows and calm/panic cadences are defined explicitly in the live script",
+        failures,
+    )
+    require(
+        "sprite.frame_coords = _get_animation_frame_coords()" in runner_script
+        and "func get_current_animation_frame_coords()" in runner_script,
+        "HeartRunner drives live presentation through explicit state-based sprite-sheet frame selection",
+        failures,
+    )
     require("_has_crossed_exit_plane" in runner_script and "exit_edge" in runner_script and "exit_threshold" in runner_script, "HeartRunner cleanup uses its assigned exit plane", failures)
     require(
         "_clamp_inside_play_rect_except_exit_edge" in runner_script
@@ -129,6 +172,13 @@ def main() -> int:
     )
     require("apply_authored_displacement" in runner_script and "debug_force_locked_exit" in runner_script, "HeartRunner preserves authored displacement support and narrow audit hooks for exit cleanup coverage", failures)
     require("collision_layer = 2" in runner_scene and "collision_mask = 0" in runner_scene, "HeartRunner is spear-detectable but has no ordinary collision mask", failures)
+    require(
+        'path="res://art/sprites/heart_runner_sheet.png"' in runner_scene
+        and "hframes = 4" in runner_scene
+        and "vframes = 3" in runner_scene,
+        "HeartRunner scene uses the live 4x3 sprite sheet for calm, startled, and flee presentation",
+        failures,
+    )
     require("score_value = 1" in runner_script or "score_value := 1" in runner_script, "HeartRunner defeat score is 1", failures)
     require(
         ("body_radius := 6.0" in runner_script or "body_radius = 6.0" in runner_scene)
@@ -175,12 +225,19 @@ def main() -> int:
     require("HEART_RUNNER" not in director, "EncounterDirector does not treat Heart Runner as a hostile enemy kind", failures)
 
     require("generate_heart_runner_appear" in generator and "generate_heart_runner_alarm" in generator and "generate_heart_pickup_spawn" in generator and "generate_heart_pickup_collect" in generator and "generate_heart_pickup_expire" in generator, "Heart Runner audio is reproducible locally, including the startled alarm cue", failures)
-    require("draw_heart_runner" in asset_generator and "draw_heart_pickup" in asset_generator and "generate_heart_runner_candidate_assets" in asset_generator and "generate_heart_runner_animation_preview" in asset_generator, "Heart Runner visuals, comparison outputs, and animation approval-board outputs are reproducible locally", failures)
+    require("draw_heart_runner" in asset_generator and "draw_heart_runner_animation_sheet" in asset_generator and "draw_heart_pickup" in asset_generator and "generate_heart_runner_candidate_assets" in asset_generator and "generate_heart_runner_animation_preview" in asset_generator, "Heart Runner visuals, live animation sheet, comparison outputs, and approval-board outputs are reproducible locally", failures)
     require("--generate-dev-heart-runner-concepts" in asset_generator, "Heart Runner concept generation remains behind an explicit workflow flag", failures)
     require("--generate-dev-heart-runner-animations" in asset_generator, "Heart Runner animation preview generation remains behind an explicit approval-gate workflow flag", failures)
+    require(
+        "0.40s startle" in asset_generator
+        and "calm -> startled hop -> landing beat -> panic sprint" in asset_generator,
+        "Heart Runner animation preview tooling documents the slowed hop timing and transition strip at the approval gate",
+        failures,
+    )
 
     for import_text, label in [
         (runner_import, "Heart Runner sprite import disables mipmaps"),
+        (runner_sheet_import, "Heart Runner live animation sheet import disables mipmaps"),
         (pickup_import, "Heart Pickup sprite import disables mipmaps"),
     ]:
         require('mipmaps/generate=false' in import_text, label, failures)
@@ -193,20 +250,23 @@ def main() -> int:
         require('importer="wav"' in import_text, label, failures)
 
     runner_image = Image.open(ROOT / "art/sprites/heart_runner.png")
+    runner_sheet_image = Image.open(ROOT / "art/sprites/heart_runner_sheet.png")
     pickup_image = Image.open(ROOT / "art/sprites/heart_pickup.png")
     comparison_image = Image.open(ROOT / "art/dev/heart_runner_candidates/heart_runner_comparison.png")
-    require(runner_image.size == (16, 16), "Heart Runner live sprite uses the approved 16x16 canvas", failures)
+    require(runner_image.size == (16, 16), "Heart Runner base silhouette uses the approved 16x16 canvas", failures)
+    require(runner_sheet_image.size == (64, 48), "Heart Runner live animation sheet uses the approved 4x3 16x16 frame layout", failures)
     require(pickup_image.size == (10, 10), "Heart pickup sprite uses the approved 10x10 canvas", failures)
     require(comparison_image.size == (384, 216), "Heart Runner comparison board renders at native arena scale", failures)
 
     manifest = json.loads((ROOT / "art/dev/heart_runner_candidates/heart_runner_manifest.json").read_text(encoding="utf-8"))
     require(len(manifest.get("candidates", [])) == 3, "Heart Runner manifest records three concept candidates", failures)
     require(manifest.get("comparison_path") == str(ROOT / "art/dev/heart_runner_candidates/heart_runner_comparison.png"), "Heart Runner manifest points to the comparison board", failures)
-    require(manifest.get("active_reference_path") == str(ROOT / "art/sprites/heart_runner.png"), "Heart Runner manifest points to the live sprite", failures)
+    require(manifest.get("active_reference_path") == str(ROOT / "art/sprites/heart_runner.png"), "Heart Runner concept manifest points to the approved base silhouette", failures)
     require(manifest.get("pickup_reference_path") == str(ROOT / "art/sprites/heart_pickup.png"), "Heart Runner manifest points to the pickup sprite", failures)
     animation_manifest = json.loads((ROOT / "art/dev/heart_runner_animation/heart_runner_animation_manifest.json").read_text(encoding="utf-8"))
     require(animation_manifest.get("board_path") == str(ROOT / "art/dev/heart_runner_animation/heart_runner_animation_board.png"), "Heart Runner animation manifest points to the approval-board output", failures)
-    require(animation_manifest.get("active_reference_path") == str(ROOT / "art/sprites/heart_runner.png"), "Heart Runner animation manifest points to the unchanged live Runner sprite", failures)
+    require(animation_manifest.get("active_reference_path") == str(ROOT / "art/sprites/heart_runner_sheet.png"), "Heart Runner animation manifest points to the live animation sheet", failures)
+    require(animation_manifest.get("base_reference_path") == str(ROOT / "art/sprites/heart_runner.png"), "Heart Runner animation manifest still records the approved base silhouette reference", failures)
     require(animation_manifest.get("sequence_count") == 3, "Heart Runner animation manifest records the three required preview treatments", failures)
     require(set(animation_manifest.get("sequences", {}).keys()) == {"casual_strut", "panicked_sprint", "startled_hop"}, "Heart Runner animation manifest names the casual, panic, and startled preview sets", failures)
 

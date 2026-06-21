@@ -23,6 +23,7 @@ SHOOTER_CANVAS_SIZE = (16, 18)
 BOOMER_CANVAS_SIZE = (16, 18)
 HEART_RUNNER_CANVAS_SIZE = (16, 16)
 HEART_PICKUP_CANVAS_SIZE = (10, 10)
+HEART_RUNNER_ANIMATION_SHEET_ROWS = ["casual_strut", "startled_hop", "panicked_sprint"]
 SHOOTER_BLOWGUN_LENGTH = 14
 SHOOTER_BLOWGUN_WIDTH = 1
 SHOOTER_BLOWGUN_ORIGIN = (10, 7)
@@ -144,6 +145,30 @@ def draw_heart_pickup(path: Path) -> None:
     draw.point((4, 4), fill=(255, 228, 190, 255))
     draw.line((4, 1, 5, 0), fill=(126, 152, 98, 255), width=1)
     draw.line((5, 0, 6, 1), fill=(167, 183, 124, 255), width=1)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def draw_heart_runner_animation_sheet(path: Path) -> None:
+    sequence_specs = build_heart_runner_animation_sequences()
+    frame_width, frame_height = HEART_RUNNER_CANVAS_SIZE
+    image = Image.new(
+        "RGBA",
+        (
+            frame_width * sequence_specs["casual_strut"]["frame_count"],
+            frame_height * len(HEART_RUNNER_ANIMATION_SHEET_ROWS),
+        ),
+        (0, 0, 0, 0),
+    )
+
+    for row_index, sequence_key in enumerate(HEART_RUNNER_ANIMATION_SHEET_ROWS):
+        for frame_index in range(sequence_specs[sequence_key]["frame_count"]):
+            frame_image = _render_heart_runner_animation_frame(sequence_key, frame_index)
+            image.alpha_composite(
+                frame_image,
+                (frame_index * frame_width, row_index * frame_height),
+            )
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -435,13 +460,15 @@ def _draw_heart_runner_animation_silhouette(
         return
 
     if sequence_key == "panicked_sprint":
-        body_offsets = [(0, 0), (1, -1), (0, 0), (1, 1)]
-        tail_offsets = [(-3, -1), (-3, -1), (-3, 0), (-2, 1)]
+        body_offsets = [(0, 0), (1, -1), (2, -2), (1, 0)]
+        head_offsets = [(1, -1), (2, -1), (3, -1), (2, 0)]
+        accent_offsets = [(0, 0), (1, 0), (1, -1), (0, 0)]
+        tail_offsets = [(-4, 0), (-4, 1), (-5, 2), (-4, 2)]
         leg_pairs = [
-            [(6, 11), (4, 14), (9, 11), (11, 14)],
-            [(7, 10), (5, 13), (10, 10), (12, 13)],
-            [(6, 11), (5, 14), (9, 11), (12, 14)],
-            [(7, 11), (6, 14), (10, 11), (12, 14)],
+            [(6, 11), (4, 14), (9, 11), (12, 14)],
+            [(7, 10), (4, 14), (10, 10), (13, 13)],
+            [(8, 10), (6, 12), (10, 10), (12, 12)],
+            [(7, 11), (5, 14), (10, 11), (13, 14)],
         ]
         _draw_heart_runner_frame(
             draw,
@@ -451,6 +478,8 @@ def _draw_heart_runner_animation_silhouette(
             leg_pairs[frame_index],
             True,
             False,
+            head_offsets[frame_index],
+            accent_offsets[frame_index],
         )
         return
 
@@ -481,21 +510,24 @@ def _draw_heart_runner_frame(
     leg_points: list[tuple[int, int]],
     lean_forward: bool,
     startled_peak: bool,
+    head_offset: tuple[int, int] = (0, 0),
+    accent_offset: tuple[int, int] = (0, 0),
 ) -> None:
     body_left = 5 + body_offset[0]
     body_top = 6 + body_offset[1]
-    head_left = 8 + body_offset[0] + (1 if lean_forward else 0)
-    head_top = 5 + body_offset[1]
-    accent_top = 8 + body_offset[1]
+    head_left = 8 + body_offset[0] + (1 if lean_forward else 0) + head_offset[0]
+    head_top = 5 + body_offset[1] + head_offset[1]
+    accent_left = body_left + 1 + accent_offset[0]
+    accent_top = 8 + body_offset[1] + accent_offset[1]
 
     draw.ellipse((body_left, body_top, body_left + 6, body_top + 5), fill=spec.body_color)
     draw.ellipse((head_left, head_top, head_left + 4, head_top + 3), fill=spec.body_color)
-    draw.ellipse((body_left + 1, accent_top, body_left + 5, accent_top + 3), fill=spec.accent_color)
+    draw.ellipse((accent_left, accent_top, accent_left + 4, accent_top + 3), fill=spec.accent_color)
     draw.point((head_left + 2, head_top + 2), fill=spec.eye_color)
     if startled_peak:
         draw.point((head_left + 3, head_top + 1), fill=spec.eye_color)
     else:
-        draw.point((body_left + 4, accent_top + 1), fill=spec.accent_color)
+        draw.point((accent_left + 3, accent_top + 1), fill=spec.accent_color)
 
     draw.line((7 + body_offset[0], 5 + body_offset[1], 8 + body_offset[0], 4 + body_offset[1]), fill=spec.shadow_color, width=1)
     draw.line((4 + body_offset[0], 9 + body_offset[1], 2 + tail_offset[0], 8 + tail_offset[1] + body_offset[1]), fill=spec.shadow_color, width=1)
@@ -622,7 +654,8 @@ def generate_heart_runner_animation_preview() -> dict[str, object]:
     draw_heart_runner_animation_board(sequence_specs, board_path)
     manifest = {
         "board_path": str(board_path),
-        "active_reference_path": str(SPRITE_DIR / "heart_runner.png"),
+        "active_reference_path": str(SPRITE_DIR / "heart_runner_sheet.png"),
+        "base_reference_path": str(SPRITE_DIR / "heart_runner.png"),
         "sequence_count": len(sequence_specs),
         "sequences": manifest_sequences,
     }
@@ -747,20 +780,23 @@ def build_heart_runner_animation_sequences() -> dict[str, dict[str, object]]:
     return {
         "casual_strut": {
             "title": "Casual Strut",
-            "description": "Small confident strut, alternating feet, slower bob.",
-            "timing_note": "4-frame calm cycle for wandering and casual exit.",
-            "frame_count": 4,
-        },
-        "panicked_sprint": {
-            "title": "Panicked Sprint",
-            "description": "Forward lean, quicker cadence, wider foot reach.",
-            "timing_note": "4-frame flee cycle with faster cadence.",
+            "description": "Confident strut with a slower bob.",
+            "timing_note": "4-frame calm cadence for wandering and casual exit.",
+            "frame_labels": ["plant", "reach", "plant", "reach"],
             "frame_count": 4,
         },
         "startled_hop": {
             "title": "Startled Hop",
-            "description": "Squash, pop, peak surprise, quick landing.",
-            "timing_note": "4-frame alarm sequence for the 0.30s startle.",
+            "description": "Recognize, pop, peak, then land/hold.",
+            "timing_note": "4-frame 0.40s startle with a short landing beat.",
+            "frame_labels": ["recognize", "pop", "peak", "land/hold"],
+            "frame_count": 4,
+        },
+        "panicked_sprint": {
+            "title": "Panicked Sprint",
+            "description": "Hard lean, wide stride, near-airborne scramble.",
+            "timing_note": "4-frame flee cadence with a more desperate silhouette.",
+            "frame_labels": ["launch", "stretch", "airborne", "catch"],
             "frame_count": 4,
         },
     }
@@ -771,59 +807,126 @@ def draw_heart_runner_animation_frame(
     frame_index: int,
     path: Path,
 ) -> None:
+    image = _render_heart_runner_animation_frame(sequence_key, frame_index)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def _render_heart_runner_animation_frame(
+    sequence_key: str,
+    frame_index: int,
+) -> Image.Image:
     image = Image.new("RGBA", HEART_RUNNER_CANVAS_SIZE, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     spec = build_heart_runner_variant_specs()[1]
     _draw_heart_runner_animation_silhouette(draw, spec, sequence_key, frame_index)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path)
+    return image
+
+
+def _scale_image_nearest_integer(
+    image: Image.Image,
+    scale_factor: int,
+) -> Image.Image:
+    if scale_factor <= 0:
+        raise ValueError("scale_factor must be positive")
+
+    scaled_size = (image.width * scale_factor, image.height * scale_factor)
+    scaled_image = Image.new("RGBA", scaled_size, (0, 0, 0, 0))
+
+    for y in range(image.height):
+        for x in range(image.width):
+            pixel = image.getpixel((x, y))
+            if pixel[3] == 0:
+                continue
+            left = x * scale_factor
+            top = y * scale_factor
+            scaled_image.paste(
+                pixel,
+                (left, top, left + scale_factor, top + scale_factor),
+            )
+
+    return scaled_image
 
 
 def draw_heart_runner_animation_board(
     sequence_specs: dict[str, dict[str, object]],
     board_path: Path,
 ) -> None:
-    board = Image.new("RGBA", (768, 448), (25, 29, 26, 255))
+    board = Image.new("RGBA", (768, 600), (25, 29, 26, 255))
     draw = ImageDraw.Draw(board, "RGBA")
     font = ImageFont.load_default()
 
-    draw.rectangle((12, 12, 756, 436), outline=(93, 102, 91, 255), width=2)
+    draw.rectangle((12, 12, 756, 588), outline=(93, 102, 91, 255), width=2)
     _draw_label(draw, (24, 20), "Heart Runner Animation Approval Gate", font)
     _draw_label(draw, (24, 34), "Current live sprite remains active; these are preview-only movement treatments.", font)
+    _draw_label(draw, (24, 48), "Transition strip: calm -> startled hop -> landing beat -> panic sprint", font)
 
     current_image = Image.open(SPRITE_DIR / "heart_runner.png").convert("RGBA")
-    board.alpha_composite(current_image, (40, 78))
-    _draw_label(draw, (28, 58), "Current Base", font)
-    current_zoom = current_image.resize((64, 64), Image.NEAREST)
-    board.alpha_composite(current_zoom, (28, 118))
+    board.alpha_composite(current_image, (40, 92))
+    _draw_label(draw, (28, 72), "Current Base", font)
+    current_zoom = _scale_image_nearest_integer(current_image, 4)
+    board.alpha_composite(current_zoom, (28, 132))
 
-    sequence_order = ["casual_strut", "panicked_sprint", "startled_hop"]
+    _draw_heart_runner_transition_strip(board, font)
+
+    sequence_order = ["casual_strut", "startled_hop", "panicked_sprint"]
     native_row_y = {
-        "casual_strut": 62,
-        "panicked_sprint": 106,
-        "startled_hop": 150,
+        "casual_strut": 96,
+        "startled_hop": 156,
+        "panicked_sprint": 216,
     }
     zoom_row_y = {
-        "casual_strut": 250,
-        "panicked_sprint": 316,
-        "startled_hop": 382,
+        "casual_strut": 368,
+        "startled_hop": 440,
+        "panicked_sprint": 512,
     }
 
     for sequence_key in sequence_order:
         sequence_spec = sequence_specs[sequence_key]
         _draw_label(draw, (140, native_row_y[sequence_key] - 12), sequence_spec["title"], font)
         _draw_label(draw, (140, zoom_row_y[sequence_key] - 12), sequence_spec["timing_note"], font)
-        _draw_label(draw, (520, zoom_row_y[sequence_key]), sequence_spec["description"], font)
+        _draw_label(draw, (500, zoom_row_y[sequence_key]), sequence_spec["description"], font)
 
         for frame_index in range(sequence_spec["frame_count"]):
             frame_path = DEV_HEART_RUNNER_ANIMATION_DIR / f"{sequence_key}_frame_{frame_index + 1}.png"
             frame_image = Image.open(frame_path).convert("RGBA")
             board.alpha_composite(frame_image, (300 + frame_index * 28, native_row_y[sequence_key]))
-            zoom_image = frame_image.resize((48, 48), Image.NEAREST)
+            zoom_image = _scale_image_nearest_integer(frame_image, 3)
             board.alpha_composite(zoom_image, (240 + frame_index * 62, zoom_row_y[sequence_key]))
+            _draw_label(
+                draw,
+                (236 + frame_index * 62, zoom_row_y[sequence_key] + 52),
+                sequence_spec["frame_labels"][frame_index],
+                font,
+            )
 
     board_path.parent.mkdir(parents=True, exist_ok=True)
     board.save(board_path)
+
+
+def _draw_heart_runner_transition_strip(
+    board: Image.Image,
+    font: ImageFont.ImageFont,
+) -> None:
+    draw = ImageDraw.Draw(board, "RGBA")
+    sequence_specs = [
+        ("casual_strut", 0, "calm"),
+        ("startled_hop", 0, "startle"),
+        ("startled_hop", 3, "land"),
+        ("panicked_sprint", 1, "panic"),
+    ]
+    x_positions = [154, 260, 366, 472]
+    y_position = 274
+    for index, (sequence_key, frame_index, label) in enumerate(sequence_specs):
+        frame_path = DEV_HEART_RUNNER_ANIMATION_DIR / f"{sequence_key}_frame_{frame_index + 1}.png"
+        frame_image = _scale_image_nearest_integer(
+            Image.open(frame_path).convert("RGBA"),
+            3,
+        )
+        board.alpha_composite(frame_image, (x_positions[index], y_position))
+        _draw_label(draw, (x_positions[index] - 6, y_position + 52), label, font)
+        if index < len(sequence_specs) - 1:
+            _draw_label(draw, (x_positions[index] + 54, y_position + 18), "->", font)
 
 
 def _build_active_blowgun_spec() -> ShooterPaletteVariantSpec:
@@ -908,6 +1011,7 @@ def draw_standard_assets() -> None:
     draw_shooter_enemy(SPRITE_DIR / "shooter_enemy.png")
     draw_boomer_enemy(SPRITE_DIR / "boomer_enemy.png")
     draw_heart_runner(SPRITE_DIR / "heart_runner.png")
+    draw_heart_runner_animation_sheet(SPRITE_DIR / "heart_runner_sheet.png")
     draw_heart_pickup(SPRITE_DIR / "heart_pickup.png")
 
 

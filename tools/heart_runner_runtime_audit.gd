@@ -157,8 +157,25 @@ func _audit_entry_and_calm_wander_behavior() -> void:
 	)
 	_require(reached_wandering, "Unarmed Heart Runner transitions from ENTERING into WANDERING after moving visibly into the arena.")
 	_require(
+		runner.sprite != null
+		and runner.sprite.texture != null
+		and runner.sprite.texture.resource_path == "res://art/sprites/heart_runner_sheet.png"
+		and runner.sprite.hframes == 4
+		and runner.sprite.vframes == 3,
+		"Heart Runner live presentation uses the approved single 4x3 sprite sheet on the existing Sprite2D seam."
+	)
+	_require(
 		runner._get_entry_progress() >= runner.entry_distance and runner.entry_elapsed >= runner.entry_min_duration,
 		"Heart Runner only finishes entry after the configured distance and minimum visible time."
+	)
+	var calm_samples := await _sample_runner_frames(runner, 0.42)
+	_require(
+		_all_samples_use_row(calm_samples, HeartRunner.ANIMATION_ROW_CALM),
+		"Heart Runner uses the calm animation row during visible entry and wandering behavior."
+	)
+	_require(
+		_count_unique_frames(calm_samples) >= 2,
+		"Heart Runner calm presentation cycles through the approved four-frame casual strut in live play."
 	)
 
 	var inner_rect := runner._get_inner_wander_rect()
@@ -194,6 +211,10 @@ func _audit_entry_and_calm_wander_behavior() -> void:
 		runner.current_route_length >= runner.casual_exit_min_route_length,
 		"Heart Runner casual exit keeps a meaningful remaining route instead of vanishing almost immediately."
 	)
+	_require(
+		runner.get_current_animation_frame_coords().y == HeartRunner.ANIMATION_ROW_CALM,
+		"Heart Runner keeps the calm strut presentation during CASUAL_EXIT."
+	)
 
 	root.queue_free()
 	await get_tree().process_frame
@@ -203,7 +224,7 @@ func _audit_spear_held_reactions() -> void:
 	var root := Node2D.new()
 	add_child(root)
 
-	var player := _spawn_player(root, Vector2(220.0, 108.0))
+	var player := _spawn_player(root, Vector2(320.0, 108.0))
 	var spear := _spawn_spear(root, player)
 
 	var armed_spawn_runner := _spawn_runner(
@@ -223,30 +244,137 @@ func _audit_spear_held_reactions() -> void:
 		armed_spawn_alarm_count == 0 and int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.ENTERING),
 		"Armed-at-spawn Heart Runner does not trigger the startled reaction while it is still mostly entering from offscreen."
 	)
+	var armed_spawn_startle_radius := armed_spawn_runner.get_startle_radius()
+	_require(
+		is_equal_approx(
+			armed_spawn_startle_radius,
+			spear.max_range - armed_spawn_runner.heart_runner_startle_range_margin
+		),
+		"Heart Runner startled radius is derived from the live spear range minus the configured margin."
+	)
+	var armed_spawn_wanders_calmly := await _advance_until(
+		func() -> bool:
+			return int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	_require(
+		armed_spawn_wanders_calmly and armed_spawn_alarm_count == 0 and armed_spawn_runner.armed_threat_active,
+		"Armed-at-spawn Heart Runner finishes entry first, then stays calm while Akedra remains armed but still outside the startled radius."
+	)
+	var calm_stride_samples := await _sample_runner_frames(armed_spawn_runner, 0.32)
+	player.global_position = armed_spawn_runner.global_position + Vector2(armed_spawn_startle_radius - 8.0, 0.0)
 	var armed_spawn_startled := await _advance_until(
 		func() -> bool:
 			return int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
 				or int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
-		1.0
+		0.35
 	)
-	_require(armed_spawn_startled and armed_spawn_alarm_count == 1, "Armed-at-spawn Heart Runner startles exactly once after entry is complete.")
+	_require(
+		armed_spawn_startled and armed_spawn_alarm_count == 1,
+		"Armed-at-spawn Heart Runner startles exactly once after entry completes and Akedra moves inside the derived threat radius."
+	)
+	var startled_samples := await _sample_runner_frames(armed_spawn_runner, 0.20)
+	_require(
+		_all_samples_use_row(startled_samples, HeartRunner.ANIMATION_ROW_STARTLED),
+		"Heart Runner switches to the one-shot startled row when the valid spear-threat reaction begins."
+	)
+	_require(
+		_count_unique_frames(startled_samples) >= 3,
+		"Heart Runner startled presentation advances through the approved recognition, pop, and peak frames before panic."
+	)
+	await _advance_physics(0.30)
+	_require(
+		int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.STARTLED),
+		"Heart Runner keeps the slowed 0.40-second startled hop readable before the flee sprint takes over."
+	)
 	var armed_spawn_flee := await _advance_until(
 		func() -> bool:
 			return int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
-		0.6
+		0.25
 	)
-	_require(armed_spawn_flee, "Heart Runner enters FLEEING after the short startled hop completes.")
+	_require(armed_spawn_flee, "Heart Runner enters FLEEING after the revised startled-hop timing completes.")
+	var flee_samples := await _sample_runner_frames(armed_spawn_runner, 0.32)
+	_require(
+		_all_samples_use_row(flee_samples, HeartRunner.ANIMATION_ROW_FLEE),
+		"Heart Runner begins the approved panic-sprint row only after the startled sequence completes."
+	)
+	_require(
+		_count_unique_frames(flee_samples) >= 3,
+		"Heart Runner live panic sprint uses multiple distinct flee frames rather than repeating a static pose."
+	)
+	_require(
+		_count_frame_changes(flee_samples) > _count_frame_changes(calm_stride_samples),
+		"Heart Runner panic sprint cadence stays visibly faster than the calm strut."
+	)
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	await _advance_physics(0.20)
+	_require(
+		int(armed_spawn_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		"Throwing the spear after panic starts does not calm the Heart Runner back down."
+	)
 	armed_spawn_runner.queue_free()
 	await get_tree().process_frame
 
 	_set_spear_state_for_audit(spear, Spear.State.FLYING)
-	var wandering_runner := _spawn_runner(
+	player.global_position = Vector2(320.0, 108.0)
+	var pending_runner := _spawn_runner(
 		root,
 		player,
 		spear,
 		Vector2(TEST_ARENA.position.x + 8.0, 108.0),
 		Arena.SpawnEdge.LEFT,
 		7002
+	)
+	var pending_alarm_count := 0
+	pending_runner.startled_started.connect(func() -> void:
+		pending_alarm_count += 1
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(pending_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	var pending_startle_radius := pending_runner.get_startle_radius()
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	await _advance_physics(0.20)
+	_require(
+		int(pending_runner.motion_state) == int(HeartRunner.MotionState.WANDERING)
+		and pending_alarm_count == 0
+		and pending_runner.armed_threat_active,
+		"Picking up the spear outside the startled radius keeps the Heart Runner calm while the armed threat remains pending."
+	)
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	player.global_position = pending_runner.global_position + Vector2(pending_startle_radius - 10.0, 0.0)
+	await _advance_physics(0.20)
+	_require(
+		int(pending_runner.motion_state) == int(HeartRunner.MotionState.WANDERING)
+		and pending_alarm_count == 0
+		and not pending_runner.armed_threat_active,
+		"Throwing the spear before entering the startled radius clears the pending armed threat and prevents panic."
+	)
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	var startled_from_repickup := await _advance_until(
+		func() -> bool:
+			return int(pending_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
+				or int(pending_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.35
+	)
+	_require(
+		startled_from_repickup and pending_alarm_count == 1,
+		"Picking the spear up again later allows a new valid proximity trigger exactly once."
+	)
+	pending_runner.queue_free()
+	await get_tree().process_frame
+
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	player.global_position = Vector2(220.0, 108.0)
+	var wandering_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 120.0),
+		Arena.SpawnEdge.LEFT,
+		7003
 	)
 	var wandering_alarm_count := 0
 	wandering_runner.startled_started.connect(func() -> void:
@@ -257,35 +385,38 @@ func _audit_spear_held_reactions() -> void:
 			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
 		1.0
 	)
+	var wandering_startle_radius := wandering_runner.get_startle_radius()
+	wandering_runner.global_position = player.global_position - Vector2(wandering_startle_radius + 10.0, 0.0)
+	wandering_runner.wander_target = player.global_position - Vector2(wandering_startle_radius - 12.0, 0.0)
+	wandering_runner.travel_direction = (wandering_runner.wander_target - wandering_runner.global_position).normalized()
 	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	await _advance_physics(0.10)
+	_require(
+		int(wandering_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		"Heart Runner continues wandering while armed but still outside the startled radius."
+	)
 	var startled_from_wander := await _advance_until(
 		func() -> bool:
-			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.STARTLED),
-		0.3
+			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
+				or int(wandering_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.40
 	)
-	_require(startled_from_wander and wandering_alarm_count == 1, "Spear retrieval during calm wandering triggers exactly one startled reaction.")
-	await _advance_until(
-		func() -> bool:
-			return int(wandering_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
-		0.6
-	)
-	_set_spear_state_for_audit(spear, Spear.State.FLYING)
-	await _advance_physics(0.20)
 	_require(
-		int(wandering_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
-		"Throwing the spear again after panic does not return the Heart Runner to a calm state."
+		startled_from_wander and wandering_alarm_count == 1,
+		"Heart Runner wandering into the startled radius while Akedra stays armed triggers exactly one startled reaction."
 	)
 	wandering_runner.queue_free()
 	await get_tree().process_frame
 
 	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	player.global_position = Vector2(320.0, 108.0)
 	var casual_exit_runner := _spawn_runner(
 		root,
 		player,
 		spear,
 		Vector2(TEST_ARENA.position.x + 8.0, 132.0),
 		Arena.SpawnEdge.LEFT,
-		7003
+		7004
 	)
 	var casual_alarm_count := 0
 	casual_exit_runner.startled_started.connect(func() -> void:
@@ -296,20 +427,64 @@ func _audit_spear_held_reactions() -> void:
 			return int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
 		1.0
 	)
+	casual_exit_runner.global_position = Vector2(64.0, 132.0)
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
 	casual_exit_runner.wander_time_left = 0.01
 	await _advance_until(
 		func() -> bool:
 			return int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.CASUAL_EXIT),
 		0.5
 	)
+	await _advance_physics(0.24)
+	_require(
+		int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.CASUAL_EXIT)
+		and casual_alarm_count == 0,
+		"CASUAL_EXIT continues normally when the Runner remains outside the startled radius even while Akedra is armed."
+	)
+	casual_exit_runner.queue_free()
+	await get_tree().process_frame
+
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
+	player.global_position = Vector2(320.0, 108.0)
+	var casual_interrupt_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 144.0),
+		Arena.SpawnEdge.LEFT,
+		7005
+	)
+	var casual_interrupt_alarm_count := 0
+	casual_interrupt_runner.startled_started.connect(func() -> void:
+		casual_interrupt_alarm_count += 1
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(casual_interrupt_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	casual_interrupt_runner.global_position = Vector2(72.0, 144.0)
 	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	casual_interrupt_runner.wander_time_left = 0.01
+	await _advance_until(
+		func() -> bool:
+			return int(casual_interrupt_runner.motion_state) == int(HeartRunner.MotionState.CASUAL_EXIT),
+		0.5
+	)
+	player.global_position = casual_interrupt_runner.global_position + Vector2(
+		casual_interrupt_runner.get_startle_radius() - 8.0,
+		0.0
+	)
 	var startled_from_casual_exit := await _advance_until(
 		func() -> bool:
-			return int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
-				or int(casual_exit_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
-		0.3
+			return int(casual_interrupt_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
+				or int(casual_interrupt_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.40
 	)
-	_require(startled_from_casual_exit and casual_alarm_count == 1, "Spear retrieval during CASUAL_EXIT interrupts into exactly one startled reaction.")
+	_require(
+		startled_from_casual_exit and casual_interrupt_alarm_count == 1,
+		"CASUAL_EXIT is interrupted into exactly one startled reaction when the Runner enters the armed threat radius before resolving."
+	)
 
 	root.queue_free()
 	await get_tree().process_frame
@@ -522,12 +697,56 @@ func _audit_boomer_displacement_and_pause_cleanup() -> void:
 		int(wander_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
 		"Heart Runner remains in WANDERING after authored displacement instead of changing to an incorrect state."
 	)
+	_require(
+		wander_runner.get_current_animation_frame_coords().y == HeartRunner.ANIMATION_ROW_CALM,
+		"Boomer displacement during wandering keeps the live calm animation row intact."
+	)
 	await _advance_physics(0.14)
 	_require(
 		wander_runner.global_position.distance_to(wander_position_before) > 6.0,
 		"Heart Runner resumes normal calm movement after a wandering-state Boomer displacement."
 	)
 
+	var displaced_startle_runner := _spawn_runner(
+		root,
+		player,
+		spear,
+		Vector2(TEST_ARENA.position.x + 8.0, 92.0),
+		Arena.SpawnEdge.LEFT,
+		72015
+	)
+	var displaced_startle_alarm_count := 0
+	displaced_startle_runner.startled_started.connect(func() -> void:
+		displaced_startle_alarm_count += 1
+	)
+	await _advance_until(
+		func() -> bool:
+			return int(displaced_startle_runner.motion_state) == int(HeartRunner.MotionState.WANDERING),
+		1.0
+	)
+	var displaced_startle_radius := displaced_startle_runner.get_startle_radius()
+	displaced_startle_runner.global_position = player.global_position - Vector2(displaced_startle_radius + 12.0, 0.0)
+	displaced_startle_runner.wander_target = displaced_startle_runner.global_position
+	displaced_startle_runner.travel_direction = Vector2.ZERO
+	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	_require(
+		displaced_startle_runner.apply_authored_displacement(Vector2.RIGHT, 18.0, 0.16),
+		"Heart Runner accepts Boomer-authored displacement that can move it into the armed startled radius."
+	)
+	var startled_from_displacement := await _advance_until(
+		func() -> bool:
+			return int(displaced_startle_runner.motion_state) == int(HeartRunner.MotionState.STARTLED)
+				or int(displaced_startle_runner.motion_state) == int(HeartRunner.MotionState.FLEEING),
+		0.35
+	)
+	_require(
+		startled_from_displacement and displaced_startle_alarm_count == 1,
+		"Boomer-authored displacement into the startled radius triggers exactly one panic reaction while Akedra remains armed."
+	)
+	displaced_startle_runner.queue_free()
+	await get_tree().process_frame
+
+	_set_spear_state_for_audit(spear, Spear.State.FLYING)
 	var casual_runner := _spawn_runner(
 		root,
 		player,
@@ -564,6 +783,7 @@ func _audit_boomer_displacement_and_pause_cleanup() -> void:
 	)
 
 	_set_spear_state_for_audit(spear, Spear.State.HELD)
+	player.global_position = Vector2(168.0, 84.0)
 	var startled_runner := _spawn_runner(
 		root,
 		player,
@@ -584,6 +804,7 @@ func _audit_boomer_displacement_and_pause_cleanup() -> void:
 	var startled_time_before_pause := startled_runner.startled_time_left
 	var visual_time_before_pause := startled_runner.visual_time
 	var startled_position_before_pause := startled_runner.global_position
+	var startled_frame_before_pause := startled_runner.get_current_animation_frame_coords()
 	_require(
 		startled_runner.apply_authored_displacement(Vector2.UP, 18.0, 0.16),
 		"Heart Runner accepts Boomer-authored displacement during the startled hop."
@@ -593,8 +814,9 @@ func _audit_boomer_displacement_and_pause_cleanup() -> void:
 	_require(
 		is_equal_approx(startled_runner.startled_time_left, startled_time_before_pause)
 		and is_equal_approx(startled_runner.visual_time, visual_time_before_pause)
-		and startled_runner.global_position == startled_position_before_pause,
-		"Pause freezes Heart Runner state timers, animation timing, and movement during the approval-gate behavior pass."
+		and startled_runner.global_position == startled_position_before_pause
+		and startled_runner.get_current_animation_frame_coords() == startled_frame_before_pause,
+		"Pause freezes Heart Runner timers, live animation frame state, and movement."
 	)
 	get_tree().paused = false
 	var reached_flee_after_pause := await _advance_until(
@@ -611,8 +833,9 @@ func _audit_boomer_displacement_and_pause_cleanup() -> void:
 	await _advance_physics(0.22)
 	_require(
 		int(startled_runner.motion_state) == int(HeartRunner.MotionState.FLEEING)
-		and startled_runner.global_position.x > flee_x_before_resume - 1.0,
-		"Heart Runner resumes its locked flee route after a fleeing-state Boomer displacement."
+		and startled_runner.global_position.x > flee_x_before_resume - 1.0
+		and startled_runner.get_current_animation_frame_coords().y == HeartRunner.ANIMATION_ROW_FLEE,
+		"Heart Runner resumes its locked flee route and panic animation after a fleeing-state Boomer displacement."
 	)
 
 	root.queue_free()
@@ -819,6 +1042,46 @@ func _advance_physics(duration: float) -> void:
 	var frames := int(ceil(duration * 60.0))
 	for _index in range(maxi(frames, 1)):
 		await get_tree().physics_frame
+
+
+func _sample_runner_frames(runner: HeartRunner, duration: float) -> Array[Vector2i]:
+	var samples: Array[Vector2i] = []
+	var frames := int(ceil(duration * 60.0))
+	for _index in range(maxi(frames, 1)):
+		await get_tree().physics_frame
+		if not is_instance_valid(runner) or runner.sprite == null:
+			break
+		samples.append(runner.get_current_animation_frame_coords())
+	return samples
+
+
+func _all_samples_use_row(samples: Array[Vector2i], row: int) -> bool:
+	if samples.is_empty():
+		return false
+	for frame_coords in samples:
+		if frame_coords.y != row:
+			return false
+	return true
+
+
+func _count_unique_frames(samples: Array[Vector2i]) -> int:
+	var seen_frames := {}
+	for frame_coords in samples:
+		seen_frames[frame_coords] = true
+	return seen_frames.size()
+
+
+func _count_frame_changes(samples: Array[Vector2i]) -> int:
+	if samples.size() <= 1:
+		return 0
+	var change_count := 0
+	var previous_frame := samples[0]
+	for index in range(1, samples.size()):
+		var frame_coords := samples[index]
+		if frame_coords != previous_frame:
+			change_count += 1
+		previous_frame = frame_coords
+	return change_count
 
 
 func _require(condition: bool, message: String) -> void:

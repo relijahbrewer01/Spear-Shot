@@ -1,12 +1,13 @@
 {
   "board_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\heart_runner_animation_board.png",
-  "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\heart_runner.png",
+  "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\heart_runner_sheet.png",
+  "base_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\heart_runner.png",
   "sequence_count": 3,
   "sequences": {
     "casual_strut": {
       "title": "Casual Strut",
-      "description": "Small confident strut, alternating feet, slower bob.",
-      "timing_note": "4-frame calm cycle for wandering and casual exit.",
+      "description": "Confident strut with a slower bob.",
+      "timing_note": "4-frame calm cadence for wandering and casual exit.",
       "frame_paths": [
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\casual_strut_frame_1.png",
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\casual_strut_frame_2.png",
@@ -14,26 +15,26 @@
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\casual_strut_frame_4.png"
       ]
     },
-    "panicked_sprint": {
-      "title": "Panicked Sprint",
-      "description": "Forward lean, quicker cadence, wider foot reach.",
-      "timing_note": "4-frame flee cycle with faster cadence.",
-      "frame_paths": [
-        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_1.png",
-        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_2.png",
-        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_3.png",
-        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_4.png"
-      ]
-    },
     "startled_hop": {
       "title": "Startled Hop",
-      "description": "Squash, pop, peak surprise, quick landing.",
-      "timing_note": "4-frame alarm sequence for the 0.30s startle.",
+      "description": "Recognize, pop, peak, then land/hold.",
+      "timing_note": "4-frame 0.40s startle with a short landing beat.",
       "frame_paths": [
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\startled_hop_frame_1.png",
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\startled_hop_frame_2.png",
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\startled_hop_frame_3.png",
         "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\startled_hop_frame_4.png"
+      ]
+    },
+    "panicked_sprint": {
+      "title": "Panicked Sprint",
+      "description": "Hard lean, wide stride, near-airborne scramble.",
+      "timing_note": "4-frame flee cadence with a more desperate silhouette.",
+      "frame_paths": [
+        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_1.png",
+        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_2.png",
+        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_3.png",
+        "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\heart_runner_animation\\panicked_sprint_frame_4.png"
       ]
     }
   }

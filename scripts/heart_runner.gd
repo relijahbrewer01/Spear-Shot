@@ -4,6 +4,13 @@ class_name HeartRunner
 const SPRITE_BASE_OFFSET := Vector2(0.0, -1.0)
 const FAILSAFE_EXTRA_TIME := 2.0
 const EDGE_SAMPLE_OFFSETS := [0.22, 0.5, 0.78]
+const ANIMATION_ROW_CALM := 0
+const ANIMATION_ROW_STARTLED := 1
+const ANIMATION_ROW_FLEE := 2
+const ANIMATION_FRAME_COUNT := 4
+const CALM_FRAME_DURATION := 0.18
+const FLEE_FRAME_DURATION := 0.10
+const STARTLED_FRAME_PROGRESS_STOPS := [0.18, 0.42, 0.72]
 
 signal defeated(defeat_position: Vector2, score_value: int, spawned_by_debug: bool)
 signal escaped(spawned_by_debug: bool)
@@ -35,7 +42,8 @@ enum MotionState {
 @export var wander_player_avoid_radius := 44.0
 @export var casual_exit_min_route_length := 64.0
 @export var flee_min_route_length := 64.0
-@export var startled_duration := 0.30
+@export var startled_duration := 0.40
+@export var heart_runner_startle_range_margin := 16.0
 @export var flee_player_route_clear_radius := 36.0
 @export var exit_candidate_edge_padding := 20.0
 @export var exit_corner_avoid_distance := 20.0
@@ -71,9 +79,10 @@ var wander_time_left := 0.0
 var wander_target := Vector2.ZERO
 var wander_retarget_time_left := 0.0
 var startled_time_left := 0.0
-var pending_startled_after_entry := false
+var armed_threat_active := false
 var has_startled := false
 var facing_left := false
+var motion_state_time := 0.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -116,8 +125,9 @@ func setup(
 	wander_retarget_time_left = 0.0
 	startled_time_left = 0.0
 	entry_elapsed = 0.0
-	pending_startled_after_entry = _is_tracked_spear_held()
+	armed_threat_active = _is_tracked_spear_held()
 	has_startled = false
+	motion_state_time = 0.0
 	current_route_length = 0.0
 	exit_target_point = Vector2.ZERO
 	exit_edge = Arena.get_opposite_spawn_edge(spawn_edge)
@@ -175,7 +185,7 @@ func debug_trigger_spear_held() -> void:
 
 func debug_force_wandering() -> void:
 	has_startled = false
-	pending_startled_after_entry = false
+	armed_threat_active = _is_tracked_spear_held()
 	entry_elapsed = entry_min_duration
 	wander_time_left = wander_duration
 	_pick_next_wander_target()
@@ -191,7 +201,7 @@ func debug_force_locked_exit(target_edge: int, target_point: Vector2, use_flee_s
 	})
 	if use_flee_state:
 		has_startled = true
-		pending_startled_after_entry = false
+		armed_threat_active = false
 		startled_time_left = 0.0
 		_set_motion_state(MotionState.FLEEING)
 	else:
@@ -215,6 +225,19 @@ func get_state_name() -> String:
 	return "UNKNOWN"
 
 
+func get_startle_radius() -> float:
+	var spear_range := 150.0
+	if tracked_spear != null:
+		spear_range = tracked_spear.max_range
+	return maxf(spear_range - heart_runner_startle_range_margin, 0.0)
+
+
+func is_inside_startle_radius() -> bool:
+	if player_ref == null:
+		return false
+	return global_position.distance_to(player_ref.global_position) <= get_startle_radius()
+
+
 func _physics_process(delta: float) -> void:
 	visual_time += delta
 
@@ -225,6 +248,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	lifetime_elapsed += delta
+	motion_state_time += delta
 	if failsafe_lifetime > 0.0 and lifetime_elapsed >= failsafe_lifetime:
 		push_warning("HeartRunner failsafe resolved an overlong lifetime.")
 		_resolve_escape()
@@ -257,13 +281,16 @@ func _update_entering(delta: float) -> void:
 	if not _has_completed_entry():
 		return
 
-	if pending_startled_after_entry:
+	if _can_enter_startled_from_proximity():
 		_enter_startled()
 	else:
 		_enter_wandering()
 
 
 func _update_wandering(delta: float) -> void:
+	if _try_enter_startled_from_proximity():
+		return
+
 	wander_time_left = maxf(wander_time_left - delta, 0.0)
 	wander_retarget_time_left = maxf(wander_retarget_time_left - delta, 0.0)
 	if wander_target.distance_to(global_position) <= 4.0 or wander_retarget_time_left == 0.0:
@@ -273,6 +300,8 @@ func _update_wandering(delta: float) -> void:
 	if direction_to_target != Vector2.ZERO:
 		travel_direction = direction_to_target
 	_move_inside_rect(delta, travel_direction, calm_move_speed, _get_inner_wander_rect())
+	if _try_enter_startled_from_proximity():
+		return
 
 	if wander_time_left == 0.0:
 		_begin_casual_exit()
@@ -286,9 +315,13 @@ func _update_startled(delta: float) -> void:
 
 
 func _update_locked_exit(delta: float, speed: float) -> void:
+	if motion_state == MotionState.CASUAL_EXIT and _try_enter_startled_from_proximity():
+		return
 	if travel_direction == Vector2.ZERO and exit_target_point != Vector2.ZERO:
 		travel_direction = (exit_target_point - global_position).normalized()
 	_move_with_exit_resolution(delta, travel_direction, speed)
+	if motion_state == MotionState.CASUAL_EXIT and _try_enter_startled_from_proximity():
+		return
 
 
 func _move_inside_rect(delta: float, direction: Vector2, speed: float, clamp_rect: Rect2) -> void:
@@ -332,7 +365,6 @@ func _apply_movement_result(target_position: Vector2, delta: float) -> void:
 
 
 func _enter_wandering() -> void:
-	pending_startled_after_entry = false
 	wander_time_left = wander_duration
 	_pick_next_wander_target()
 	_set_motion_state(MotionState.WANDERING)
@@ -351,7 +383,7 @@ func _enter_startled() -> void:
 		return
 
 	has_startled = true
-	pending_startled_after_entry = false
+	armed_threat_active = false
 	startled_time_left = startled_duration
 	var route := _choose_exit_route(true)
 	if not route.get("valid", false):
@@ -519,6 +551,24 @@ func _is_tracked_spear_held() -> bool:
 	return tracked_spear != null and tracked_spear.is_held()
 
 
+func _can_enter_startled_from_proximity() -> bool:
+	return (
+		active
+		and not is_resolved
+		and not has_startled
+		and armed_threat_active
+		and _has_completed_entry()
+		and is_inside_startle_radius()
+	)
+
+
+func _try_enter_startled_from_proximity() -> bool:
+	if not _can_enter_startled_from_proximity():
+		return false
+	_enter_startled()
+	return has_startled
+
+
 func _connect_spear_state_signal() -> void:
 	if tracked_spear == null:
 		return
@@ -538,16 +588,14 @@ func _disconnect_spear_state_signal() -> void:
 
 
 func _on_tracked_spear_state_changed(new_state: int) -> void:
-	if new_state != Spear.State.HELD:
-		return
 	if not active or is_resolved or has_startled:
 		return
 
-	match motion_state:
-		MotionState.ENTERING:
-			pending_startled_after_entry = true
-		MotionState.WANDERING, MotionState.CASUAL_EXIT:
-			_enter_startled()
+	armed_threat_active = new_state == Spear.State.HELD
+	if not armed_threat_active:
+		return
+	if motion_state == MotionState.WANDERING or motion_state == MotionState.CASUAL_EXIT:
+		_try_enter_startled_from_proximity()
 
 
 func _update_displacement_timer(delta: float) -> void:
@@ -788,6 +836,7 @@ func _set_motion_state(new_state: MotionState) -> void:
 		return
 
 	motion_state = new_state
+	motion_state_time = 0.0
 	state_changed.emit(motion_state)
 
 
@@ -799,46 +848,41 @@ func _update_sprite_visuals() -> void:
 	if sprite == null:
 		return
 
-	sprite.global_position = _get_sprite_target_global_position()
+	sprite.global_position = (global_position + SPRITE_BASE_OFFSET).round()
 	sprite.global_rotation = 0.0
-	sprite.scale = _get_visual_scale()
+	sprite.scale = Vector2.ONE
 	sprite.flip_h = facing_left
+	sprite.frame_coords = _get_animation_frame_coords()
 	sprite.self_modulate = Color.WHITE
 
 
-func _get_sprite_target_global_position() -> Vector2:
-	var offset := SPRITE_BASE_OFFSET
+func get_current_animation_frame_coords() -> Vector2i:
+	return _get_animation_frame_coords()
+
+
+func _get_animation_frame_coords() -> Vector2i:
+	if sprite != null and motion_state == MotionState.RESOLVED:
+		return sprite.frame_coords
+
 	match motion_state:
 		MotionState.STARTLED:
-			offset.y += _get_startled_hop_offset()
+			return Vector2i(_get_startled_animation_frame(), ANIMATION_ROW_STARTLED)
 		MotionState.FLEEING:
-			offset.y += roundf(sin(visual_time * 22.0) * 1.5)
+			return Vector2i(_get_looping_animation_frame(FLEE_FRAME_DURATION), ANIMATION_ROW_FLEE)
 		_:
-			offset.y += roundf(sin(visual_time * 8.0) * 1.0)
-	return (global_position + offset).round()
+			return Vector2i(_get_looping_animation_frame(CALM_FRAME_DURATION), ANIMATION_ROW_CALM)
 
 
-func _get_visual_scale() -> Vector2:
-	if motion_state == MotionState.STARTLED:
-		var progress := 1.0 - (startled_time_left / maxf(startled_duration, 0.001))
-		if progress < 0.22:
-			return Vector2(1.08, 0.92)
-		if progress < 0.68:
-			return Vector2(0.95, 1.05)
-		return Vector2(1.03, 0.97)
-	if motion_state == MotionState.FLEEING:
-		return Vector2(1.05, 0.95)
-	if displacement_time_left > 0.0:
-		return Vector2(1.04, 0.96)
-	return Vector2.ONE
+func _get_looping_animation_frame(frame_duration: float) -> int:
+	if frame_duration <= 0.0:
+		return 0
+	return int(floor(motion_state_time / frame_duration)) % ANIMATION_FRAME_COUNT
 
 
-func _get_startled_hop_offset() -> float:
+func _get_startled_animation_frame() -> int:
 	var progress := 1.0 - (startled_time_left / maxf(startled_duration, 0.001))
-	if progress < 0.18:
-		return lerpf(0.0, 1.5, progress / 0.18)
-	if progress < 0.48:
-		return lerpf(1.5, -5.0, (progress - 0.18) / 0.30)
-	if progress < 0.76:
-		return lerpf(-5.0, -1.0, (progress - 0.48) / 0.28)
-	return lerpf(-1.0, 0.0, (progress - 0.76) / 0.24)
+	var frame_index := 0
+	for progress_stop in STARTLED_FRAME_PROGRESS_STOPS:
+		if progress >= progress_stop:
+			frame_index += 1
+	return mini(frame_index, ANIMATION_FRAME_COUNT - 1)

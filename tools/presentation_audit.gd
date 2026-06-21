@@ -9,6 +9,7 @@ const TEXTURE_PATHS := [
 	"res://art/sprites/shooter_enemy.png",
 	"res://art/sprites/boomer_enemy.png",
 	"res://art/sprites/heart_runner.png",
+	"res://art/sprites/heart_runner_sheet.png",
 	"res://art/sprites/heart_pickup.png",
 	"res://art/sprites/spear_hunter.png",
 ]
@@ -107,11 +108,20 @@ func _audit_scene_sprite(scene_path: String, sprite_path: String, report_lines: 
 		instance.queue_free()
 		return 1
 
+	if scene_path == "res://HeartRunner.tscn":
+		if sprite.hframes != 4 or sprite.vframes != 3:
+			push_error("AUDIT: HeartRunner sprite sheet is not configured for a 4x3 live animation layout")
+			report_lines.append("FAILED HeartRunner sprite sheet layout")
+			instance.queue_free()
+			return 1
+
 	report_lines.append(
-		"scene=%s sprite=%s texture=%s" % [
+		"scene=%s sprite=%s texture=%s hframes=%s vframes=%s" % [
 			scene_path,
 			sprite_path,
 			sprite.texture.resource_path,
+			sprite.hframes,
+			sprite.vframes,
 		]
 	)
 	instance.queue_free()

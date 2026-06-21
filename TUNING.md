@@ -257,12 +257,21 @@
 | `heart_runner_health_2_spawn_chance` | `0.04` | `scripts/main.gd` | Runner chance while Akedra is at `2` health. |
 | `heart_runner_health_1_spawn_chance` | `0.10` | `scripts/main.gd` | Runner chance while Akedra is at `1` health. |
 | `heart_runner_speed` | `140.0px/s` | `scripts/main.gd`, `scripts/heart_runner.gd` | Straight cross-arena run speed. |
+| `calm_move_speed` | `70.0px/s` | `scripts/heart_runner.gd` | Calm entry, wandering, and timeout-exit pace before panic begins. |
+| `entry_distance` / `entry_min_duration` | `20.0px / 0.45s` | `scripts/heart_runner.gd` | Visible calm entry requirement before any startle check is allowed. |
+| `wander_duration` | `8.0s` | `scripts/heart_runner.gd` | Maximum calm wandering time before the Runner chooses a casual exit. |
 | `heart_runner_spawn_safe_radius` | `56.0px` | `scripts/main.gd` | Minimum safe distance from Akedra for edge entry. |
 | `heart_runner_landed_spear_safe_radius` | `24.0px` | `scripts/main.gd` | Extra safe-entry clearance from a landed spear. |
 | `heart_runner_post_resolution_cooldown` | `18.0s` | `scripts/main.gd` | Cooldown applied once after escape or pickup resolution. |
+| `heart_runner_startle_range_margin` | `16.0px` | `scripts/heart_runner.gd` | Subtracted from the live spear max range to derive the Runner's threat radius. |
+| Derived startle radius | `134.0px` | `scripts/heart_runner.gd`, `scripts/spear.gd` | Current proximity trigger using `150px - 16px`; the Runner only startles inside this armed threat range. |
+| `startled_duration` | `0.40s` | `scripts/heart_runner.gd` | Total one-shot startled hop covering recognition, pop, peak, and brief landing beat. |
+| Calm animation cadence | `4 frames @ 0.18s/frame` | `scripts/heart_runner.gd`, `art/sprites/heart_runner_sheet.png` | Approved casual strut used for `ENTERING`, `WANDERING`, and `CASUAL_EXIT`. |
+| Panic animation cadence | `4 frames @ 0.10s/frame` | `scripts/heart_runner.gd`, `art/sprites/heart_runner_sheet.png` | Faster panic sprint cadence with stronger lean and wider stride during `FLEEING`. |
 | `score_value` | `1` | `HeartRunner.tscn`, `scripts/heart_runner.gd` | Score for defeating the Runner before it escapes. |
 | `body_radius` | `6.0px` | `HeartRunner.tscn`, `scripts/heart_runner.gd` | Small readable Runner footprint. |
 | Collision radius | `6.0px` | `HeartRunner.tscn` | Heart Runner collision shape size. |
+| Live animation sheet layout | `4x3` frames on `64x48px` | `HeartRunner.tscn`, `art/sprites/heart_runner_sheet.png` | Single Sprite2D sheet for calm, startled, and panic rows without changing collision size. |
 | `cleanup_margin` | `12.0px` | `scripts/heart_runner.gd` | Extra distance beyond the assigned exit plane before natural cleanup. |
 | `pickup_radius` | `10.0px` | `HeartPickup.tscn`, `scripts/heart_pickup.gd` | Pickup body radius used for overlap collection and arena clamping. |
 | `heart_pickup_lifetime` | `7.0s` | `scripts/main.gd`, `scripts/heart_pickup.gd` | Time before an uncollected heart pickup expires. |

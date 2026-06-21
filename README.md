@@ -57,7 +57,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Shielded enemies use a compact broad body plus visible hide/wood/bone plate primitives, keeping the protected state readable without a magical glow or boss-sized silhouette
 - Blowgun Shooters use a small wiry hooded-forager silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
 - The approved final Shooter body uses a coherent moss-hood palette with a pale face, charcoal-brown torso, and restrained rust pouch on the roomier `16x18` canvas, keeping it small, readable, and distinct from the melee cast at `384x216`
-- Heart Runner opportunities use a tiny red pulse-beast silhouette on a compact `16x16` canvas, keeping the body readable against the arena while clearly separating it from the hostile roster
+- Heart Runner opportunities use a tiny red pulse-beast silhouette on a compact `16x16` frame, now played through a live four-frame calm strut, four-frame startled hop, and four-frame panic sprint while keeping the body readable and distinct from the hostile roster
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -85,7 +85,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
 - `art/sprites/boomer_enemy.png`: active Boomer sprite chosen from the local concept pass and kept on the same small readable scale as the rest of the special roster
-- `art/sprites/heart_runner.png`: active Heart Runner sprite chosen from the local three-variant comparison board
+- `art/sprites/heart_runner.png`: approved Heart Runner base silhouette chosen from the local three-variant comparison board
+- `art/sprites/heart_runner_sheet.png`: live `4x3` Heart Runner animation sheet containing the approved calm strut, startled hop, and panic sprint
 - `art/sprites/heart_pickup.png`: temporary heart pickup sprite used after a Runner defeat
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
@@ -103,7 +104,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/heart_pickup_collect.wav`: local recovery cue for collecting the heart pickup
 - `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, and Heart Runner sprites plus the temporary local comparison outputs for the Phase 4 concept passes
+- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, and Heart Runner sprites, the live Heart Runner animation sheet, and the temporary local comparison outputs for the Phase 4 concept passes
 - `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -122,7 +123,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
-- `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile edge-to-edge opportunity runner with explicit spear-hit handling, authored displacement support, and original-exit-plane cleanup
+- `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile edge-to-edge opportunity runner with explicit spear-hit handling, visible calm entry, state-driven live animation, authored displacement support, and original-exit-plane cleanup
 - `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
 - `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
@@ -146,7 +147,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/boomer_enemy_audit.py`: static Phase 4.3 Boomer contract audit
 - `tools/BoomerEnemyRuntimeAudit.tscn`: runtime audit for Boomer movement, fuse, detonation, scoring, cleanup, and intro integration
 - `tools/heart_runner_audit.py`: static Phase 4.4 opportunity-system, pickup, audio, and contract audit
-- `tools/HeartRunnerRuntimeAudit.tscn`: runtime audit for Heart Runner spawning, cleanup, pickup, cooldown, and pause/restart behavior
+- `tools/HeartRunnerRuntimeAudit.tscn`: runtime audit for Heart Runner spawning, state-driven animation, cleanup, pickup, cooldown, and pause/restart behavior
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
@@ -173,6 +174,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 ## Opportunity behavior
 
 - Heart Runner: separate from the hostile population system, unlocks around `20` seconds, rolls on its own `8-12` second opportunity timer, and becomes more likely at lower player health
+- It makes a visible calm entry, wanders for up to `8.0` seconds at `70px/s`, and then chooses a calm timeout exit if it never panics
+- Akedra only threatens it while holding the spear inside the derived `134px` startle radius (`150px` max throw range minus a `16px` margin)
+- Picking up the spear outside that radius keeps the Runner calm until either Akedra, the Runner, or a Boomer displacement carries it inside range; throwing the spear first clears that pending threat
+- A valid proximity trigger plays one `0.40s` startled hop plus alarm cue, then locks into an irreversible `140px/s` panic sprint along a fair flee route away from Akedra
 - It crosses the arena from one safe edge to the opposite side, cleans up only when it crosses its originally assigned exit plane, and does not despawn just because a Boomer shockwave pushes it into another boundary
 - A valid thrown-spear hit defeats it for `1` point without stopping spear flight
 - Defeating it spawns one temporary heart pickup clamped inside the playable arena, healing Akedra by `1` up to a temporary `4` health maximum

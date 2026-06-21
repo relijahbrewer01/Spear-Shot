@@ -65,6 +65,22 @@ enum SpawnSource {
 @export var maximum_boomer_spawn_chance := 0.07
 @export var boomer_intro_target_time_min := 65.0
 @export var boomer_intro_target_time_max := 78.0
+<<<<<<< Updated upstream
+=======
+@export var heart_runner_unlock_time := 20.0
+@export var heart_runner_roll_interval_min := 8.0
+@export var heart_runner_roll_interval_max := 12.0
+@export var heart_runner_health_3_spawn_chance := 0.01
+@export var heart_runner_health_2_spawn_chance := 0.04
+@export var heart_runner_health_1_spawn_chance := 0.15
+@export var heart_runner_one_health_grace_duration := 90.0
+@export var heart_runner_speed := 140.0
+@export var heart_runner_spawn_safe_radius := 56.0
+@export var heart_runner_landed_spear_safe_radius := 24.0
+@export var heart_runner_post_resolution_cooldown := 18.0
+@export var heart_pickup_lifetime := 7.0
+@export var heart_pickup_warning_duration := 1.5
+>>>>>>> Stashed changes
 
 var score := 0
 var high_score := 0
@@ -88,6 +104,16 @@ var hit_stop_previous_time_scale := 1.0
 var rng := RandomNumberGenerator.new()
 var debug_intro_target_sequence: Array = []
 var debug_ambient_roll_sequence: Array = []
+<<<<<<< Updated upstream
+=======
+var debug_heart_runner_roll_sequence: Array = []
+var debug_heart_runner_interval_sequence: Array = []
+var heart_runner_next_eligible_time := 0.0
+var heart_runner_one_health_active_time := 0.0
+var heart_runner_one_health_grace_due := false
+var active_heart_runner: HeartRunner
+var active_heart_pickup: HeartPickup
+>>>>>>> Stashed changes
 
 @onready var arena: Arena = $Arena
 @onready var player: Player = $Player
@@ -190,6 +216,12 @@ func _reset_runtime_state() -> void:
 	spear.reset_for_new_run(player, play_rect)
 	spawn_timer.wait_time = base_spawn_interval
 	spawn_timer.start()
+<<<<<<< Updated upstream
+=======
+	heart_runner_next_eligible_time = 0.0
+	_reset_heart_runner_one_health_grace()
+	_start_opportunity_timer()
+>>>>>>> Stashed changes
 	destination_marker.clear_marker()
 	_stop_gameplay_sfx()
 
@@ -202,6 +234,7 @@ func _reset_runtime_state() -> void:
 func _process(delta: float) -> void:
 	if run_state == RunState.RUNNING:
 		survival_time += delta
+		_update_heart_runner_one_health_grace(delta)
 		hud.set_survival_time(survival_time)
 		encounter_director.advance(delta, survival_time)
 
@@ -353,6 +386,223 @@ func _debug_spawn_boomer_enemy() -> void:
 		print("DEBUG: Boomer enemy spawn failed; cap or safe spawn search blocked it.")
 
 
+<<<<<<< Updated upstream
+=======
+func _debug_spawn_heart_runner() -> void:
+	var spawned := _try_spawn_heart_runner(true)
+	if spawned:
+		print("DEBUG: spawned Heart Runner with key 4.")
+	else:
+		print("DEBUG: Heart Runner spawn failed; an active Runner/pickup or safe entry search blocked it.")
+
+
+func _on_opportunity_timer_timeout() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_run_heart_runner_opportunity_check()
+
+
+func _run_heart_runner_opportunity_check() -> void:
+	if not _is_heart_runner_opportunity_eligible_for_roll():
+		_start_opportunity_timer()
+		return
+
+	if _is_heart_runner_one_health_grace_ready_for_forced_spawn():
+		_try_spawn_heart_runner(false)
+		_start_opportunity_timer()
+		return
+
+	var spawn_chance := _get_current_heart_runner_spawn_chance()
+	if spawn_chance > 0.0 and _get_heart_runner_roll() < spawn_chance:
+		_try_spawn_heart_runner(false)
+
+	_start_opportunity_timer()
+
+
+func _is_heart_runner_opportunity_eligible_for_roll() -> bool:
+	if run_state != RunState.RUNNING:
+		return false
+	if player == null or not player.is_alive():
+		return false
+	if active_heart_runner != null or active_heart_pickup != null:
+		return false
+	if survival_time < heart_runner_unlock_time:
+		return false
+	if survival_time < heart_runner_next_eligible_time:
+		return false
+	return true
+
+
+func _start_opportunity_timer() -> void:
+	if opportunity_timer == null:
+		return
+
+	opportunity_timer.wait_time = _get_next_heart_runner_roll_interval()
+	opportunity_timer.start()
+
+
+func _get_next_heart_runner_roll_interval() -> float:
+	if not debug_heart_runner_interval_sequence.is_empty():
+		return maxf(float(debug_heart_runner_interval_sequence.pop_front()), 0.01)
+
+	return rng.randf_range(heart_runner_roll_interval_min, heart_runner_roll_interval_max)
+
+
+func _get_heart_runner_roll() -> float:
+	if not debug_heart_runner_roll_sequence.is_empty():
+		return float(debug_heart_runner_roll_sequence.pop_front())
+
+	return rng.randf()
+
+
+func _get_current_heart_runner_spawn_chance() -> float:
+	if player == null:
+		return 0.0
+
+	match player.health:
+		4:
+			return 0.0
+		3:
+			return heart_runner_health_3_spawn_chance
+		2:
+			return heart_runner_health_2_spawn_chance
+		1:
+			return heart_runner_health_1_spawn_chance
+
+	return 0.0
+
+
+func _update_heart_runner_one_health_grace(delta: float) -> void:
+	if player == null or not player.is_alive() or player.health != 1:
+		_reset_heart_runner_one_health_grace()
+		return
+	if heart_runner_one_health_grace_due:
+		return
+
+	heart_runner_one_health_active_time = minf(
+		heart_runner_one_health_active_time + delta,
+		heart_runner_one_health_grace_duration
+	)
+	if heart_runner_one_health_active_time >= heart_runner_one_health_grace_duration:
+		heart_runner_one_health_grace_due = true
+
+
+func _is_heart_runner_one_health_grace_ready_for_forced_spawn() -> bool:
+	return (
+		heart_runner_one_health_grace_due
+		and player != null
+		and player.is_alive()
+		and player.health == 1
+	)
+
+
+func _consume_heart_runner_one_health_grace_after_organic_spawn() -> void:
+	heart_runner_one_health_active_time = 0.0
+	heart_runner_one_health_grace_due = false
+
+
+func _reset_heart_runner_one_health_grace() -> void:
+	heart_runner_one_health_active_time = 0.0
+	heart_runner_one_health_grace_due = false
+
+
+func _try_spawn_heart_runner(is_debug_spawn: bool) -> bool:
+	if active_heart_runner != null or active_heart_pickup != null:
+		return false
+	if player == null or not player.is_alive():
+		return false
+	if not is_debug_spawn and survival_time < heart_runner_unlock_time:
+		return false
+
+	var spawn_setup := _find_heart_runner_spawn_setup()
+	if not spawn_setup.get("valid", false):
+		return false
+
+	var heart_runner := HeartRunnerScene.instantiate() as HeartRunner
+	if heart_runner == null:
+		return false
+
+	var play_rect := arena.get_play_rect()
+	opportunity_container.add_child(heart_runner)
+	heart_runner.setup(
+		play_rect,
+		spawn_setup["entry_position"],
+		int(spawn_setup["spawn_edge"]),
+		heart_runner_speed,
+		player,
+		spear,
+		is_debug_spawn,
+		rng.randi()
+	)
+	heart_runner.defeated.connect(_on_heart_runner_defeated)
+	heart_runner.escaped.connect(_on_heart_runner_escaped)
+	heart_runner.startled_started.connect(_on_heart_runner_startled)
+	heart_runner.tree_exited.connect(_on_heart_runner_tree_exited.bind(heart_runner))
+	active_heart_runner = heart_runner
+	if not is_debug_spawn and player != null and player.health == 1:
+		_consume_heart_runner_one_health_grace_after_organic_spawn()
+	_play_sfx(heart_runner_appear_player)
+	return true
+
+
+func _find_heart_runner_spawn_setup() -> Dictionary:
+	var shuffled_edges := [
+		Arena.SpawnEdge.TOP,
+		Arena.SpawnEdge.BOTTOM,
+		Arena.SpawnEdge.LEFT,
+		Arena.SpawnEdge.RIGHT,
+	]
+	shuffled_edges.shuffle()
+
+	for spawn_edge in shuffled_edges:
+		var entry_position := _find_safe_heart_runner_entry_position(spawn_edge)
+		if not entry_position.is_finite():
+			continue
+
+		return {
+			"valid": true,
+			"entry_position": entry_position,
+			"spawn_edge": spawn_edge,
+		}
+
+	return {
+		"valid": false,
+	}
+
+
+func _find_safe_heart_runner_entry_position(spawn_edge: int) -> Vector2:
+	var avoid_positions: Array[Vector2] = [player.global_position]
+	var avoid_radii: Array[float] = [heart_runner_spawn_safe_radius]
+	if spear.is_landed():
+		avoid_positions.append(spear.global_position)
+		avoid_radii.append(heart_runner_landed_spear_safe_radius)
+
+	return arena.find_safe_spawn_position(spawn_edge, avoid_positions, avoid_radii)
+
+
+func _spawn_heart_pickup(spawn_position: Vector2, spawned_by_debug: bool) -> bool:
+	if active_heart_pickup != null:
+		return false
+
+	var heart_pickup := HeartPickupScene.instantiate() as HeartPickup
+	if heart_pickup == null:
+		return false
+
+	opportunity_container.add_child(heart_pickup)
+	heart_pickup.lifetime = heart_pickup_lifetime
+	heart_pickup.warning_duration = heart_pickup_warning_duration
+	heart_pickup.setup(player, arena.get_play_rect(), spawn_position)
+	heart_pickup.collected.connect(_on_heart_pickup_collected.bind(spawned_by_debug))
+	heart_pickup.expired.connect(_on_heart_pickup_expired.bind(spawned_by_debug))
+	heart_pickup.warning_started.connect(_on_heart_pickup_warning_started)
+	heart_pickup.tree_exited.connect(_on_heart_pickup_tree_exited.bind(heart_pickup))
+	active_heart_pickup = heart_pickup
+	_play_sfx(heart_pickup_spawn_player)
+	return true
+
+
+>>>>>>> Stashed changes
 func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
 	var avoid_positions: Array[Vector2] = [player.global_position]
 	var avoid_radii: Array[float] = [spawn_safe_radius]
@@ -710,6 +960,31 @@ func debug_set_ambient_roll_sequence(new_ambient_roll_sequence: Array) -> void:
 	debug_ambient_roll_sequence = new_ambient_roll_sequence.duplicate()
 
 
+<<<<<<< Updated upstream
+=======
+func debug_set_heart_runner_roll_sequence(new_roll_sequence: Array) -> void:
+	debug_heart_runner_roll_sequence = new_roll_sequence.duplicate()
+
+
+func debug_set_heart_runner_interval_sequence(new_interval_sequence: Array) -> void:
+	debug_heart_runner_interval_sequence = new_interval_sequence.duplicate()
+
+
+func debug_set_heart_runner_one_health_grace_state(
+	new_active_time: float,
+	is_due: bool = false
+) -> void:
+	heart_runner_one_health_active_time = clampf(
+		new_active_time,
+		0.0,
+		heart_runner_one_health_grace_duration
+	)
+	heart_runner_one_health_grace_due = is_due or (
+		heart_runner_one_health_active_time >= heart_runner_one_health_grace_duration
+	)
+
+
+>>>>>>> Stashed changes
 func _on_spawn_timer_timeout() -> void:
 	if run_state != RunState.RUNNING:
 		return
@@ -752,6 +1027,69 @@ func _on_enemy_tree_exited(enemy_id: int, run_generation: int) -> void:
 	encounter_director.notify_enemy_removed(enemy_id, run_generation)
 
 
+<<<<<<< Updated upstream
+=======
+func _on_heart_runner_defeated(
+	defeat_position: Vector2,
+	score_value: int,
+	spawned_by_debug: bool
+) -> void:
+	active_heart_runner = null
+	score += score_value
+	hud.set_score(score)
+	_spawn_heart_pickup(defeat_position, spawned_by_debug)
+
+
+func _on_heart_runner_escaped(spawned_by_debug: bool) -> void:
+	active_heart_runner = null
+	if not spawned_by_debug:
+		_start_heart_runner_resolution_cooldown()
+
+
+func _on_heart_runner_startled() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(heart_runner_alarm_player)
+
+
+func _on_heart_runner_tree_exited(heart_runner: HeartRunner) -> void:
+	if active_heart_runner == heart_runner:
+		active_heart_runner = null
+
+
+func _on_heart_pickup_collected(spawned_by_debug: bool) -> void:
+	active_heart_pickup = null
+	_play_sfx(heart_pickup_collect_player)
+	if player != null and player.health != 1:
+		_reset_heart_runner_one_health_grace()
+	if not spawned_by_debug:
+		_start_heart_runner_resolution_cooldown()
+
+
+func _on_heart_pickup_expired(spawned_by_debug: bool) -> void:
+	active_heart_pickup = null
+	if not spawned_by_debug:
+		_start_heart_runner_resolution_cooldown()
+
+
+func _on_heart_pickup_warning_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(heart_pickup_expire_player)
+
+
+func _on_heart_pickup_tree_exited(heart_pickup: HeartPickup) -> void:
+	if active_heart_pickup == heart_pickup:
+		active_heart_pickup = null
+
+
+func _start_heart_runner_resolution_cooldown() -> void:
+	heart_runner_next_eligible_time = survival_time + heart_runner_post_resolution_cooldown
+
+
+>>>>>>> Stashed changes
 func _on_player_damaged(_new_health: int) -> void:
 	_play_sfx(player_hurt_player)
 	_start_screen_shake(damage_shake_duration, damage_shake_strength)
@@ -762,6 +1100,7 @@ func _on_player_died() -> void:
 		return
 
 	_cancel_hit_stop()
+	_reset_heart_runner_one_health_grace()
 	run_state = RunState.GAME_OVER
 	spawn_timer.stop()
 	encounter_director.stop_for_game_over()

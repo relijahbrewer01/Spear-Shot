@@ -67,6 +67,7 @@ def main() -> int:
     pickup_scene = read_text("HeartPickup.tscn")
     generator = read_text("tools/generate_sfx.py")
     asset_generator = read_text("tools/generate_phase4_assets.py")
+    spawn_analysis = read_text("tools/heart_runner_spawn_analysis.py")
     runner_import = read_text("art/sprites/heart_runner.png.import")
     runner_sheet_import = read_text("art/sprites/heart_runner_sheet.png.import")
     pickup_import = read_text("art/sprites/heart_pickup.png.import")
@@ -107,6 +108,7 @@ def main() -> int:
         "audio/heart_pickup_collect.wav.import",
         "audio/heart_pickup_expire.wav",
         "audio/heart_pickup_expire.wav.import",
+        "tools/heart_runner_spawn_analysis.py",
     ]:
         require((ROOT / relative_path).exists(), f"{relative_path} exists", failures)
 
@@ -206,12 +208,23 @@ def main() -> int:
     require("DEBUG_HEART_RUNNER_SPAWN_ENABLED := true" in main_script and "KEY_4" in main_script and "_debug_spawn_heart_runner" in main_script, "Heart Runner debug spawn uses key 4", failures)
     require("heart_runner_unlock_time := 20.0" in main_script, "Heart Runner unlock time is configured in Main", failures)
     require("heart_runner_roll_interval_min := 8.0" in main_script and "heart_runner_roll_interval_max := 12.0" in main_script, "Heart Runner roll interval is configured in Main", failures)
-    require("heart_runner_health_3_spawn_chance := 0.01" in main_script and "heart_runner_health_2_spawn_chance := 0.04" in main_script and "heart_runner_health_1_spawn_chance := 0.10" in main_script, "Heart Runner health-based spawn chances match the approved values", failures)
-    require("heart_runner_post_resolution_cooldown := 18.0" in main_script and "heart_pickup_lifetime := 7.0" in main_script and "heart_pickup_warning_duration := 1.5" in main_script, "Heart Runner cooldown and pickup timing live in Main", failures)
+    require("heart_runner_health_3_spawn_chance := 0.01" in main_script and "heart_runner_health_2_spawn_chance := 0.04" in main_script and "heart_runner_health_1_spawn_chance := 0.15" in main_script, "Heart Runner health-based spawn chances match the approved live values", failures)
+    require("heart_runner_one_health_grace_duration := 90.0" in main_script and "heart_runner_post_resolution_cooldown := 18.0" in main_script and "heart_pickup_lifetime := 7.0" in main_script and "heart_pickup_warning_duration := 1.5" in main_script, "Heart Runner cooldown, pickup timing, and one-health grace duration live in Main", failures)
     require("active_heart_runner: HeartRunner" in main_script and "active_heart_pickup: HeartPickup" in main_script, "Main tracks one active Heart Runner and one active Heart Pickup", failures)
     require("if active_heart_runner != null or active_heart_pickup != null:" in main_script, "Heart Runner and pickup share a strict one-active opportunity limit", failures)
     require("_find_safe_heart_runner_entry_position" in main_script and '"valid": false' in main_script, "Heart Runner entry search defers instead of using an unsafe fallback", failures)
     require("debug_set_heart_runner_roll_sequence" in main_script and "debug_set_heart_runner_interval_sequence" in main_script, "Heart Runner opportunity rolls have deterministic audit hooks", failures)
+    require("debug_set_heart_runner_one_health_grace_state" in main_script and "_update_heart_runner_one_health_grace" in main_script and "_is_heart_runner_one_health_grace_ready_for_forced_spawn" in main_script, "Heart Runner one-health grace uses explicit readable live state and audit hooks", failures)
+    require("_consume_heart_runner_one_health_grace_after_organic_spawn" in main_script and "_reset_heart_runner_one_health_grace" in main_script, "Heart Runner one-health grace resets only through explicit organic-spawn and state-reset seams", failures)
+    require(
+        "DEFAULT_TRIALS = 100_000" in spawn_analysis
+        and "DEFAULT_SEED = 424_242" in spawn_analysis
+        and "Candidate A - previous live baseline" in spawn_analysis
+        and "Candidate D - approved live configuration" in spawn_analysis
+        and "build_live_opportunity_config" in spawn_analysis,
+        "Heart Runner deterministic spawn analysis is reproducible with fixed seeds and marks the approved live candidate explicitly",
+        failures,
+    )
     require("OpportunityContainer" in main_scene and "OpportunityTimer" in main_scene, "Main scene contains dedicated opportunity nodes", failures)
     require("HeartRunnerAppearPlayer" in main_scene and "HeartRunnerAlarmPlayer" in main_scene and "HeartPickupSpawnPlayer" in main_scene and "HeartPickupCollectPlayer" in main_scene and "HeartPickupExpirePlayer" in main_scene, "Main scene contains Heart Runner audio players", failures)
     require('path="res://audio/heart_runner_appear.wav"' in main_scene and 'path="res://audio/heart_runner_alarm.wav"' in main_scene and 'path="res://audio/heart_pickup_spawn.wav"' in main_scene and 'path="res://audio/heart_pickup_collect.wav"' in main_scene and 'path="res://audio/heart_pickup_expire.wav"' in main_scene, "Heart Runner and pickup streams are assigned explicitly in Main", failures)
@@ -273,6 +286,12 @@ def main() -> int:
     require("Heart Runner" in readme and "Heart Runner" in tuning and "Heart Runner" in roadmap, "README, TUNING, and ROADMAP all document Heart Runner", failures)
     require("debug-spawns one Heart Runner" in readme, "README documents the key 4 debug spawn", failures)
     require("future heart runner" not in roadmap.lower(), "ROADMAP no longer describes Heart Runner as deferred future work", failures)
+    require("originally assigned opposite-edge exit plane" not in readme and "originally assigned opposite-edge exit plane" not in roadmap and "originally assigned opposite-edge exit plane" not in tuning, "Heart Runner docs no longer describe a permanently assigned opposite-edge cleanup route", failures)
+    require("crosses the arena from one safe edge to the opposite side" not in readme, "README no longer claims the Heart Runner always crosses directly to the opposite side", failures)
+    require("currently locked route's assigned exit plane" in readme and "currently locked casual or panic route" in roadmap and "Approved panic flee speed." in tuning, "Heart Runner docs match the final locked-route cleanup and panic-speed wording", failures)
+    require("15%" in readme and "90s" in readme and "guarantees an opportunity, not automatic healing" in readme, "README documents the approved one-health chance and grace behavior", failures)
+    require("healing above one resets it" in readme.lower() and "debug spawning does not affect organic grace" in readme.lower(), "README documents the one-health grace reset and debug-isolation rules", failures)
+    require("heart_runner_one_health_grace_duration" in tuning and "`heart_runner_health_1_spawn_chance` | `0.15`" in tuning and "`heart_runner_one_health_grace_duration` | `90.0s`" in tuning, "TUNING documents the approved live one-health chance and grace duration", failures)
 
     audit_wav("audio/heart_runner_appear.wav", 0.12, 0.18, failures)
     audit_wav("audio/heart_runner_alarm.wav", 0.10, 0.14, failures)

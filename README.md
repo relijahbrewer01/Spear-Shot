@@ -100,6 +100,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/boomer_fuse.wav`: local three-pulse fuse escalation cue for the Boomer
 - `audio/boomer_explosion.wav`: local physical blast cue for the Boomer
 - `audio/heart_runner_appear.wav`: local skittering arrival cue for the Heart Runner
+- `audio/heart_runner_alarm.wav`: local startled alarm cue for the Heart Runner's panic trigger
 - `audio/heart_pickup_spawn.wav`: local reward-pop cue for a spawned heart pickup
 - `audio/heart_pickup_collect.wav`: local recovery cue for collecting the heart pickup
 - `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
@@ -123,7 +124,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
-- `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile edge-to-edge opportunity runner with explicit spear-hit handling, visible calm entry, state-driven live animation, authored displacement support, and original-exit-plane cleanup
+- `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile opportunity runner with visible calm entry, limited wandering, proximity-triggered panic, locked casual-or-panic exit routing, explicit spear-hit handling, authored displacement support, and currently locked route exit-plane cleanup
 - `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
 - `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
@@ -174,6 +175,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 ## Opportunity behavior
 
 - Heart Runner: separate from the hostile population system, unlocks around `20` seconds, rolls on its own `8-12` second opportunity timer, and becomes more likely at lower player health
+- At `1 HP`, the organic Heart Runner chance is now `15%`, and `90s` of continuous active one-health gameplay guarantees one later valid opportunity check if ordinary rolls never succeed
 - It makes a visible calm entry, wanders for up to `8.0` seconds at `70px/s`, and then chooses a calm timeout exit if it never panics
 - Akedra only threatens it while holding the spear inside the derived `134px` startle radius (`150px` max throw range minus a `16px` margin)
 - Picking up the spear outside that radius keeps the Runner calm until either Akedra, the Runner, or a Boomer displacement carries it inside range; throwing the spear first clears that pending threat
@@ -181,6 +183,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - It crosses the arena from one safe edge to the opposite side, cleans up only when it crosses its originally assigned exit plane, and does not despawn just because a Boomer shockwave pushes it into another boundary
 - A valid thrown-spear hit defeats it for `1` point without stopping spear flight
 - Defeating it spawns one temporary heart pickup clamped inside the playable arena, healing Akedra by `1` up to a temporary `4` health maximum
+- The one-health grace guarantees an opportunity, not automatic healing: it pauses with gameplay, healing above one resets it, any successful organic one-health Runner spawn also resets the interval, and an active Runner, active pickup, the normal cooldown, or safe-entry failure can still defer a due guarantee
+- Debug spawning does not affect organic grace time, due-state, cooldown, or later eligibility
 - Only one Heart Runner or heart pickup may exist at a time, and the whole opportunity system stays outside hostile caps, wave thresholds, and encounter pressure bookkeeping
 
 ## Encounter director
@@ -316,6 +320,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `heart_runner_health_3_spawn_chance`
   - `heart_runner_health_2_spawn_chance`
   - `heart_runner_health_1_spawn_chance`
+  - `heart_runner_one_health_grace_duration`
   - `heart_runner_speed`
   - `heart_runner_spawn_safe_radius`
   - `heart_runner_landed_spear_safe_radius`

@@ -73,7 +73,8 @@ enum SpawnSource {
 @export var heart_runner_roll_interval_max := 12.0
 @export var heart_runner_health_3_spawn_chance := 0.01
 @export var heart_runner_health_2_spawn_chance := 0.04
-@export var heart_runner_health_1_spawn_chance := 0.10
+@export var heart_runner_health_1_spawn_chance := 0.15
+@export var heart_runner_one_health_grace_duration := 90.0
 @export var heart_runner_speed := 140.0
 @export var heart_runner_spawn_safe_radius := 56.0
 @export var heart_runner_landed_spear_safe_radius := 24.0
@@ -106,6 +107,8 @@ var debug_ambient_roll_sequence: Array = []
 var debug_heart_runner_roll_sequence: Array = []
 var debug_heart_runner_interval_sequence: Array = []
 var heart_runner_next_eligible_time := 0.0
+var heart_runner_one_health_active_time := 0.0
+var heart_runner_one_health_grace_due := false
 var active_heart_runner: HeartRunner
 var active_heart_pickup: HeartPickup
 
@@ -220,6 +223,7 @@ func _reset_runtime_state() -> void:
 	spawn_timer.wait_time = base_spawn_interval
 	spawn_timer.start()
 	heart_runner_next_eligible_time = 0.0
+	_reset_heart_runner_one_health_grace()
 	_start_opportunity_timer()
 	destination_marker.clear_marker()
 	_stop_gameplay_sfx()
@@ -233,6 +237,7 @@ func _reset_runtime_state() -> void:
 func _process(delta: float) -> void:
 	if run_state == RunState.RUNNING:
 		survival_time += delta
+		_update_heart_runner_one_health_grace(delta)
 		hud.set_survival_time(survival_time)
 		encounter_director.advance(delta, survival_time)
 
@@ -407,6 +412,11 @@ func _run_heart_runner_opportunity_check() -> void:
 		_start_opportunity_timer()
 		return
 
+	if _is_heart_runner_one_health_grace_ready_for_forced_spawn():
+		_try_spawn_heart_runner(false)
+		_start_opportunity_timer()
+		return
+
 	var spawn_chance := _get_current_heart_runner_spawn_chance()
 	if spawn_chance > 0.0 and _get_heart_runner_roll() < spawn_chance:
 		_try_spawn_heart_runner(false)
@@ -467,6 +477,40 @@ func _get_current_heart_runner_spawn_chance() -> float:
 	return 0.0
 
 
+func _update_heart_runner_one_health_grace(delta: float) -> void:
+	if player == null or not player.is_alive() or player.health != 1:
+		_reset_heart_runner_one_health_grace()
+		return
+	if heart_runner_one_health_grace_due:
+		return
+
+	heart_runner_one_health_active_time = minf(
+		heart_runner_one_health_active_time + delta,
+		heart_runner_one_health_grace_duration
+	)
+	if heart_runner_one_health_active_time >= heart_runner_one_health_grace_duration:
+		heart_runner_one_health_grace_due = true
+
+
+func _is_heart_runner_one_health_grace_ready_for_forced_spawn() -> bool:
+	return (
+		heart_runner_one_health_grace_due
+		and player != null
+		and player.is_alive()
+		and player.health == 1
+	)
+
+
+func _consume_heart_runner_one_health_grace_after_organic_spawn() -> void:
+	heart_runner_one_health_active_time = 0.0
+	heart_runner_one_health_grace_due = false
+
+
+func _reset_heart_runner_one_health_grace() -> void:
+	heart_runner_one_health_active_time = 0.0
+	heart_runner_one_health_grace_due = false
+
+
 func _try_spawn_heart_runner(is_debug_spawn: bool) -> bool:
 	if active_heart_runner != null or active_heart_pickup != null:
 		return false
@@ -500,6 +544,8 @@ func _try_spawn_heart_runner(is_debug_spawn: bool) -> bool:
 	heart_runner.startled_started.connect(_on_heart_runner_startled)
 	heart_runner.tree_exited.connect(_on_heart_runner_tree_exited.bind(heart_runner))
 	active_heart_runner = heart_runner
+	if not is_debug_spawn and player != null and player.health == 1:
+		_consume_heart_runner_one_health_grace_after_organic_spawn()
 	_play_sfx(heart_runner_appear_player)
 	return true
 
@@ -925,6 +971,20 @@ func debug_set_heart_runner_interval_sequence(new_interval_sequence: Array) -> v
 	debug_heart_runner_interval_sequence = new_interval_sequence.duplicate()
 
 
+func debug_set_heart_runner_one_health_grace_state(
+	new_active_time: float,
+	is_due: bool = false
+) -> void:
+	heart_runner_one_health_active_time = clampf(
+		new_active_time,
+		0.0,
+		heart_runner_one_health_grace_duration
+	)
+	heart_runner_one_health_grace_due = is_due or (
+		heart_runner_one_health_active_time >= heart_runner_one_health_grace_duration
+	)
+
+
 func _on_spawn_timer_timeout() -> void:
 	if run_state != RunState.RUNNING:
 		return
@@ -999,6 +1059,8 @@ func _on_heart_runner_tree_exited(heart_runner: HeartRunner) -> void:
 func _on_heart_pickup_collected(spawned_by_debug: bool) -> void:
 	active_heart_pickup = null
 	_play_sfx(heart_pickup_collect_player)
+	if player != null and player.health != 1:
+		_reset_heart_runner_one_health_grace()
 	if not spawned_by_debug:
 		_start_heart_runner_resolution_cooldown()
 
@@ -1035,6 +1097,7 @@ func _on_player_died() -> void:
 		return
 
 	_cancel_hit_stop()
+	_reset_heart_runner_one_health_grace()
 	run_state = RunState.GAME_OVER
 	spawn_timer.stop()
 	opportunity_timer.stop()

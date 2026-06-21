@@ -16,6 +16,9 @@ func _ready() -> void:
 
 
 func _run_audit() -> void:
+	await _audit_opportunity_timer_lifecycle()
+	await _audit_one_health_grace_accumulation_and_reset()
+	await _audit_one_health_grace_fulfillment_and_deferral()
 	await _audit_spawn_rules_and_debug_behavior()
 	await _audit_entry_and_calm_wander_behavior()
 	await _audit_spear_held_reactions()
@@ -29,6 +32,312 @@ func _run_audit() -> void:
 	print("Heart Runner runtime audit passed." if failures.is_empty() else "Heart Runner runtime audit failed.")
 	get_tree().paused = false
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+func _audit_opportunity_timer_lifecycle() -> void:
+	var main := MainScene.instantiate()
+	add_child(main)
+	await get_tree().process_frame
+
+	var spawn_timer := main.get_node("SpawnTimer") as Timer
+	var opportunity_timer := main.get_node("OpportunityTimer") as Timer
+	var player := main.get_node("Player") as Player
+
+	spawn_timer.stop()
+	player.health = 1
+	main.set("survival_time", 25.0)
+	main.set("heart_runner_next_eligible_time", 0.0)
+	main.call("_clear_opportunities")
+	main.call("debug_set_heart_runner_roll_sequence", [0.99, 0.99, 0.0])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05, 0.05, 0.05])
+	opportunity_timer.stop()
+	main.call("_start_opportunity_timer")
+	_require(
+		not opportunity_timer.is_stopped()
+		and is_equal_approx(opportunity_timer.wait_time, 0.05),
+		"Heart Runner opportunity timer starts correctly with a fresh independent interval."
+	)
+	var spawned_after_retries := await _advance_until(
+		func() -> bool:
+			return main.get("active_heart_runner") != null,
+		0.35
+	)
+	_require(
+		spawned_after_retries,
+		"Heart Runner opportunity checks continue while the run is active until a later eligible roll succeeds."
+	)
+
+	main.call("_clear_opportunities")
+	main.set("survival_time", 25.0)
+	main.set("heart_runner_next_eligible_time", 0.0)
+	main.call("debug_set_heart_runner_roll_sequence", [0.0])
+	main.call("debug_set_heart_runner_interval_sequence", [0.15, 0.05])
+	opportunity_timer.stop()
+	main.call("_start_opportunity_timer")
+	var timer_left_before_pause := opportunity_timer.time_left
+	main.call("_set_pause_state", true)
+	await get_tree().create_timer(0.18, true, false, true).timeout
+	_require(
+		absf(opportunity_timer.time_left - timer_left_before_pause) <= 0.03,
+		"Pause freezes the Heart Runner opportunity timer."
+	)
+	main.call("_start_resume_countdown")
+	await get_tree().create_timer(0.18, true, false, true).timeout
+	_require(
+		absf(opportunity_timer.time_left - timer_left_before_pause) <= 0.03,
+		"Resume countdown keeps the Heart Runner opportunity timer frozen until gameplay resumes."
+	)
+	main.call("_on_resume_countdown_finished")
+	var spawned_after_resume := await _advance_until(
+		func() -> bool:
+			return main.get("active_heart_runner") != null,
+		0.30
+	)
+	_require(
+		spawned_after_resume,
+		"Heart Runner opportunity timing resumes correctly after countdown completion."
+	)
+
+	main.call("_clear_opportunities")
+	main.set("survival_time", 25.0)
+	main.set("heart_runner_next_eligible_time", 42.0)
+	main.call("debug_set_heart_runner_roll_sequence", [0.0])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	opportunity_timer.stop()
+	main.call("_start_opportunity_timer")
+	main.call("_on_player_died")
+	await get_tree().process_frame
+	_require(
+		opportunity_timer.is_stopped(),
+		"Game over stops the Heart Runner opportunity timer."
+	)
+	main.call("_restart_run")
+	await get_tree().process_frame
+	spawn_timer.stop()
+	_require(
+		is_equal_approx(float(main.get("heart_runner_next_eligible_time")), 0.0),
+		"Restart resets Heart Runner cooldown timing to zero."
+	)
+	_require(
+		not opportunity_timer.is_stopped(),
+		"Restart starts a fresh Heart Runner opportunity timer for the new run."
+	)
+
+	await _free_audit_main(main)
+
+
+func _audit_one_health_grace_accumulation_and_reset() -> void:
+	var main := await _spawn_live_main_for_audit()
+	var spawn_timer := main.get_node("SpawnTimer") as Timer
+	var opportunity_timer := main.get_node("OpportunityTimer") as Timer
+	var player := main.get_node("Player") as Player
+
+	spawn_timer.stop()
+	opportunity_timer.stop()
+	player.health = 1
+	main.call("debug_set_heart_runner_one_health_grace_state", 89.92, false)
+	await _advance_physics(0.16)
+	_require(
+		bool(main.get("heart_runner_one_health_grace_due"))
+		and float(main.get("heart_runner_one_health_active_time")) >= float(main.get("heart_runner_one_health_grace_duration")),
+		"Heart Runner one-health grace becomes due after 90 seconds of eligible active gameplay."
+	)
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 45.0, false)
+	var grace_before_pause := float(main.get("heart_runner_one_health_active_time"))
+	main.call("_set_pause_state", true)
+	await get_tree().create_timer(0.18, true, false, true).timeout
+	_require(
+		is_equal_approx(float(main.get("heart_runner_one_health_active_time")), grace_before_pause)
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"Pause freezes Heart Runner one-health grace accumulation."
+	)
+	main.call("_start_resume_countdown")
+	await get_tree().create_timer(0.18, true, false, true).timeout
+	_require(
+		is_equal_approx(float(main.get("heart_runner_one_health_active_time")), grace_before_pause)
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"Resume countdown also freezes Heart Runner one-health grace accumulation."
+	)
+	main.call("_on_resume_countdown_finished")
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 60.0, true)
+	player.health = 2
+	await get_tree().physics_frame
+	_require(
+		is_zero_approx(float(main.get("heart_runner_one_health_active_time")))
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"Healing above one resets both accumulated and due Heart Runner grace state."
+	)
+	player.health = 1
+	await _advance_physics(0.08)
+	_require(
+		float(main.get("heart_runner_one_health_active_time")) > 0.0
+		and float(main.get("heart_runner_one_health_active_time")) < 1.0
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"Returning later to one health restarts Heart Runner grace accumulation from zero."
+	)
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	main.call("_restart_run")
+	await get_tree().process_frame
+	spawn_timer.stop()
+	opportunity_timer.stop()
+	_require(
+		is_zero_approx(float(main.get("heart_runner_one_health_active_time")))
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"Restart resets Heart Runner grace accumulation and due state."
+	)
+
+	player = main.get_node("Player") as Player
+	player.health = 1
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	main.call("_on_player_died")
+	await get_tree().process_frame
+	_require(
+		is_zero_approx(float(main.get("heart_runner_one_health_active_time")))
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"Game over resets Heart Runner grace accumulation and due state."
+	)
+
+	await _free_audit_main(main)
+
+
+func _audit_one_health_grace_fulfillment_and_deferral() -> void:
+	var main := await _spawn_live_main_for_audit()
+	var spawn_timer := main.get_node("SpawnTimer") as Timer
+	var opportunity_timer := main.get_node("OpportunityTimer") as Timer
+	var player := main.get_node("Player") as Player
+
+	spawn_timer.stop()
+	opportunity_timer.stop()
+	player.health = 1
+	main.set("survival_time", 25.0)
+	main.set("heart_runner_next_eligible_time", 0.0)
+	main.call("_clear_opportunities")
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 42.0, false)
+	main.call("debug_set_heart_runner_roll_sequence", [0.99])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		is_equal_approx(float(main.get("heart_runner_one_health_active_time")), 42.0)
+		and not bool(main.get("heart_runner_one_health_grace_due"))
+		and main.get("active_heart_runner") == null,
+		"Failed ordinary one-health rolls do not reset Heart Runner grace state."
+	)
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	main.set("survival_time", 19.5)
+	main.call("debug_set_heart_runner_roll_sequence", [0.99])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") == null and bool(main.get("heart_runner_one_health_grace_due")),
+		"Due Heart Runner grace cannot spawn before the 20-second unlock."
+	)
+
+	main.set("survival_time", 25.0)
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	var debug_spawned_runner := bool(main.call("_try_spawn_heart_runner", true))
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		debug_spawned_runner
+		and main.get("active_heart_runner") != null
+		and bool(main.get("heart_runner_one_health_grace_due")),
+		"An active Heart Runner delays a due grace opportunity without consuming it."
+	)
+	main.call("_clear_opportunities")
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	_require(
+		bool(main.call("_spawn_heart_pickup", TEST_ARENA.get_center(), true)),
+		"Debug pickup spawn is available for one-health grace deferral coverage."
+	)
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") == null
+		and main.get("active_heart_pickup") != null
+		and bool(main.get("heart_runner_one_health_grace_due")),
+		"An active heart pickup delays a due grace opportunity without consuming it."
+	)
+	main.call("_clear_opportunities")
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	main.set("heart_runner_next_eligible_time", 40.0)
+	main.set("survival_time", 25.0)
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") == null
+		and bool(main.get("heart_runner_one_health_grace_due"))
+		and is_equal_approx(float(main.get("heart_runner_next_eligible_time")), 40.0),
+		"Post-resolution cooldown delays a due grace opportunity without bypassing the normal gate."
+	)
+	main.set("heart_runner_next_eligible_time", 0.0)
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	main.set("heart_runner_spawn_safe_radius", 1000.0)
+	main.call("debug_set_heart_runner_roll_sequence", [0.99])
+	main.call("debug_set_heart_runner_interval_sequence", [8.5])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") == null
+		and bool(main.get("heart_runner_one_health_grace_due"))
+		and is_equal_approx(opportunity_timer.wait_time, 8.5),
+		"Safe-entry failure preserves a due Heart Runner grace opportunity for a later valid check."
+	)
+	main.set("heart_runner_spawn_safe_radius", 56.0)
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 90.0, true)
+	main.call("debug_set_heart_runner_roll_sequence", [0.99])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") != null
+		and is_zero_approx(float(main.get("heart_runner_one_health_active_time")))
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"A successful grace-forced Heart Runner spawn consumes grace exactly once."
+	)
+	main.call("_clear_opportunities")
+	main.call("debug_set_heart_runner_roll_sequence", [0.99])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") == null
+		and is_zero_approx(float(main.get("heart_runner_one_health_active_time")))
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"One completed grace interval cannot immediately produce a duplicate forced spawn."
+	)
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 42.0, false)
+	main.call("debug_set_heart_runner_roll_sequence", [0.0])
+	main.call("debug_set_heart_runner_interval_sequence", [0.05])
+	main.call("_run_heart_runner_opportunity_check")
+	_require(
+		main.get("active_heart_runner") != null
+		and is_zero_approx(float(main.get("heart_runner_one_health_active_time")))
+		and not bool(main.get("heart_runner_one_health_grace_due")),
+		"A successful ordinary one-health Heart Runner spawn also resets the grace interval."
+	)
+	main.call("_clear_opportunities")
+
+	main.call("debug_set_heart_runner_one_health_grace_state", 44.0, false)
+	var debug_grace_before := float(main.get("heart_runner_one_health_active_time"))
+	var debug_due_before := bool(main.get("heart_runner_one_health_grace_due"))
+	_require(
+		bool(main.call("_try_spawn_heart_runner", true)),
+		"Debug Heart Runner spawn remains available during one-health grace bookkeeping coverage."
+	)
+	_require(
+		is_equal_approx(float(main.get("heart_runner_one_health_active_time")), debug_grace_before)
+		and bool(main.get("heart_runner_one_health_grace_due")) == debug_due_before,
+		"Debug Heart Runner spawns leave all organic one-health grace state untouched."
+	)
+
+	await _free_audit_main(main)
 
 
 func _audit_spawn_rules_and_debug_behavior() -> void:
@@ -61,8 +370,8 @@ func _audit_spawn_rules_and_debug_behavior() -> void:
 	)
 	player.health = 1
 	_require(
-		is_equal_approx(float(main.call("_get_current_heart_runner_spawn_chance")), 0.10),
-		"Heart Runner chance is 0.10 at one health."
+		is_equal_approx(float(main.call("_get_current_heart_runner_spawn_chance")), 0.15),
+		"Heart Runner chance is 0.15 at one health."
 	)
 	player.health = 4
 	_require(
@@ -928,6 +1237,13 @@ func _spawn_main_for_audit() -> Node:
 	main.set_process(false)
 	(main.get_node("SpawnTimer") as Timer).stop()
 	(main.get_node("OpportunityTimer") as Timer).stop()
+	return main
+
+
+func _spawn_live_main_for_audit() -> Node:
+	var main := MainScene.instantiate()
+	add_child(main)
+	await get_tree().process_frame
 	return main
 
 

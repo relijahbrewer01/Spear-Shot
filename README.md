@@ -180,7 +180,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Akedra only threatens it while holding the spear inside the derived `134px` startle radius (`150px` max throw range minus a `16px` margin)
 - Picking up the spear outside that radius keeps the Runner calm until either Akedra, the Runner, or a Boomer displacement carries it inside range; throwing the spear first clears that pending threat
 - A valid proximity trigger plays one `0.40s` startled hop plus alarm cue, then locks into an irreversible `140px/s` panic sprint along a fair flee route away from Akedra
-- It crosses the arena from one safe edge to the opposite side, cleans up only when it crosses its originally assigned exit plane, and does not despawn just because a Boomer shockwave pushes it into another boundary
+- It enters visibly, then later locks either a calm exit route or a panic flee route; cleanup happens only after it crosses that currently locked route's assigned exit plane plus the cleanup margin, so Boomer displacement through another boundary does not count as escape
 - A valid thrown-spear hit defeats it for `1` point without stopping spear flight
 - Defeating it spawns one temporary heart pickup clamped inside the playable arena, healing Akedra by `1` up to a temporary `4` health maximum
 - The one-health grace guarantees an opportunity, not automatic healing: it pauses with gameplay, healing above one resets it, any successful organic one-health Runner spawn also resets the interval, and an active Runner, active pickup, the normal cooldown, or safe-entry failure can still defer a due guarantee

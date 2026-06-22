@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.6.0-alpha.4 - Heart Runner`
+Current milestone: `Spear Shot v0.6.0-alpha.4.1 - Input & Audio Polish`
 
 ## Game concept
 
@@ -28,7 +28,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `W`, `A`, `S`, `D`: move
 - Right mouse button: move to the clicked destination and show a brief trap-style ground marker
 - Mouse: aim
-- Left mouse button or `Q`: throw spear
+- Left mouse button or `Q`: throw spear; during a dodge, queue one throw toward the latest captured target for release when the roll ends
 - `Shift`: dodge toward aim, cancel prior movement intent, and require previously held movement keys to be released before they move again
 - `Spacebar`: dodge using movement direction first, then click-move direction, then aim fallback while preserving movement continuity
 - `Escape` or `P`: pause, or begin the faster `3 2 1` resume countdown
@@ -72,8 +72,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Shift` dodges toward aim, clears click-to-move, and suppresses only the WASD keys already held until each is released
 - `Spacebar` dodges along current movement and preserves held WASD or click-to-move continuity afterward
 - A new right-click issued during either active dodge is buffered, replaces any earlier buffered click, and begins moving Akedra on the first normal frame after the roll
+- One valid spear throw pressed during a dodge is buffered separately, keeps its latest captured mouse-world target, and releases exactly once through the normal spear path when `dodge_ended` fires
 - A tiny world-space exertion wisp beside Akedra shrinks with the real cooldown and gives one restrained glint when dodge becomes ready
-- A locally generated physical swoosh blends displaced air, cloth movement, body weight, and a small foot scuff once per valid dodge
+- Spear throw, dodge, and hurt feedback each use a three-clip non-repeating local variant pool driven by audio-only randomness that cannot perturb gameplay spawns or encounter rolls
+- The two calm background loops alternate deterministically between fresh runs: launch uses track 1, the first restart uses track 2, and later restarts continue alternating
 - The shared dodge cooldown starts when the dodge begins, not when it ends
 
 ## Asset generation
@@ -90,6 +92,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/heart_pickup.png`: temporary heart pickup sprite used after a Runner defeat
 - `art/sprites/spear_hunter.png`: spear sprite
 - `music/quiet_hunter_loop.wav`: original calm retro loop generated locally for the MVP
+- `music/quiet_hunter_loop_02.wav`: second related calm retro loop used on alternating runs
+- `audio/throw_alt_01.wav` and `audio/throw_alt_02.wav`: alternate nonverbal spear-release cues
+- `audio/dodge_alt_01.wav` and `audio/dodge_alt_02.wav`: alternate short dodge movement cues
+- `audio/player_hurt_alt_01.wav` and `audio/player_hurt_alt_02.wav`: alternate brief player impact reactions
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
 - `audio/shield_break.wav`: local physical crack/thud cue for Shielded shield break
 - `audio/blowgun_windup.wav`: local reed/breath cue for Blowgun Shooter aiming
@@ -106,11 +112,11 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
 - `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, and Heart Runner sprites, the live Heart Runner animation sheet, and the temporary local comparison outputs for the Phase 4 concept passes
-- `tools/generate_music.py`: synthesizes the background music loop locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
+- `tools/generate_music.py`: synthesizes both background loops locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
 
-- `Main.tscn` and `scripts/main.gd`: overall game flow, spawning, scoring, timer, restart, and screen shake
+- `Main.tscn` and `scripts/main.gd`: overall game flow, spawning, scoring, timer, dodge-only throw buffering, player-action SFX pools, run-cycling music, restart, and screen shake
 - Run restarts reset gameplay state in place so window size, position, and maximized state are preserved
 - `Arena.tscn` and `scripts/arena.gd`: arena visuals, play bounds, and enemy edge spawn positions
 - `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, upright facing, dodge readability visuals, and narrow authored forced movement with shove-specific temporary damage protection
@@ -150,6 +156,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/heart_runner_audit.py`: static Phase 4.4 opportunity-system, pickup, audio, and contract audit
 - `tools/HeartRunnerRuntimeAudit.tscn`: runtime audit for Heart Runner spawning, state-driven animation, cleanup, pickup, cooldown, and pause/restart behavior
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
+- `tools/PlayerThrowBufferRuntimeAudit.tscn`: runtime audit for captured dodge-throw targets, one-shot release, clear paths, pause, and forced-movement exclusion
+- `tools/InputAudioPolishRuntimeAudit.tscn`: runtime audit for non-repeating SFX selection, gameplay-RNG isolation, lifecycle cleanup, and deterministic music cycling
+- `tools/player_action_audio_audit.py`: static PCM, import, loudness, generator, and dedicated audio-RNG audit for the three player-action pools
+- `tools/music_cycling_audit.py`: static loop format, import, loudness, generation, fallback, and run-cycling audit
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
 ## Enemy behavior

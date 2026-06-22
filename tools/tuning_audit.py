@@ -44,6 +44,7 @@ def main() -> int:
         "## Heart Runner Opportunity",
         "## Dart Projectile",
         "## HUD And Feedback",
+        "## Input And Audio Polish",
         "## Common Tuning Requests",
     ]:
         require(section in tuning, f"TUNING.md includes {section}", failures)
@@ -114,6 +115,9 @@ def main() -> int:
         "DAMAGE_SOURCE_DART",
         "FORCED_MOVEMENT_PROTECTION_SHOVE",
         "try_start_forced_movement",
+        "Buffered spear throw",
+        "audio_rng",
+        "Music run cycle",
     ]:
         require(variable_name in tuning, f"TUNING.md documents {variable_name}", failures)
 
@@ -163,6 +167,9 @@ def main() -> int:
     require("Heart Runner" in readme and "Heart Runner" in roadmap, "Docs mention the implemented Heart Runner opportunity", failures)
     require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
     require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)
+    require("## Phase 4 Interlude 1 — Input & Audio Polish" in roadmap, "ROADMAP documents the bounded input/audio interlude", failures)
+    require("Phase 4.5" in roadmap and "does not replace" in roadmap, "ROADMAP keeps Phase 4.5 reserved for enemy development", failures)
+    require("quiet_hunter_loop_02.wav" in readme and "dedicated `audio_rng`" in tuning, "README and TUNING document the new local audio behavior", failures)
 
     if failures:
         print(f"\nTuning audit failed with {len(failures)} issue(s).")

@@ -89,10 +89,10 @@ def main() -> int:
         failures,
     )
     require(
-        main_script.count("_play_sfx(dodge_player)") == 2
+        main_script.count("_play_player_action_sfx(PLAYER_ACTION_DODGE)") == 2
         and "if player.try_start_aim_dodge" in main_script
         and "if player.try_start_movement_dodge" in main_script,
-        "Only successful Shift and Space dodges play the sound once",
+        "Only successful Shift and Space dodges select and play one pooled sound",
         failures,
     )
     require(

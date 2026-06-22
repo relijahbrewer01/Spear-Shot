@@ -97,6 +97,7 @@
 | `dodge_trail_lifetime` | `0.22s` | `scripts/player.gd` | Trail fade duration. |
 | `ready_glint_duration` | `0.12s` | `scripts/player_dodge_cooldown_indicator.gd` | Brief cooldown-ready sparkle. |
 | Buffered click destination | `1 pending target` | `scripts/player.gd` | Right-click during dodge replaces any previous buffered move target. |
+| Buffered spear throw | `1 pending target` | `scripts/main.gd` | A valid held-spear throw during dodge replaces the previous captured target and releases once after `dodge_ended`. |
 | Forced-movement dodge cancel | `Shift` and `Space` if ready | `scripts/player.gd`, `scripts/main.gd` | Dodges can cancel Shooter shove knockback while preserving their normal direction rules. |
 
 ## Spear
@@ -310,6 +311,19 @@
 | `edge_inset` | `5.0px` | `scripts/encounter_telegraph.gd` | Wave marker inset from arena edge. |
 | `marker_half_length` | `17.0px` | `scripts/encounter_telegraph.gd` | Wave marker length. |
 | `pulse_speed` | `9.0` | `scripts/encounter_telegraph.gd` | Wave warning pulse speed. |
+
+## Input And Audio Polish
+
+| Setting | Current value | Source | Purpose / tuning effect |
+| --- | --- | --- | --- |
+| Player-action SFX pool size | `3` per action | `scripts/main.gd` | Throw, dodge, and hurt each retain the original clip plus two local alternates. |
+| Immediate SFX repeat | disabled per category | `scripts/main.gd` | Each action remembers its own last variant without coupling histories. |
+| Audio random source | dedicated `audio_rng` | `scripts/main.gd` | Player sound variation cannot consume gameplay RNG state. |
+| Dodge player mix | `-5.0dB` | `Main.tscn` | Preserves the existing restrained dodge level on the SFX bus. |
+| SFX bus mix | `-4.0dB` | `default_bus_layout.tres` | Shared sound-effect bus level remains unchanged. |
+| Music bus mix | `-13.0dB` | `default_bus_layout.tres` | Both calm loops retain the existing background-music level. |
+| Music run cycle | `track 1, track 2, repeat` | `scripts/main.gd` | Launch starts on the original; each in-place restart advances once and starts the selected loop from the beginning. |
+| Music loop format | `44.1kHz`, `16-bit`, stereo | `tools/generate_music.py` | Both locally generated tracks share format, duration, loop configuration, and similar loudness. |
 
 ## Common Tuning Requests
 

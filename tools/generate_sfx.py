@@ -167,6 +167,91 @@ def generate_dodge() -> list[float]:
     return samples
 
 
+def generate_throw_variant(seed: int, duration: float, pitch_offset: float) -> list[float]:
+    rng = random.Random(seed)
+    length = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    low_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = rng.random() * 2.0 - 1.0
+        low_noise = low_noise * 0.84 + raw_noise * 0.16
+        air = raw_noise - low_noise
+        effort_frequency = 175.0 + pitch_offset - progress * 24.0
+        effort = math.sin(2.0 * math.pi * effort_frequency * index / SAMPLE_RATE)
+        shaft_frequency = 390.0 + pitch_offset + progress * 250.0
+        shaft_whistle = math.sin(2.0 * math.pi * shaft_frequency * index / SAMPLE_RATE)
+        release_curve = math.sin(progress * math.pi) * (1.0 - progress * 0.42)
+        samples.append(
+            (
+                air * 0.42
+                + effort * 0.20 * (1.0 - progress)
+                + shaft_whistle * 0.15
+            )
+            * release_curve
+            * envelope(progress, 0.02, 0.62)
+        )
+    return samples
+
+
+def generate_dodge_variant(seed: int, duration: float, body_pitch: float) -> list[float]:
+    rng = random.Random(seed)
+    length = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    low_noise = 0.0
+    previous_raw_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = rng.random() * 2.0 - 1.0
+        low_noise = low_noise * 0.90 + raw_noise * 0.10
+        cloth_noise = raw_noise - low_noise
+        air_noise = raw_noise - previous_raw_noise
+        previous_raw_noise = raw_noise
+        body_tone = math.sin(
+            2.0 * math.pi * (body_pitch - progress * 38.0) * index / SAMPLE_RATE
+        )
+        foot_scuff = math.sin(2.0 * math.pi * 108.0 * index / SAMPLE_RATE)
+        movement_curve = math.sin(progress * math.pi)
+        scuff_curve = math.exp(-((progress - 0.34) / 0.16) ** 2)
+        samples.append(
+            (
+                cloth_noise * 0.46
+                + air_noise * 0.18
+                + body_tone * 0.24 * (1.0 - progress)
+                + foot_scuff * 0.15 * scuff_curve
+            )
+            * movement_curve
+            * envelope(progress, 0.02, 0.58)
+        )
+    return samples
+
+
+def generate_hurt_variant(seed: int, duration: float, base_pitch: float) -> list[float]:
+    rng = random.Random(seed)
+    length = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    low_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = rng.random() * 2.0 - 1.0
+        low_noise = low_noise * 0.76 + raw_noise * 0.24
+        impact_noise = raw_noise - low_noise
+        reaction = math.sin(
+            2.0 * math.pi * (base_pitch - progress * 46.0) * index / SAMPLE_RATE
+        )
+        body_impact = math.sin(2.0 * math.pi * 96.0 * index / SAMPLE_RATE)
+        transient = math.exp(-progress * 18.0)
+        samples.append(
+            (
+                reaction * 0.38
+                + impact_noise * 0.42
+                + body_impact * 0.20 * transient
+            )
+            * envelope(progress, 0.01, 0.80)
+        )
+    return samples
+
+
 def generate_wave_warning() -> list[float]:
     length = int(SAMPLE_RATE * 0.34)
     samples: list[float] = []
@@ -494,6 +579,16 @@ def main() -> None:
         "heart_pickup_expire.wav": generate_heart_pickup_expire(),
         "heart_runner_alarm.wav": generate_heart_runner_alarm(),
     }
+    sounds.update(
+        {
+            "throw_alt_01.wav": generate_throw_variant(4101, 0.17, -18.0),
+            "throw_alt_02.wav": generate_throw_variant(4102, 0.19, 24.0),
+            "dodge_alt_01.wav": generate_dodge_variant(4201, 0.18, 188.0),
+            "dodge_alt_02.wav": generate_dodge_variant(4202, 0.21, 224.0),
+            "player_hurt_alt_01.wav": generate_hurt_variant(4301, 0.12, 164.0),
+            "player_hurt_alt_02.wav": generate_hurt_variant(4302, 0.14, 198.0),
+        }
+    )
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)
 

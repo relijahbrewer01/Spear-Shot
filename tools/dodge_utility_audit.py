@@ -84,8 +84,8 @@ def main() -> int:
     require(
         "if player.try_start_aim_dodge" in main_script
         and "if player.try_start_movement_dodge" in main_script
-        and main_script.count("_play_sfx(dodge_player)") == 2,
-        "Dodge sound plays only after a successful Shift or Space dodge",
+        and main_script.count("_play_player_action_sfx(PLAYER_ACTION_DODGE)") == 2,
+        "Dodge sound pool plays only after a successful Shift or Space dodge",
         failures,
     )
     require(

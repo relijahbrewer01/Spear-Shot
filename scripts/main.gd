@@ -15,6 +15,28 @@ const DEBUG_SHIELDED_SPAWN_ENABLED := true
 const DEBUG_SHOOTER_SPAWN_ENABLED := true
 const DEBUG_BOOMER_SPAWN_ENABLED := true
 const DEBUG_HEART_RUNNER_SPAWN_ENABLED := true
+const PLAYER_ACTION_THROW := &"throw"
+const PLAYER_ACTION_DODGE := &"dodge"
+const PLAYER_ACTION_HURT := &"hurt"
+const THROW_SFX_PATHS: Array[String] = [
+	"res://audio/throw.wav",
+	"res://audio/throw_alt_01.wav",
+	"res://audio/throw_alt_02.wav",
+]
+const DODGE_SFX_PATHS: Array[String] = [
+	"res://audio/dodge.wav",
+	"res://audio/dodge_alt_01.wav",
+	"res://audio/dodge_alt_02.wav",
+]
+const HURT_SFX_PATHS: Array[String] = [
+	"res://audio/player_hurt.wav",
+	"res://audio/player_hurt_alt_01.wav",
+	"res://audio/player_hurt_alt_02.wav",
+]
+const MUSIC_TRACK_PATHS: Array[String] = [
+	"res://music/quiet_hunter_loop.wav",
+	"res://music/quiet_hunter_loop_02.wav",
+]
 
 enum RunState {
 	RUNNING,
@@ -102,6 +124,17 @@ var hit_stop_active := false
 var hit_stop_restore_token := 0
 var hit_stop_previous_time_scale := 1.0
 var rng := RandomNumberGenerator.new()
+var audio_rng := RandomNumberGenerator.new()
+var has_buffered_spear_throw := false
+var buffered_spear_throw_target := Vector2.ZERO
+var throw_sfx_variants: Array[AudioStream] = []
+var dodge_sfx_variants: Array[AudioStream] = []
+var hurt_sfx_variants: Array[AudioStream] = []
+var last_throw_sfx_index := -1
+var last_dodge_sfx_index := -1
+var last_hurt_sfx_index := -1
+var current_music_track_index := 0
+var original_music_stream: AudioStream
 var debug_intro_target_sequence: Array = []
 var debug_ambient_roll_sequence: Array = []
 var debug_heart_runner_roll_sequence: Array = []
@@ -154,10 +187,13 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_ensure_input_actions()
 	rng.randomize()
+	audio_rng.randomize()
 	high_score = HighScoreStore.load_high_score()
 	_configure_window()
 	hud.process_mode = Node.PROCESS_MODE_ALWAYS
 	music_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	original_music_stream = music_player.stream
+	_load_player_action_sfx_variants()
 
 	var play_rect := arena.get_play_rect()
 	player.set_arena_rect(play_rect)
@@ -168,9 +204,11 @@ func _ready() -> void:
 
 	player.damaged.connect(_on_player_damaged)
 	player.died.connect(_on_player_died)
+	player.dodge_ended.connect(_on_player_dodge_ended)
 	spear.enemy_hit.connect(_on_spear_enemy_hit)
 	spear.picked_up.connect(_on_spear_picked_up)
 	spear.thrown.connect(_on_spear_thrown)
+	spear.state_changed.connect(_on_spear_state_changed)
 	spawn_timer.timeout.connect(_on_spawn_timer_timeout)
 	opportunity_timer.timeout.connect(_on_opportunity_timer_timeout)
 	encounter_director.spawn_requested.connect(_on_director_spawn_requested)
@@ -185,12 +223,13 @@ func _ready() -> void:
 	hud.restart_requested.connect(_on_restart_requested)
 
 	_reset_runtime_state()
-	_start_background_music()
+	_start_background_music(true)
 
 
 func _exit_tree() -> void:
 	if get_tree() != null:
 		get_tree().paused = false
+	_clear_buffered_spear_throw()
 	_cancel_hit_stop()
 	_stop_all_audio()
 
@@ -208,6 +247,7 @@ func _reset_runtime_state() -> void:
 	shake_left = 0.0
 	shake_strength = 0.0
 	shake_duration = 0.0
+	_clear_buffered_spear_throw()
 	_cancel_hit_stop()
 
 	for child in enemy_container.get_children():
@@ -269,12 +309,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("dodge_aim"):
 		if player.try_start_aim_dodge(_get_shift_dodge_direction()):
 			destination_marker.clear_marker()
-			_play_sfx(dodge_player)
-		return
+			_play_player_action_sfx(PLAYER_ACTION_DODGE)
+			return
 	elif event.is_action_pressed("dodge_move"):
 		if player.try_start_movement_dodge(_get_space_dodge_direction()):
-			_play_sfx(dodge_player)
-		return
+			_play_player_action_sfx(PLAYER_ACTION_DODGE)
+			return
 
 	if event.is_action_pressed("move_to_cursor"):
 		var move_target := arena.clamp_to_play_rect(get_global_mouse_position(), player.body_radius)
@@ -285,11 +325,55 @@ func _unhandled_input(event: InputEvent) -> void:
 		destination_marker.show_marker(move_target)
 		return
 
+	if event.is_action_pressed("throw_spear"):
+		_handle_spear_throw_input(get_global_mouse_position())
+		return
+
 	if player.is_dodging():
 		return
 
-	if event.is_action_pressed("throw_spear"):
-		spear.try_throw(get_global_mouse_position())
+
+func _handle_spear_throw_input(target_position: Vector2) -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	if player.is_dodging():
+		if spear.is_held():
+			has_buffered_spear_throw = true
+			buffered_spear_throw_target = target_position
+		return
+
+	spear.try_throw(target_position)
+
+
+func _on_player_dodge_ended() -> void:
+	if not has_buffered_spear_throw:
+		return
+
+	var target_position := buffered_spear_throw_target
+	_clear_buffered_spear_throw()
+	if run_state != RunState.RUNNING or not player.active or not spear.is_held():
+		return
+
+	spear.try_throw(target_position)
+
+
+func _on_spear_state_changed(new_state: int) -> void:
+	if new_state != Spear.State.HELD:
+		_clear_buffered_spear_throw()
+
+
+func _clear_buffered_spear_throw() -> void:
+	has_buffered_spear_throw = false
+	buffered_spear_throw_target = Vector2.ZERO
+
+
+func debug_has_buffered_spear_throw() -> bool:
+	return has_buffered_spear_throw
+
+
+func debug_get_buffered_spear_throw_target() -> Vector2:
+	return buffered_spear_throw_target
 
 
 func _spawn_enemy() -> bool:
@@ -1088,7 +1172,7 @@ func _start_heart_runner_resolution_cooldown() -> void:
 
 
 func _on_player_damaged(_new_health: int) -> void:
-	_play_sfx(player_hurt_player)
+	_play_player_action_sfx(PLAYER_ACTION_HURT)
 	_start_screen_shake(damage_shake_duration, damage_shake_strength)
 
 
@@ -1104,6 +1188,8 @@ func _on_player_died() -> void:
 	encounter_director.stop_for_game_over()
 	player.set_active(false)
 	spear.set_active(false)
+	_clear_buffered_spear_throw()
+	_stop_player_action_sfx()
 
 	for child in enemy_container.get_children():
 		if child.has_method("set_active"):
@@ -1127,7 +1213,7 @@ func _on_player_died() -> void:
 
 
 func _on_spear_thrown() -> void:
-	_play_sfx(throw_player)
+	_play_player_action_sfx(PLAYER_ACTION_THROW)
 
 
 func _on_spear_enemy_hit(_hit_position: Vector2) -> void:
@@ -1327,7 +1413,9 @@ func _on_restart_requested() -> void:
 
 func _restart_run() -> void:
 	get_tree().paused = false
+	_advance_music_track_for_new_run()
 	_reset_runtime_state()
+	_start_background_music(true)
 
 
 func _start_screen_shake(duration: float, strength: float) -> void:
@@ -1345,6 +1433,88 @@ func _play_sfx(audio_player: AudioStreamPlayer) -> void:
 	audio_player.play()
 
 
+func _load_player_action_sfx_variants() -> void:
+	throw_sfx_variants = _load_audio_stream_pool(THROW_SFX_PATHS, throw_player.stream)
+	dodge_sfx_variants = _load_audio_stream_pool(DODGE_SFX_PATHS, dodge_player.stream)
+	hurt_sfx_variants = _load_audio_stream_pool(HURT_SFX_PATHS, player_hurt_player.stream)
+
+
+func _load_audio_stream_pool(paths: Array[String], fallback_stream: AudioStream) -> Array[AudioStream]:
+	var streams: Array[AudioStream] = []
+	for path in paths:
+		if not ResourceLoader.exists(path):
+			continue
+		var stream := load(path) as AudioStream
+		if stream != null:
+			streams.append(stream)
+
+	if streams.is_empty() and fallback_stream != null:
+		streams.append(fallback_stream)
+	return streams
+
+
+func _play_player_action_sfx(action_category: StringName) -> void:
+	var audio_player: AudioStreamPlayer
+	var variants: Array[AudioStream]
+	match action_category:
+		PLAYER_ACTION_THROW:
+			audio_player = throw_player
+			variants = throw_sfx_variants
+		PLAYER_ACTION_DODGE:
+			audio_player = dodge_player
+			variants = dodge_sfx_variants
+		PLAYER_ACTION_HURT:
+			audio_player = player_hurt_player
+			variants = hurt_sfx_variants
+		_:
+			return
+
+	var variant_index := _select_player_action_sfx_index(action_category, variants.size())
+	if variant_index < 0:
+		return
+	audio_player.stream = variants[variant_index]
+	_play_sfx(audio_player)
+
+
+func _select_player_action_sfx_index(action_category: StringName, pool_size: int) -> int:
+	if pool_size <= 0:
+		return -1
+
+	var last_index := _get_last_player_action_sfx_index(action_category)
+	var selected_index := audio_rng.randi_range(0, pool_size - 1)
+	if pool_size > 1 and selected_index == last_index:
+		selected_index = (selected_index + 1 + audio_rng.randi_range(0, pool_size - 2)) % pool_size
+	_set_last_player_action_sfx_index(action_category, selected_index)
+	return selected_index
+
+
+func _get_last_player_action_sfx_index(action_category: StringName) -> int:
+	match action_category:
+		PLAYER_ACTION_THROW:
+			return last_throw_sfx_index
+		PLAYER_ACTION_DODGE:
+			return last_dodge_sfx_index
+		PLAYER_ACTION_HURT:
+			return last_hurt_sfx_index
+	return -1
+
+
+func _set_last_player_action_sfx_index(action_category: StringName, selected_index: int) -> void:
+	match action_category:
+		PLAYER_ACTION_THROW:
+			last_throw_sfx_index = selected_index
+		PLAYER_ACTION_DODGE:
+			last_dodge_sfx_index = selected_index
+		PLAYER_ACTION_HURT:
+			last_hurt_sfx_index = selected_index
+
+
+func _stop_player_action_sfx() -> void:
+	for audio_player in [throw_player, dodge_player, player_hurt_player]:
+		if audio_player != null:
+			audio_player.stop()
+
+
 func _spawn_boomer_blast_effect(position: Vector2, core_radius: float, outer_radius: float) -> void:
 	var blast_effect := BoomerBlastEffectScene.instantiate() as BoomerBlastEffect
 	if blast_effect == null:
@@ -1355,17 +1525,38 @@ func _spawn_boomer_blast_effect(position: Vector2, core_radius: float, outer_rad
 	blast_effect.setup(core_radius, outer_radius)
 
 
-func _start_background_music() -> void:
+func _start_background_music(restart_from_beginning := false) -> void:
 	if music_player == null:
 		return
+
+	music_player.stream = _load_music_stream_or_fallback(
+		MUSIC_TRACK_PATHS[current_music_track_index]
+	)
 	if music_player.stream == null:
 		return
 
 	if not music_player.finished.is_connected(_on_music_player_finished):
 		music_player.finished.connect(_on_music_player_finished)
 
+	if restart_from_beginning:
+		music_player.stop()
 	if not music_player.playing:
 		music_player.play()
+
+
+func _advance_music_track_for_new_run() -> void:
+	if MUSIC_TRACK_PATHS.is_empty():
+		current_music_track_index = 0
+		return
+	current_music_track_index = (current_music_track_index + 1) % MUSIC_TRACK_PATHS.size()
+
+
+func _load_music_stream_or_fallback(track_path: String) -> AudioStream:
+	if ResourceLoader.exists(track_path):
+		var selected_stream := load(track_path) as AudioStream
+		if selected_stream != null:
+			return selected_stream
+	return original_music_stream
 
 
 func _on_music_player_finished() -> void:
@@ -1373,6 +1564,53 @@ func _on_music_player_finished() -> void:
 		return
 
 	music_player.play()
+
+
+func debug_seed_audio_rng(seed_value: int) -> void:
+	audio_rng.seed = seed_value
+	last_throw_sfx_index = -1
+	last_dodge_sfx_index = -1
+	last_hurt_sfx_index = -1
+
+
+func debug_select_player_action_sfx_index(action_category: StringName) -> int:
+	match action_category:
+		PLAYER_ACTION_THROW:
+			return _select_player_action_sfx_index(action_category, throw_sfx_variants.size())
+		PLAYER_ACTION_DODGE:
+			return _select_player_action_sfx_index(action_category, dodge_sfx_variants.size())
+		PLAYER_ACTION_HURT:
+			return _select_player_action_sfx_index(action_category, hurt_sfx_variants.size())
+	return -1
+
+
+func debug_get_last_player_action_sfx_index(action_category: StringName) -> int:
+	return _get_last_player_action_sfx_index(action_category)
+
+
+func debug_get_player_action_sfx_pool_size(action_category: StringName) -> int:
+	match action_category:
+		PLAYER_ACTION_THROW:
+			return throw_sfx_variants.size()
+		PLAYER_ACTION_DODGE:
+			return dodge_sfx_variants.size()
+		PLAYER_ACTION_HURT:
+			return hurt_sfx_variants.size()
+	return 0
+
+
+func debug_get_current_music_track_index() -> int:
+	return current_music_track_index
+
+
+func debug_get_current_music_stream_path() -> String:
+	if music_player == null or music_player.stream == null:
+		return ""
+	return music_player.stream.resource_path
+
+
+func debug_load_music_stream_for_path(track_path: String) -> AudioStream:
+	return _load_music_stream_or_fallback(track_path)
 
 
 func _stop_all_audio() -> void:

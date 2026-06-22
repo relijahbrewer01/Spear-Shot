@@ -9,6 +9,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT / "music" / "quiet_hunter_loop.wav"
+OUTPUT_PATH_02 = ROOT / "music" / "quiet_hunter_loop_02.wav"
 SAMPLE_RATE = 44100
 BPM = 82
 BEAT = 60.0 / BPM
@@ -208,6 +209,107 @@ def build_track() -> np.ndarray:
     return mix
 
 
+def build_track_02() -> np.ndarray:
+    total_samples = int(DURATION * SAMPLE_RATE)
+    mix = np.zeros((2, total_samples), dtype=np.float32)
+
+    progression = [
+        ["D3", "F3", "A3", "E4"],
+        ["C3", "E3", "G3", "D4"],
+        ["G2", "D3", "F3", "A3"],
+        ["Bb2", "D3", "F3", "C4"],
+        ["D3", "A3", "C4", "F4"],
+        ["F2", "C3", "A3", "E4"],
+        ["G2", "D3", "A3", "C4"],
+        ["A2", "E3", "G3", "C4"],
+    ]
+    melody_bars = [
+        ["D5", None, "A4", "F4"],
+        [None, "G4", "E4", None],
+        ["A4", None, "C5", "G4"],
+        ["F4", "D4", None, "C4"],
+        ["E5", None, "D5", "A4"],
+        [None, "A4", "F4", None],
+        ["G4", "C5", None, "A4"],
+        ["E4", None, "D4", None],
+    ]
+    arp_pattern = [0, 1, 3, 2, 1, 3, 0, 2]
+
+    for bar in range(BARS):
+        chord = progression[bar % len(progression)]
+        bar_start = bar * 4 * BEAT
+
+        add_voice(
+            mix,
+            bar_start,
+            4 * BEAT,
+            [note_frequency(note) for note in chord],
+            amplitude=0.125,
+            voice="sine",
+            pan=0.5,
+            attack=0.10,
+            release=0.12,
+        )
+
+        bass_root = note_frequency(chord[0])
+        for beat_index in [0, 2]:
+            add_voice(
+                mix,
+                bar_start + beat_index * BEAT,
+                BEAT * 1.75,
+                [bass_root],
+                amplitude=0.105 if beat_index == 0 else 0.075,
+                voice="triangle",
+                pan=0.40,
+                attack=0.04,
+                release=0.24,
+            )
+
+        for slot, chord_index in zip(
+            [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5],
+            arp_pattern,
+        ):
+            add_voice(
+                mix,
+                bar_start + slot * BEAT,
+                BEAT * 0.46,
+                [note_frequency(chord[chord_index])],
+                amplitude=0.07,
+                voice="pulse",
+                pan=0.70,
+                attack=0.05,
+                release=0.34,
+            )
+
+        melody = melody_bars[bar % len(melody_bars)]
+        if bar >= 8:
+            melody = melody[2:] + melody[:2]
+        for beat_index, note_name in enumerate(melody):
+            if note_name is None:
+                continue
+            add_voice(
+                mix,
+                bar_start + beat_index * BEAT,
+                BEAT * 1.15,
+                [note_frequency(note_name)],
+                amplitude=0.082,
+                voice="sine",
+                pan=0.26,
+                attack=0.09,
+                release=0.32,
+            )
+
+    peak = np.max(np.abs(mix))
+    if peak > 0:
+        mix *= TARGET_PEAK / peak
+
+    fade_samples = int(SAMPLE_RATE * 0.02)
+    fade = np.linspace(0.0, 1.0, fade_samples, dtype=np.float32)
+    mix[:, :fade_samples] *= fade
+    mix[:, -fade_samples:] *= fade[::-1]
+    return mix
+
+
 def write_wav(path: Path, mix: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     interleaved = np.empty(mix.shape[1] * 2, dtype=np.int16)
@@ -224,6 +326,7 @@ def write_wav(path: Path, mix: np.ndarray) -> None:
 
 def main() -> None:
     write_wav(OUTPUT_PATH, build_track())
+    write_wav(OUTPUT_PATH_02, build_track_02())
 
 
 if __name__ == "__main__":

@@ -252,6 +252,37 @@ def generate_hurt_variant(seed: int, duration: float, base_pitch: float) -> list
     return samples
 
 
+def generate_spear_recover() -> list[float]:
+    rng = random.Random(4401)
+    length = int(SAMPLE_RATE * 0.16)
+    samples: list[float] = []
+    wood_body = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = rng.random() * 2.0 - 1.0
+        wood_body = wood_body * 0.80 + raw_noise * 0.20
+
+        handling_hit = math.exp(-((progress - 0.10) / 0.075) ** 2)
+        wood_knock = math.sin(2.0 * math.pi * 188.0 * index / SAMPLE_RATE)
+        metal_click = math.sin(2.0 * math.pi * 1120.0 * index / SAMPLE_RATE)
+
+        ready_progress = max((progress - 0.43) / 0.57, 0.0)
+        ready_envelope = math.sin(ready_progress * math.pi) if ready_progress > 0.0 else 0.0
+        ready_tone = math.sin(
+            2.0 * math.pi * (430.0 + ready_progress * 95.0) * index / SAMPLE_RATE
+        )
+        samples.append(
+            (
+                wood_knock * 0.42 * handling_hit
+                + wood_body * 0.30 * handling_hit
+                + metal_click * 0.18 * handling_hit
+                + ready_tone * 0.16 * ready_envelope
+            )
+            * envelope(progress, 0.01, 0.40)
+        )
+    return samples
+
+
 def generate_wave_warning() -> list[float]:
     length = int(SAMPLE_RATE * 0.34)
     samples: list[float] = []
@@ -587,6 +618,7 @@ def main() -> None:
             "dodge_alt_02.wav": generate_dodge_variant(4202, 0.21, 224.0),
             "player_hurt_alt_01.wav": generate_hurt_variant(4301, 0.12, 164.0),
             "player_hurt_alt_02.wav": generate_hurt_variant(4302, 0.14, 198.0),
+            "spear_recover.wav": generate_spear_recover(),
         }
     )
     for filename, samples in sounds.items():

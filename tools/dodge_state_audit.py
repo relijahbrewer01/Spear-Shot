@@ -29,8 +29,8 @@ def main() -> int:
     roadmap_text = read_text("ROADMAP.md")
 
     require(
-        'Current milestone: `Spear Shot v0.6.0-alpha.4 - Heart Runner`' in readme_text,
-        "README milestone is stamped v0.6.0-alpha.4 Heart Runner",
+        'Current milestone: `Spear Shot v0.6.0-alpha.4.1 - Input & Audio Polish`' in readme_text,
+        "README milestone remains v0.6.0-alpha.4.1 Input & Audio Polish",
         failures,
     )
     require("signal dodge_started" in player_script and "signal dodge_ended" in player_script and "signal dodge_ready" in player_script, "Player exposes dodge start/end/ready hooks", failures)
@@ -58,7 +58,14 @@ def main() -> int:
     require("pickup_area" in spear_script and "_on_pickup_body_entered" in spear_script, "Landed spear pickup remains body-based and available during dodge", failures)
     require('event.is_action_pressed("dodge_aim")' in main_script and 'event.is_action_pressed("dodge_move")' in main_script, "Main handles both dodge input actions", failures)
     require("run_state != RunState.RUNNING" in main_script, "Dodge input is blocked outside the running state", failures)
-    require("if player.is_dodging():\n\t\treturn" in main_script, "Throw and click-move input are blocked during active dodge", failures)
+    dodge_guard_index = main_script.index("if player.is_dodging():\n\t\treturn")
+    require(
+        main_script.index('event.is_action_pressed("move_to_cursor")') < dodge_guard_index
+        and main_script.index('event.is_action_pressed("throw_spear")') < dodge_guard_index
+        and "_handle_spear_throw_input" in main_script,
+        "Dodge-aware click and throw inputs are handled before other active-dodge input is blocked",
+        failures,
+    )
     require("player.get_last_valid_aim_direction()" in main_script, "Dodge direction fallback cannot become zero", failures)
     require('"_cancel_hit_stop()"' not in player_script, "Player dodge does not directly tamper with global hit-stop state", failures)
     require("collision_layer =" not in player_script and "collision_mask =" not in player_script, "Dodge does not rely on temporary player collision-layer rewrites", failures)

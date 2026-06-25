@@ -40,6 +40,7 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 
 - One held-spear throw pressed during Akedra's dodge is buffered with the latest captured target and released exactly once through the normal throw path after `dodge_ended`.
 - Spear throw, dodge, and player hurt sounds now use independent three-clip non-repeating pools driven by a dedicated audio random source that does not alter gameplay randomness.
+- Legitimate landed-spear recovery now plays one dedicated ready cue after the spear is held again, including overlap-safe forced landings that use the same pickup authority.
 - A second locally generated calm hunter loop alternates deterministically with the original whenever a fresh run begins through restart.
 - This is a bounded polish interlude and does not replace, renumber, or expand the next Phase 4.5 enemy-development work.
 

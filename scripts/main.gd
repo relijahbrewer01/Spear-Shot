@@ -1190,6 +1190,8 @@ func _on_player_died() -> void:
 	spear.set_active(false)
 	_clear_buffered_spear_throw()
 	_stop_player_action_sfx()
+	if pickup_player != null:
+		pickup_player.stop()
 
 	for child in enemy_container.get_children():
 		if child.has_method("set_active"):

@@ -116,6 +116,7 @@ def main() -> int:
         "FORCED_MOVEMENT_PROTECTION_SHOVE",
         "try_start_forced_movement",
         "Buffered spear throw",
+        "Spear recovery cue",
         "audio_rng",
         "Music run cycle",
     ]:
@@ -170,6 +171,7 @@ def main() -> int:
     require("## Phase 4 Interlude 1 — Input & Audio Polish" in roadmap, "ROADMAP documents the bounded input/audio interlude", failures)
     require("Phase 4.5" in roadmap and "does not replace" in roadmap, "ROADMAP keeps Phase 4.5 reserved for enemy development", failures)
     require("quiet_hunter_loop_02.wav" in readme and "dedicated `audio_rng`" in tuning, "README and TUNING document the new local audio behavior", failures)
+    require("spear_recover.wav" in readme and "legitimate landed-spear recovery" in roadmap.lower(), "Input/audio docs include the recovery-only spear cue", failures)
 
     if failures:
         print(f"\nTuning audit failed with {len(failures)} issue(s).")

@@ -8,7 +8,7 @@
 [ext_resource type="AudioStream" uid="uid://cous5ikllb5m" path="res://audio/throw.wav" id="6"]
 [ext_resource type="AudioStream" uid="uid://23wb6657jxis" path="res://audio/enemy_hit.wav" id="7"]
 [ext_resource type="AudioStream" uid="uid://bcsxd3hh3c7l2" path="res://audio/enemy_death.wav" id="8"]
-[ext_resource type="AudioStream" uid="uid://bhkcwmaogci7f" path="res://audio/pickup.wav" id="9"]
+[ext_resource type="AudioStream" path="res://audio/spear_recover.wav" id="9"]
 [ext_resource type="AudioStream" uid="uid://bklk86ftkkeco" path="res://audio/player_hurt.wav" id="10"]
 [ext_resource type="AudioStream" uid="uid://2qtec5epgxjy" path="res://audio/game_over.wav" id="11"]
 [ext_resource type="AudioStream" uid="uid://duhbd165otiqh" path="res://music/quiet_hunter_loop.wav" id="12"]

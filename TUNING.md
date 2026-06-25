@@ -317,6 +317,7 @@
 | Setting | Current value | Source | Purpose / tuning effect |
 | --- | --- | --- | --- |
 | Player-action SFX pool size | `3` per action | `scripts/main.gd` | Throw, dodge, and hurt each retain the original clip plus two local alternates. |
+| Spear recovery cue | `1` clip, `0.16s` | `scripts/spear.gd`, `scripts/main.gd` | Plays only after legitimate `LANDED -> HELD` recovery; initial equip, reset, and landing alone remain silent. |
 | Immediate SFX repeat | disabled per category | `scripts/main.gd` | Each action remembers its own last variant without coupling histories. |
 | Audio random source | dedicated `audio_rng` | `scripts/main.gd` | Player sound variation cannot consume gameplay RNG state. |
 | Dodge player mix | `-5.0dB` | `Main.tscn` | Preserves the existing restrained dodge level on the SFX bus. |

@@ -25,6 +25,7 @@ func _run_audit() -> void:
 	_audit_audio_rng_isolation(main)
 	await _audit_player_sound_lifecycle(main)
 	await _audit_music_cycling(main)
+	await _audit_spear_recovery_audio(main)
 
 	for failure in failures:
 		push_error("INPUT AUDIO POLISH AUDIT: %s" % failure)
@@ -38,6 +39,8 @@ func _run_audit() -> void:
 func _audit_initial_music(main: Node) -> void:
 	_require(main.call("debug_get_current_music_track_index") == 0, "Application startup selects track 1 without advancing twice.")
 	_require(main.call("debug_get_current_music_stream_path") == TRACK_01, "Application startup uses the original music loop.")
+	var recovery_player := main.get_node("AudioPlayers/PickupPlayer") as AudioStreamPlayer
+	_require(not recovery_player.playing, "Application startup does not play the spear recovery cue.")
 
 
 func _audit_audio_pools_and_non_repetition(main: Node) -> void:
@@ -170,6 +173,81 @@ func _audit_music_cycling(main: Node) -> void:
 		fallback_stream != null and fallback_stream.resource_path == TRACK_01,
 		"Missing alternate music safely falls back to the original track."
 	)
+
+
+func _audit_spear_recovery_audio(main: Node) -> void:
+	main.call("_restart_run")
+	_stop_background_timers(main)
+	var player := main.get_node("Player") as Player
+	var spear := main.get_node("Spear") as Spear
+	var recovery_player := main.get_node("AudioPlayers/PickupPlayer") as AudioStreamPlayer
+	var pickup_counter := {"count": 0}
+	spear.picked_up.connect(func() -> void:
+		pickup_counter["count"] = int(pickup_counter["count"]) + 1
+	)
+
+	_require(not recovery_player.playing, "Restart/reset does not play the spear recovery cue.")
+	_require(
+		spear.try_throw(player.global_position + Vector2.RIGHT * 100.0),
+		"Recovery audit begins with an ordinary valid throw."
+	)
+	var landing_position := player.global_position + Vector2.RIGHT * 96.0
+	spear.call("_enter_landed_state", landing_position)
+	await get_tree().process_frame
+	_require(spear.is_landed(), "Flying spear reaches the LANDED state for recovery coverage.")
+	_require(not recovery_player.playing, "FLYING to LANDED does not play the recovery cue.")
+	_require(int(pickup_counter["count"]) == 0, "Landing alone does not emit a pickup event.")
+
+	main.rng.seed = 66101
+	var expected_gameplay_roll := main.rng.randi()
+	main.rng.seed = 66101
+	main.audio_rng.seed = 66102
+	var expected_audio_roll := main.audio_rng.randi()
+	main.audio_rng.seed = 66102
+
+	player.global_position = landing_position
+	spear.call("_on_pickup_body_entered", player)
+	_require(int(pickup_counter["count"]) == 1, "Legitimate landed-spear collection emits one pickup event.")
+	_require(spear.is_held(), "Spear is held and re-armed when the recovery cue begins.")
+	_require(recovery_player.playing, "Legitimate LANDED to HELD recovery plays the cue once.")
+	_require(main.rng.randi() == expected_gameplay_roll, "Recovery playback does not consume gameplay RNG.")
+	_require(main.audio_rng.randi() == expected_audio_roll, "Recovery playback does not consume player-action audio RNG.")
+
+	spear.call("_on_pickup_body_entered", player)
+	spear.call("_on_pickup_body_entered", player)
+	_require(int(pickup_counter["count"]) == 1, "Duplicate overlap callbacks cannot replay the recovery cue.")
+
+	var paused_position := recovery_player.get_playback_position()
+	get_tree().paused = true
+	await get_tree().create_timer(0.05, true, false, true).timeout
+	var paused_position_after_wait := recovery_player.get_playback_position()
+	get_tree().paused = false
+	_require(
+		absf(paused_position_after_wait - paused_position) <= 0.02,
+		"Pause freezes the short recovery cue instead of advancing or queuing another play."
+	)
+	_require(
+		spear.try_throw(player.global_position + Vector2.UP * 100.0),
+		"Recovered spear is immediately throwable while the cue is active."
+	)
+
+	main.call("_restart_run")
+	_stop_background_timers(main)
+	_require(not recovery_player.playing, "Restart stops an active recovery cue.")
+
+	_require(
+		spear.try_throw(player.global_position + Vector2.RIGHT * 100.0),
+		"Game-over cleanup setup begins with a valid throw."
+	)
+	landing_position = player.global_position + Vector2.RIGHT * 96.0
+	spear.call("_enter_landed_state", landing_position)
+	player.global_position = landing_position
+	spear.call("_on_pickup_body_entered", player)
+	_require(recovery_player.playing, "Game-over cleanup setup starts the recovery cue.")
+	main.call("_on_player_died")
+	_require(not recovery_player.playing, "Game over stops an active recovery cue.")
+	main.call("_stop_all_audio")
+	_require(not recovery_player.playing, "Teardown audio cleanup leaves no recovery cue active.")
 
 
 func _stop_background_timers(main: Node) -> void:

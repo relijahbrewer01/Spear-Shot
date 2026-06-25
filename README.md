@@ -75,6 +75,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - One valid spear throw pressed during a dodge is buffered separately, keeps its latest captured mouse-world target, and releases exactly once through the normal spear path when `dodge_ended` fires
 - A tiny world-space exertion wisp beside Akedra shrinks with the real cooldown and gives one restrained glint when dodge becomes ready
 - Spear throw, dodge, and hurt feedback each use a three-clip non-repeating local variant pool driven by audio-only randomness that cannot perturb gameplay spawns or encounter rolls
+- One crisp spear-retrieval confirmation cue plays only after a legitimate landed spear returns to `HELD`; initial equip, scene load, and restart/reset remain silent
 - The two calm background loops alternate deterministically between fresh runs: launch uses track 1, the first restart uses track 2, and later restarts continue alternating
 - The shared dodge cooldown starts when the dodge begins, not when it ends
 
@@ -96,6 +97,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/throw_alt_01.wav` and `audio/throw_alt_02.wav`: alternate nonverbal spear-release cues
 - `audio/dodge_alt_01.wav` and `audio/dodge_alt_02.wav`: alternate short dodge movement cues
 - `audio/player_hurt_alt_01.wav` and `audio/player_hurt_alt_02.wav`: alternate brief player impact reactions
+- `audio/spear_recover.wav`: single wood/metal handling cue confirming that a legitimately recovered spear is armed again
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
 - `audio/shield_break.wav`: local physical crack/thud cue for Shielded shield break
 - `audio/blowgun_windup.wav`: local reed/breath cue for Blowgun Shooter aiming
@@ -160,6 +162,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/InputAudioPolishRuntimeAudit.tscn`: runtime audit for non-repeating SFX selection, gameplay-RNG isolation, lifecycle cleanup, and deterministic music cycling
 - `tools/player_action_audio_audit.py`: static PCM, import, loudness, generator, and dedicated audio-RNG audit for the three player-action pools
 - `tools/music_cycling_audit.py`: static loop format, import, loudness, generation, fallback, and run-cycling audit
+- `tools/spear_recovery_audio_audit.py`: static recovery-state, PCM, import, generator, cleanup, RNG-isolation, and documentation audit
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
 ## Enemy behavior

@@ -260,20 +260,37 @@
 | Setting | Current value | Source | Purpose / tuning effect |
 | --- | --- | --- | --- |
 | `score_value` | `2` | `ProwlerEnemy.tscn` | Score for a killed Prowler. |
-| Body sprite canvas dimensions | `16x16px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Compact live canvas for the selected low stalking predator silhouette. |
-| Selected concept | `Moss Lynx` | `art/dev/prowler_candidates/prowler_manifest.json`, `tools/generate_phase4_assets.py` | Final approved candidate with a shoulder-hump profile, pale muzzle, and narrow trailing tail. |
-| Apparent silhouette bounds | About `14x10px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Measured non-transparent Prowler silhouette on the compact canvas. |
+| Body sprite canvas dimensions | `16x16px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Compact live base canvas for the selected low stalking predator silhouette. |
+| Live animation sheet layout | `4x5` frames on `64x80px` | `ProwlerEnemy.tscn`, `art/sprites/prowler_enemy_sheet.png`, `tools/generate_phase4_assets.py` | Single Sprite2D sheet for stalking, alert, hunting, pounce, and recovery states. |
+| Selected concept | `Moss Lynx` | `art/dev/prowler_candidates/prowler_manifest.json`, `tools/generate_phase4_assets.py` | Final approved candidate with a shoulder-hump profile, pale muzzle, red-eye hunt state, and narrow trailing tail. |
+| Apparent silhouette bounds | About `14x10px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Measured non-transparent Prowler silhouette on the compact base canvas. |
 | `body_radius` | `7.0px` | `ProwlerEnemy.tscn` | Fair body footprint. |
 | Collision radius | `7.0px` | `ProwlerEnemy.tscn` | Physics shape size. |
 | `stalk_speed_scale` | `0.82` | `scripts/prowler_enemy.gd` | Cautious stalking speed relative to current enemy speed. |
 | `hunt_speed_scale` | `1.48` | `scripts/prowler_enemy.gd` | Aggressive unarmed hunt speed relative to current enemy speed. |
-| `unarmed_alert_delay` | `0.14s` | `scripts/prowler_enemy.gd` | One-shot readable delay before the unarmed hunt fully commits. |
+| `unarmed_alert_delay` | `0.28s` | `scripts/prowler_enemy.gd` | One-shot readable red-eye delay before the unarmed hunt fully commits. |
 | `stalk_distance_min/max` | `72.0-104.0px` | `scripts/prowler_enemy.gd` | Desired stalking band while Akedra is armed; `stalk_distance_min` begins the retreat response and `stalk_distance_max` begins the cautious approach response. |
 | `stalk_dead_zone` | `5.0px` | `scripts/prowler_enemy.gd` | Hysteresis around the stalking band to reduce direction jitter. |
 | `stalk_lateral_commit_duration` | `0.55s` | `scripts/prowler_enemy.gd` | Time a lateral stalking choice stays committed before reevaluation. |
 | `wall_fallback_commit_duration` | `0.35s` | `scripts/prowler_enemy.gd` | Brief wall-tangent fallback commitment when the stalking lane would leave the arena. |
+| `defensive_trigger_radius` | `26.0px` | `scripts/prowler_enemy.gd` | Armed-state personal-space radius that starts the defensive pounce windup. |
+| `defensive_windup_duration` | `0.16s` | `scripts/prowler_enemy.gd` | Short crouch/spring prep before the defensive pass-through pounce begins. |
+| `defensive_pounce_distance/duration` | `42.0px / 0.18s` | `scripts/prowler_enemy.gd` | Distance and commitment time for the armed defensive pass-through pounce. |
+| `defensive_retreat_distance` | `92.0px` | `scripts/prowler_enemy.gd` | Arena-clamped retreat target distance after the armed defensive pounce completes. |
+| `defensive_retrigger_cooldown` | `1.10s` | `scripts/prowler_enemy.gd` | Prevents immediate repeated defensive pounces while Akedra remains crowded. |
+| `hunt_pounce_trigger_distance` | `36.0px` | `scripts/prowler_enemy.gd` | Distance where the unarmed hunter can convert direct chase into one committed pounce attempt. |
+| `hunt_pounce_windup_duration` | `0.18s` | `scripts/prowler_enemy.gd` | Locked pre-launch crouch before the committed hunting pounce. |
+| `hunt_pounce_distance/duration` | `48.0px / 0.18s` | `scripts/prowler_enemy.gd` | Distance and commitment time for the unarmed hunting pounce. |
+| `hunt_player_knockback_distance/duration` | `28.0px / 0.18s` | `scripts/prowler_enemy.gd`, `scripts/player.gd` | Successful hunting-pounce knockback applied to Akedra through existing forced movement. |
+| `hunt_prowler_recoil_distance/duration` | `26.0px / 0.16s` | `scripts/prowler_enemy.gd` | Immediate opposite recoil applied to the Prowler after a successful hunting pounce hit. |
+| `hunt_hit_stop_duration` | `0.06s` | `scripts/prowler_enemy.gd`, `scripts/main.gd` | Brief strong authored hit stop requested on a successful hunting pounce hit. |
+| `miss_skid_duration` | `0.18s` | `scripts/prowler_enemy.gd` | Brief committed slide after a dodged or invulnerability-rejected hunting pounce. |
+| `miss_stun_duration` | `0.42s` | `scripts/prowler_enemy.gd` | Vulnerable punish window after the miss skid ends. |
+| One hunting pounce per unarmed cycle | `1` committed attempt between `HELD -> unheld` and the next legitimate recovery | `scripts/prowler_enemy.gd`, `scripts/spear.gd` | Prevents repeated leap spam during one throw/recovery window. |
 | `separation_distance` | `20.0px` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing radius. |
 | `separation_strength` | `50.0` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing force. |
+| `audio/prowler_alert.wav` | `0.34s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_alert.wav`, `tools/generate_sfx.py` | Territorial growl that plays once on a real armed-to-unarmed transformation. |
+| `audio/prowler_pounce_hit.wav` | `0.13s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_pounce_hit.wav`, `tools/generate_sfx.py` | Physical bite/body-impact cue that plays only after a valid hunting pounce hit. |
 | Spawn and introduction values | `78s`, `78-88s`, `0.03`, `0.00030`, `0.08` | `scripts/main.gd` | Prowler unlock, intro target, starting chance, growth, and max chance. |
 
 ## Heart Runner Opportunity
@@ -363,7 +380,7 @@
 | Make the Shooter attack faster | `aim_duration`, `locked_duration`, `burst_interval`, `attack_cooldown`, `minimum_dart_interval` | Keep one visible lock cue and one locked direction for both darts. |
 | Make darts easier to avoid | `aim_duration`, `locked_duration`, `speed`, `burst_interval` | Dart speed currently stays at `145.0px/s`. |
 | Make Boomers less oppressive | `hop_distance`, `fuse_trigger_distance`, `fuse_duration`, `core_blast_radius`, `outer_shockwave_radius` | Preserve the discrete hop-and-stop rhythm and one-active cap while tuning fairness. |
-| Make the Prowler more or less punishing around throws | `unarmed_alert_delay`, `stalk_speed_scale`, `hunt_speed_scale`, `stalk_distance_min/max`, `stalk_lateral_commit_duration`, `wall_fallback_commit_duration`, `prowler_spawn_chance_at_unlock` | These tune how threatening the unarmed window feels without changing spear authority. |
+| Make the Prowler more or less punishing around throws | `unarmed_alert_delay`, `stalk_speed_scale`, `hunt_speed_scale`, `stalk_distance_min/max`, `defensive_trigger_radius`, `defensive_retrigger_cooldown`, `hunt_pounce_trigger_distance`, `hunt_pounce_windup_duration`, `miss_stun_duration`, `prowler_spawn_chance_at_unlock` | These tune how threatening the armed stalking and unarmed pounce window feel without changing spear authority. |
 | Make Heart Runner opportunities more generous or rarer | `heart_runner_roll_interval_min/max`, `heart_runner_health_3_spawn_chance`, `heart_runner_health_2_spawn_chance`, `heart_runner_health_1_spawn_chance`, `heart_runner_one_health_grace_duration`, `heart_runner_post_resolution_cooldown` | The opportunity system is separate from hostile caps and wave timing. |
 | Reduce Shielded retrieval pressure | `stopped_hit_landing_clearance`, `stagger_duration`, `knockback_distance` | These affect how safe spear recovery feels after a shield stop. |
 | Increase time between waves | `first_wave_time_min/max`, `inter_wave_interval_min/max`, `recovery_duration` | Wave composition is separate from wave cadence. |

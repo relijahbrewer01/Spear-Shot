@@ -1,6 +1,9 @@
 {
   "comparison_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_comparison.png",
+  "behavior_board_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_behavior_board.png",
   "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\prowler_enemy.png",
+  "active_sheet_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\prowler_enemy_sheet.png",
+  "selected_concept": "Moss Lynx",
   "candidates": [
     {
       "key": "1",

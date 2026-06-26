@@ -186,6 +186,8 @@ var active_heart_pickup: HeartPickup
 @onready var boomer_land_player: AudioStreamPlayer = $AudioPlayers/BoomerLandPlayer
 @onready var boomer_fuse_player: AudioStreamPlayer = $AudioPlayers/BoomerFusePlayer
 @onready var boomer_explosion_player: AudioStreamPlayer = $AudioPlayers/BoomerExplosionPlayer
+@onready var prowler_alert_player: AudioStreamPlayer = $AudioPlayers/ProwlerAlertPlayer
+@onready var prowler_pounce_hit_player: AudioStreamPlayer = $AudioPlayers/ProwlerPounceHitPlayer
 @onready var heart_runner_appear_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAppearPlayer
 @onready var heart_runner_alarm_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAlarmPlayer
 @onready var heart_pickup_spawn_player: AudioStreamPlayer = $AudioPlayers/HeartPickupSpawnPlayer
@@ -374,6 +376,8 @@ func _on_player_dodge_ended() -> void:
 func _on_spear_state_changed(new_state: int) -> void:
 	if new_state != Spear.State.HELD:
 		_clear_buffered_spear_throw()
+	elif prowler_alert_player != null:
+		prowler_alert_player.stop()
 
 
 func _clear_buffered_spear_throw() -> void:
@@ -446,6 +450,10 @@ func _try_spawn_enemy(
 		enemy.connect(&"fuse_started", _on_boomer_enemy_fuse_started)
 	if enemy.has_signal("detonated"):
 		enemy.connect(&"detonated", _on_boomer_enemy_detonated)
+	if enemy.has_signal("alert_started"):
+		enemy.connect(&"alert_started", _on_prowler_alert_started)
+	if enemy.has_signal("hunt_pounce_hit"):
+		enemy.connect(&"hunt_pounce_hit", _on_prowler_hunt_pounce_hit)
 	enemy_container.add_child(enemy)
 	encounter_director.register_enemy(enemy, enemy_kind, wave_id)
 	_mark_intro_seen_for_spawn(enemy_kind, spawn_source)
@@ -1409,6 +1417,21 @@ func _on_boomer_enemy_detonated(
 	_spawn_boomer_blast_effect(position, core_radius, outer_radius)
 
 
+func _on_prowler_alert_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(prowler_alert_player)
+
+
+func _on_prowler_hunt_pounce_hit(_hit_position: Vector2, hit_stop_duration: float) -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(prowler_pounce_hit_player)
+	_try_start_authored_hit_stop(hit_stop_duration, 0.03)
+
+
 func _spawn_dart_projectile(
 	spawn_position: Vector2,
 	fire_direction: Vector2,
@@ -1739,6 +1762,8 @@ func _stop_all_audio() -> void:
 		boomer_land_player,
 		boomer_fuse_player,
 		boomer_explosion_player,
+		prowler_alert_player,
+		prowler_pounce_hit_player,
 		heart_runner_appear_player,
 		heart_runner_alarm_player,
 		heart_pickup_spawn_player,
@@ -1768,6 +1793,8 @@ func _stop_gameplay_sfx() -> void:
 		boomer_land_player,
 		boomer_fuse_player,
 		boomer_explosion_player,
+		prowler_alert_player,
+		prowler_pounce_hit_player,
 		heart_runner_appear_player,
 		heart_runner_alarm_player,
 		heart_pickup_spawn_player,
@@ -1840,8 +1867,6 @@ func _cancel_resume_countdown() -> void:
 func _try_start_close_hit_stop(hit_position: Vector2) -> void:
 	if run_state != RunState.RUNNING:
 		return
-	if hit_stop_active:
-		return
 	if close_hit_stop_duration <= 0.0:
 		return
 	if player == null:
@@ -1849,15 +1874,24 @@ func _try_start_close_hit_stop(hit_position: Vector2) -> void:
 	if player.global_position.distance_to(hit_position) > close_hit_stop_distance:
 		return
 
+	_try_start_authored_hit_stop(close_hit_stop_duration, close_hit_stop_time_scale)
+
+
+func _try_start_authored_hit_stop(hit_stop_duration: float, hit_stop_time_scale: float) -> void:
+	if hit_stop_active:
+		return
+	if hit_stop_duration <= 0.0:
+		return
+
 	hit_stop_active = true
 	hit_stop_restore_token += 1
 	hit_stop_previous_time_scale = Engine.time_scale
-	Engine.time_scale = min(close_hit_stop_time_scale, hit_stop_previous_time_scale)
-	_restore_close_hit_stop_async(hit_stop_restore_token)
+	Engine.time_scale = min(hit_stop_time_scale, hit_stop_previous_time_scale)
+	_restore_hit_stop_async(hit_stop_restore_token, hit_stop_duration)
 
 
-func _restore_close_hit_stop_async(restore_token: int) -> void:
-	await get_tree().create_timer(close_hit_stop_duration, true, false, true).timeout
+func _restore_hit_stop_async(restore_token: int, hit_stop_duration: float) -> void:
+	await get_tree().create_timer(hit_stop_duration, true, false, true).timeout
 	if restore_token != hit_stop_restore_token:
 		return
 	_cancel_hit_stop()

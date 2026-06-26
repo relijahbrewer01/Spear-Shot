@@ -25,6 +25,7 @@ BOOMER_CANVAS_SIZE = (16, 18)
 PROWLER_CANVAS_SIZE = (16, 16)
 HEART_RUNNER_CANVAS_SIZE = (16, 16)
 HEART_PICKUP_CANVAS_SIZE = (10, 10)
+PROWLER_ANIMATION_SHEET_ROWS = ["stalk", "alert", "hunt", "pounce", "recovery"]
 HEART_RUNNER_ANIMATION_SHEET_ROWS = ["casual_strut", "startled_hop", "panicked_sprint"]
 SHOOTER_BLOWGUN_LENGTH = 14
 SHOOTER_BLOWGUN_WIDTH = 1
@@ -122,6 +123,26 @@ def draw_prowler_enemy(path: Path) -> None:
     image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     _draw_prowler_variant_silhouette(draw, build_prowler_variant_specs()[1])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def draw_prowler_animation_sheet(path: Path) -> None:
+    frame_width, frame_height = PROWLER_CANVAS_SIZE
+    image = Image.new(
+        "RGBA",
+        (frame_width * 4, frame_height * len(PROWLER_ANIMATION_SHEET_ROWS)),
+        (0, 0, 0, 0),
+    )
+
+    for row_index, sequence_key in enumerate(PROWLER_ANIMATION_SHEET_ROWS):
+        for frame_index in range(4):
+            frame_image = _render_prowler_animation_frame(sequence_key, frame_index)
+            image.alpha_composite(
+                frame_image,
+                (frame_index * frame_width, row_index * frame_height),
+            )
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -500,6 +521,256 @@ def _draw_prowler_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ProwlerVar
     draw.point((9, 9), fill=spec.shadow_color)
 
 
+def _render_prowler_animation_frame(
+    sequence_key: str,
+    frame_index: int,
+) -> Image.Image:
+    image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    spec = build_prowler_variant_specs()[1]
+    _draw_prowler_animation_silhouette(draw, spec, sequence_key, frame_index)
+    return image
+
+
+def _draw_prowler_animation_silhouette(
+    draw: ImageDraw.ImageDraw,
+    spec: ProwlerVariantSpec,
+    sequence_key: str,
+    frame_index: int,
+) -> None:
+    red_eye = (232, 78, 74, 255)
+    muzzle_color = spec.accent_color
+    back_color = spec.body_color
+    shadow_color = spec.shadow_color
+    eye_color = spec.eye_color
+
+    if sequence_key == "stalk":
+        body_boxes = [
+            (4, 8, 11, 12),
+            (4, 7, 11, 11),
+            (4, 8, 11, 12),
+            (4, 7, 11, 11),
+        ]
+        head_polys = [
+            [(8, 7), (11, 6), (13, 7), (13, 9), (10, 10), (8, 9)],
+            [(8, 6), (11, 5), (13, 6), (13, 8), (10, 9), (8, 8)],
+            [(8, 7), (11, 6), (13, 7), (13, 9), (10, 10), (8, 9)],
+            [(8, 6), (11, 5), (13, 6), (13, 8), (10, 9), (8, 8)],
+        ]
+        tail_lines = [
+            ((4, 9), (2, 8), (1, 9)),
+            ((4, 8), (2, 7), (1, 8)),
+            ((4, 9), (2, 10), (1, 9)),
+            ((4, 8), (2, 9), (1, 8)),
+        ]
+        front_legs = [
+            ((10, 12), (13, 13)),
+            ((9, 11), (12, 13)),
+            ((10, 12), (13, 12)),
+            ((9, 11), (12, 12)),
+        ]
+        hind_legs = [
+            ((5, 12), (4, 15), (8, 12), (9, 15)),
+            ((5, 11), (4, 14), (8, 11), (9, 14)),
+            ((5, 12), (4, 15), (8, 12), (9, 14)),
+            ((5, 11), (4, 14), (8, 11), (9, 15)),
+        ]
+        body_box = body_boxes[frame_index]
+        draw.ellipse(body_box, fill=back_color)
+        draw.polygon(head_polys[frame_index], fill=back_color)
+        draw.polygon(
+            [
+                (9, head_polys[frame_index][0][1]),
+                (12, head_polys[frame_index][0][1]),
+                (13, head_polys[frame_index][3][1]),
+                (11, head_polys[frame_index][4][1]),
+                (9, head_polys[frame_index][5][1]),
+            ],
+            fill=muzzle_color,
+        )
+        tail = tail_lines[frame_index]
+        draw.line((tail[0][0], tail[0][1], tail[1][0], tail[1][1]), fill=shadow_color, width=1)
+        draw.line((tail[1][0], tail[1][1], tail[2][0], tail[2][1]), fill=shadow_color, width=1)
+        legs = hind_legs[frame_index]
+        draw.line((legs[0][0], legs[0][1], legs[1][0], legs[1][1]), fill=shadow_color, width=1)
+        draw.line((legs[2][0], legs[2][1], legs[3][0], legs[3][1]), fill=shadow_color, width=1)
+        front_leg = front_legs[frame_index]
+        draw.line((front_leg[0][0], front_leg[0][1], front_leg[1][0], front_leg[1][1]), fill=shadow_color, width=1)
+        draw.point((11, 8 if frame_index % 2 == 0 else 7), fill=eye_color)
+        draw.point((12, 8 if frame_index % 2 == 0 else 7), fill=eye_color)
+        return
+
+    if sequence_key == "alert":
+        frame_settings = [
+            {"body": (4, 8, 11, 12), "head_y": 7, "eye": eye_color, "jaw": False},
+            {"body": (4, 7, 11, 11), "head_y": 6, "eye": eye_color, "jaw": False},
+            {"body": (4, 7, 11, 11), "head_y": 6, "eye": red_eye, "jaw": True},
+            {"body": (4, 8, 11, 12), "head_y": 7, "eye": red_eye, "jaw": True},
+        ]
+        setting = frame_settings[frame_index]
+        draw.ellipse(setting["body"], fill=back_color)
+        draw.polygon(
+            [(8, setting["head_y"]), (11, setting["head_y"] - 1), (13, setting["head_y"]), (14, setting["head_y"] + 2), (10, setting["head_y"] + 3), (8, setting["head_y"] + 2)],
+            fill=back_color,
+        )
+        draw.polygon(
+            [(9, setting["head_y"]), (12, setting["head_y"]), (13, setting["head_y"] + 2), (11, setting["head_y"] + 3), (9, setting["head_y"] + 2)],
+            fill=muzzle_color,
+        )
+        draw.line((4, 9, 2, 8), fill=shadow_color, width=1)
+        draw.line((2, 8, 1, 9), fill=shadow_color, width=1)
+        draw.line((5, setting["body"][3], 4, 15), fill=shadow_color, width=1)
+        draw.line((8, setting["body"][3], 9, 15), fill=shadow_color, width=1)
+        draw.line((10, setting["body"][3], 13, 13), fill=shadow_color, width=1)
+        draw.point((11, setting["head_y"] + 1), fill=setting["eye"])
+        draw.point((12, setting["head_y"] + 1), fill=setting["eye"])
+        if setting["jaw"]:
+            draw.line((10, setting["head_y"] + 3, 12, setting["head_y"] + 4), fill=shadow_color, width=1)
+        return
+
+    if sequence_key == "hunt":
+        body_boxes = [
+            (4, 8, 11, 12),
+            (5, 7, 12, 11),
+            (4, 8, 11, 12),
+            (5, 7, 12, 11),
+        ]
+        head_polys = [
+            [(8, 7), (11, 6), (13, 7), (14, 8), (11, 10), (8, 9)],
+            [(9, 6), (12, 5), (14, 6), (15, 7), (12, 9), (9, 8)],
+            [(8, 7), (11, 6), (13, 7), (14, 8), (11, 10), (8, 9)],
+            [(9, 6), (12, 5), (14, 6), (15, 7), (12, 9), (9, 8)],
+        ]
+        tail_lines = [
+            ((4, 9), (2, 9), (1, 10)),
+            ((5, 8), (3, 8), (2, 9)),
+            ((4, 9), (2, 8), (1, 9)),
+            ((5, 8), (3, 7), (2, 8)),
+        ]
+        hind_legs = [
+            ((5, 12), (4, 15), (8, 12), (9, 14)),
+            ((6, 11), (4, 14), (9, 11), (10, 14)),
+            ((5, 12), (4, 15), (8, 12), (9, 14)),
+            ((6, 11), (5, 14), (9, 11), (11, 13)),
+        ]
+        front_legs = [
+            ((10, 12), (13, 14)),
+            ((11, 11), (14, 13)),
+            ((10, 12), (13, 13)),
+            ((11, 11), (14, 12)),
+        ]
+        body_box = body_boxes[frame_index]
+        draw.ellipse(body_box, fill=back_color)
+        draw.polygon(head_polys[frame_index], fill=back_color)
+        draw.polygon(
+            [
+                (10, head_polys[frame_index][0][1]),
+                (13, head_polys[frame_index][0][1]),
+                (14, head_polys[frame_index][3][1]),
+                (12, head_polys[frame_index][4][1]),
+                (10, head_polys[frame_index][5][1]),
+            ],
+            fill=muzzle_color,
+        )
+        tail = tail_lines[frame_index]
+        draw.line((tail[0][0], tail[0][1], tail[1][0], tail[1][1]), fill=shadow_color, width=1)
+        draw.line((tail[1][0], tail[1][1], tail[2][0], tail[2][1]), fill=shadow_color, width=1)
+        legs = hind_legs[frame_index]
+        draw.line((legs[0][0], legs[0][1], legs[1][0], legs[1][1]), fill=shadow_color, width=1)
+        draw.line((legs[2][0], legs[2][1], legs[3][0], legs[3][1]), fill=shadow_color, width=1)
+        front_leg = front_legs[frame_index]
+        draw.line((front_leg[0][0], front_leg[0][1], front_leg[1][0], front_leg[1][1]), fill=shadow_color, width=1)
+        draw.point((12 if frame_index % 2 == 0 else 13, 8 if frame_index % 2 == 0 else 7), fill=red_eye)
+        draw.point((13 if frame_index % 2 == 0 else 14, 8 if frame_index % 2 == 0 else 7), fill=red_eye)
+        return
+
+    if sequence_key == "pounce":
+        if frame_index <= 1:
+            crouch_y = 8 if frame_index == 0 else 7
+            draw.ellipse((4, crouch_y, 11, crouch_y + 4), fill=back_color)
+            draw.polygon([(8, crouch_y - 1), (11, crouch_y - 2), (13, crouch_y - 1), (14, crouch_y + 1), (10, crouch_y + 2), (8, crouch_y + 1)], fill=back_color)
+            draw.polygon([(9, crouch_y - 1), (12, crouch_y - 1), (13, crouch_y + 1), (11, crouch_y + 2), (9, crouch_y + 1)], fill=muzzle_color)
+            draw.line((4, crouch_y + 1, 2, crouch_y), fill=shadow_color, width=1)
+            draw.line((2, crouch_y, 1, crouch_y + 1), fill=shadow_color, width=1)
+            draw.line((5, crouch_y + 4, 4, 15), fill=shadow_color, width=1)
+            draw.line((8, crouch_y + 4, 9, 15), fill=shadow_color, width=1)
+            draw.line((10, crouch_y + 4, 13, 13), fill=shadow_color, width=1)
+            draw.point((11, crouch_y), fill=red_eye)
+            draw.point((12, crouch_y), fill=red_eye)
+            return
+
+        if frame_index == 2:
+            draw.ellipse((5, 6, 11, 10), fill=back_color)
+            draw.polygon([(9, 5), (12, 4), (14, 5), (15, 7), (12, 8), (9, 7)], fill=back_color)
+            draw.polygon([(10, 5), (13, 5), (14, 7), (12, 8), (10, 7)], fill=muzzle_color)
+            draw.line((5, 8, 3, 6), fill=shadow_color, width=1)
+            draw.line((7, 10, 4, 13), fill=shadow_color, width=1)
+            draw.line((9, 10, 12, 13), fill=shadow_color, width=1)
+            draw.line((11, 9, 14, 11), fill=shadow_color, width=1)
+            draw.point((12, 6), fill=red_eye)
+            draw.point((13, 6), fill=red_eye)
+            return
+
+        draw.ellipse((6, 6, 12, 10), fill=back_color)
+        draw.polygon([(10, 5), (13, 4), (15, 5), (15, 7), (13, 8), (10, 7)], fill=back_color)
+        draw.polygon([(11, 5), (14, 5), (15, 7), (13, 8), (11, 7)], fill=muzzle_color)
+        draw.line((6, 8, 4, 6), fill=shadow_color, width=1)
+        draw.line((8, 10, 5, 13), fill=shadow_color, width=1)
+        draw.line((10, 10, 13, 13), fill=shadow_color, width=1)
+        draw.line((12, 9, 15, 10), fill=shadow_color, width=1)
+        draw.point((13, 6), fill=red_eye)
+        draw.point((14, 6), fill=red_eye)
+        return
+
+    recovery_frames = [
+        {
+            "body": (5, 9, 12, 13),
+            "head": [(9, 8), (12, 7), (14, 8), (14, 10), (11, 11), (9, 10)],
+            "tail": ((5, 10), (3, 11), (2, 12)),
+            "eyes": red_eye,
+        },
+        {
+            "body": (4, 9, 11, 13),
+            "head": [(8, 8), (11, 7), (13, 8), (13, 10), (10, 11), (8, 10)],
+            "tail": ((4, 10), (2, 10), (1, 11)),
+            "eyes": red_eye,
+        },
+        {
+            "body": (4, 10, 11, 13),
+            "head": [(8, 9), (11, 8), (13, 9), (13, 10), (10, 11), (8, 10)],
+            "tail": ((4, 10), (2, 9), (1, 10)),
+            "eyes": eye_color,
+        },
+        {
+            "body": (4, 8, 11, 12),
+            "head": [(8, 7), (11, 6), (13, 7), (13, 9), (10, 10), (8, 9)],
+            "tail": ((4, 9), (2, 8), (1, 9)),
+            "eyes": eye_color,
+        },
+    ]
+    frame = recovery_frames[frame_index]
+    draw.ellipse(frame["body"], fill=back_color)
+    draw.polygon(frame["head"], fill=back_color)
+    draw.polygon(
+        [
+            (9, frame["head"][0][1]),
+            (12, frame["head"][0][1]),
+            (13, frame["head"][3][1]),
+            (11, frame["head"][4][1]),
+            (9, frame["head"][5][1]),
+        ],
+        fill=muzzle_color,
+    )
+    tail = frame["tail"]
+    draw.line((tail[0][0], tail[0][1], tail[1][0], tail[1][1]), fill=shadow_color, width=1)
+    draw.line((tail[1][0], tail[1][1], tail[2][0], tail[2][1]), fill=shadow_color, width=1)
+    draw.line((5, frame["body"][3], 4, 15), fill=shadow_color, width=1)
+    draw.line((8, frame["body"][3], 9, 15), fill=shadow_color, width=1)
+    draw.line((10, frame["body"][3], 13, 13), fill=shadow_color, width=1)
+    draw.point((11, frame["head"][0][1] + 1), fill=frame["eyes"])
+    draw.point((12, frame["head"][0][1] + 1), fill=frame["eyes"])
+
+
 def _draw_palette_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ShooterPaletteVariantSpec) -> None:
     draw.ellipse((6, 9, 11, 17), fill=spec.shadow_color)
     draw.polygon(
@@ -723,6 +994,7 @@ def generate_boomer_candidate_assets() -> dict[str, object]:
 def generate_prowler_candidate_assets() -> dict[str, object]:
     DEV_PROWLER_DIR.mkdir(parents=True, exist_ok=True)
     comparison_path = DEV_PROWLER_DIR / "prowler_comparison.png"
+    behavior_board_path = DEV_PROWLER_DIR / "prowler_behavior_board.png"
     manifest_path = DEV_PROWLER_DIR / "prowler_manifest.json"
 
     variant_specs: list[ProwlerVariantSpec] = []
@@ -738,9 +1010,13 @@ def generate_prowler_candidate_assets() -> dict[str, object]:
         })
 
     draw_prowler_comparison(variant_specs, comparison_path)
+    draw_prowler_behavior_board(behavior_board_path)
     manifest = {
         "comparison_path": str(comparison_path),
+        "behavior_board_path": str(behavior_board_path),
         "active_reference_path": str(SPRITE_DIR / "prowler_enemy.png"),
+        "active_sheet_path": str(SPRITE_DIR / "prowler_enemy_sheet.png"),
+        "selected_concept": "Moss Lynx",
         "candidates": manifest_candidates,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -921,6 +1197,69 @@ def draw_prowler_comparison(
 
     comparison_path.parent.mkdir(parents=True, exist_ok=True)
     background.save(comparison_path)
+
+
+def build_prowler_animation_sequences() -> dict[str, dict[str, object]]:
+    return {
+        "stalk": {
+            "title": "Stalk",
+            "description": "Low cautious pacing while Akedra is armed.",
+        },
+        "alert": {
+            "title": "Alert",
+            "description": "Red-eye territorial snap on HELD -> unheld.",
+        },
+        "hunt": {
+            "title": "Hunt",
+            "description": "Forward-leaning aggressive chase with faster cadence.",
+        },
+        "pounce": {
+            "title": "Pounce",
+            "description": "Committed defensive or hunting launch frames.",
+        },
+        "recovery": {
+            "title": "Recovery",
+            "description": "Miss skid, punishable stun, and wary reset frames.",
+        },
+    }
+
+
+def draw_prowler_behavior_board(board_path: Path) -> None:
+    background = _load_arena_background()
+    draw = ImageDraw.Draw(background)
+    font = ImageFont.load_default()
+    sequence_specs = build_prowler_animation_sequences()
+
+    _draw_label(draw, (8, 8), "Prowler Behavior Board", font)
+    _draw_label(draw, (8, 20), "Revised Moss Lynx states at native arena scale", font)
+
+    benchmark_row = [
+        ("Akedra", ROOT / "art" / "sprites" / "player_hunter.png", (34, 92)),
+        ("Normal", ROOT / "art" / "sprites" / "enemy_creature.png", (80, 92)),
+        ("Shielded", ROOT / "art" / "sprites" / "shielded_enemy.png", (126, 92)),
+        ("Shooter", ROOT / "art" / "sprites" / "shooter_enemy.png", (172, 92)),
+        ("Boomer", ROOT / "art" / "sprites" / "boomer_enemy.png", (218, 92)),
+        ("Runner", ROOT / "art" / "sprites" / "heart_runner.png", (264, 92)),
+        ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (330, 92)),
+    ]
+    for label, sprite_path, feet_position in benchmark_row:
+        _paste_grounded_sprite(background, sprite_path, feet_position)
+        _draw_label(draw, (feet_position[0] - 16, feet_position[1] + 4), label, font)
+
+    state_keys = ["stalk", "alert", "hunt", "pounce", "recovery"]
+    state_frames = [1, 3, 1, 2, 2]
+    state_positions = [18, 90, 162, 234, 306]
+    for index, sequence_key in enumerate(state_keys):
+        frame_image = _scale_image_nearest_integer(
+            _render_prowler_animation_frame(sequence_key, state_frames[index]),
+            3,
+        )
+        background.alpha_composite(frame_image, (state_positions[index], 136))
+        _draw_label(draw, (state_positions[index] - 2, 126), sequence_specs[sequence_key]["title"], font)
+        _draw_label(draw, (state_positions[index] - 12, 188), sequence_specs[sequence_key]["description"], font)
+
+    board_path.parent.mkdir(parents=True, exist_ok=True)
+    background.save(board_path)
 
 
 def draw_heart_runner_comparison(
@@ -1197,6 +1536,7 @@ def draw_standard_assets() -> None:
     draw_shooter_enemy(SPRITE_DIR / "shooter_enemy.png")
     draw_boomer_enemy(SPRITE_DIR / "boomer_enemy.png")
     draw_prowler_enemy(SPRITE_DIR / "prowler_enemy.png")
+    draw_prowler_animation_sheet(SPRITE_DIR / "prowler_enemy_sheet.png")
     draw_heart_runner(SPRITE_DIR / "heart_runner.png")
     draw_heart_runner_animation_sheet(SPRITE_DIR / "heart_runner_sheet.png")
     draw_heart_pickup(SPRITE_DIR / "heart_pickup.png")
@@ -1232,7 +1572,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Generate live assets plus the temporary Shooter, Boomer, Heart Runner concept, and Heart Runner animation outputs.",
+        help="Generate live assets plus the temporary Shooter, Boomer, Prowler, Heart Runner concept, and Heart Runner animation outputs.",
     )
     return parser.parse_args()
 

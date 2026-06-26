@@ -547,6 +547,56 @@ def generate_heart_runner_alarm() -> list[float]:
     return samples
 
 
+def generate_prowler_alert() -> list[float]:
+    length = int(SAMPLE_RATE * 0.34)
+    samples: list[float] = []
+    body_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        body_noise = body_noise * 0.90 + raw_noise * 0.10
+        low_growl = math.sin(2.0 * math.pi * (132.0 - progress * 24.0) * index / SAMPLE_RATE)
+        throat_resonance = math.sin(2.0 * math.pi * (214.0 + progress * 32.0) * index / SAMPLE_RATE)
+        hiss_noise = (raw_noise - body_noise) * 0.22
+        pulse = math.exp(-((progress - 0.58) / 0.20) ** 2)
+        samples.append(
+            (
+                low_growl * 0.34
+                + throat_resonance * 0.18 * (0.35 + pulse)
+                + body_noise * 0.24 * (0.45 + pulse)
+                + hiss_noise
+            )
+            * envelope(progress, 0.03, 0.20)
+        )
+    return samples
+
+
+def generate_prowler_pounce_hit() -> list[float]:
+    length = int(SAMPLE_RATE * 0.13)
+    samples: list[float] = []
+    body_resonance = 0.0
+    previous_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        snap_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        body_resonance = body_resonance * 0.84 + raw_noise * 0.16
+        bite_click = math.sin(2.0 * math.pi * (520.0 - progress * 160.0) * index / SAMPLE_RATE)
+        body_thump = math.sin(2.0 * math.pi * (148.0 - progress * 20.0) * index / SAMPLE_RATE)
+        hit_curve = math.exp(-progress * 9.0)
+        samples.append(
+            (
+                bite_click * 0.26 * hit_curve
+                + body_thump * 0.40 * hit_curve
+                + body_resonance * 0.24 * hit_curve
+                + snap_noise * 0.22 * hit_curve
+            )
+            * envelope(progress, 0.006, 0.60)
+        )
+    return samples
+
+
 def generate_heart_pickup_spawn() -> list[float]:
     length = int(SAMPLE_RATE * 0.16)
     samples: list[float] = []
@@ -604,6 +654,8 @@ def main() -> None:
         "boomer_land.wav": generate_boomer_land(),
         "boomer_fuse.wav": generate_boomer_fuse(),
         "boomer_explosion.wav": generate_boomer_explosion(),
+        "prowler_alert.wav": generate_prowler_alert(),
+        "prowler_pounce_hit.wav": generate_prowler_pounce_hit(),
         "heart_runner_appear.wav": generate_heart_runner_appear(),
         "heart_pickup_spawn.wav": generate_heart_pickup_spawn(),
         "heart_pickup_collect.wav": generate_heart_pickup_collect(),

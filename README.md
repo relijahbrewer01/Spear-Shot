@@ -90,7 +90,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
 - `art/sprites/boomer_enemy.png`: active Boomer sprite chosen from the local concept pass and kept on the same small readable scale as the rest of the special roster
-- `art/sprites/prowler_enemy.png`: active Prowler sprite chosen from the local three-candidate comparison board as the final low stalking predator silhouette
+- `art/sprites/prowler_enemy.png`: active Prowler base sprite chosen from the local three-candidate comparison board as the final Moss Lynx predator silhouette
+- `art/sprites/prowler_enemy_sheet.png`: live `4x5` Prowler animation sheet covering stalking, alert, hunting, pounce, and recovery states
 - `art/sprites/heart_runner.png`: approved Heart Runner base silhouette chosen from the local three-variant comparison board
 - `art/sprites/heart_runner_sheet.png`: live `4x3` Heart Runner animation sheet containing the approved calm strut, startled hop, and panic sprint
 - `art/sprites/heart_pickup.png`: temporary heart pickup sprite used after a Runner defeat
@@ -110,13 +111,15 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/boomer_land.wav`: local physical landing cue for the Boomer
 - `audio/boomer_fuse.wav`: local three-pulse fuse escalation cue for the Boomer
 - `audio/boomer_explosion.wav`: local physical blast cue for the Boomer
+- `audio/prowler_alert.wav`: local territorial growl cue for the Prowler's armed-to-unarmed transformation
+- `audio/prowler_pounce_hit.wav`: local physical bite/body-impact cue for a successful hunting pounce
 - `audio/heart_runner_appear.wav`: local skittering arrival cue for the Heart Runner
 - `audio/heart_runner_alarm.wav`: local startled alarm cue for the Heart Runner's panic trigger
 - `audio/heart_pickup_spawn.wav`: local reward-pop cue for a spawned heart pickup
 - `audio/heart_pickup_collect.wav`: local recovery cue for collecting the heart pickup
 - `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, Prowler, and Heart Runner sprites, the live Heart Runner animation sheet, and the temporary local comparison outputs for the Phase 4 concept passes
+- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, Prowler, and Heart Runner sprites, the live Prowler and Heart Runner animation sheets, and the temporary local comparison/behavior-board outputs for the Phase 4 concept passes
 - `tools/generate_music.py`: synthesizes both background loops locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -134,7 +137,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
 - `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
-- `ProwlerEnemy.tscn` and `scripts/prowler_enemy.gd`: ambient-only weapon-state predator that stalks while Akedra is armed, flashes through a short alert, then hunts aggressively whenever the spear is not held
+- `ProwlerEnemy.tscn` and `scripts/prowler_enemy.gd`: ambient-only weapon-state predator with armed stalking, a defensive personal-space pounce, red-eye unarmed alert, one committed hunting pounce per unarmed window, and miss/recovery handling
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
 - `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile opportunity runner with visible calm entry, limited wandering, proximity-triggered panic, locked casual-or-panic exit routing, explicit spear-hit handling, authored displacement support, and currently locked route exit-plane cleanup
 - `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
@@ -160,7 +163,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/boomer_enemy_audit.py`: static Phase 4.3 Boomer contract audit
 - `tools/BoomerEnemyRuntimeAudit.tscn`: runtime audit for Boomer movement, fuse, detonation, scoring, cleanup, and intro integration
 - `tools/prowler_enemy_audit.py`: static Phase 4.5 Prowler contract audit
-- `tools/ProwlerEnemyRuntimeAudit.tscn`: runtime audit for Prowler stalking, alert/hunt transitions, intro integration, cleanup, and cap behavior
+- `tools/ProwlerEnemyRuntimeAudit.tscn`: runtime audit for Prowler stalking, defensive armed pounce, alert/hunt transitions, committed hunting pounce outcomes, intro integration, cleanup, and cap behavior
 - `tools/heart_runner_audit.py`: static Phase 4.4 opportunity-system, pickup, audio, and contract audit
 - `tools/HeartRunnerRuntimeAudit.tscn`: runtime audit for Heart Runner spawning, state-driven animation, cleanup, pickup, cooldown, and pause/restart behavior
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
@@ -174,9 +177,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 ## Phase 4.5 - Prowler
 
 - Prowler is an ambient-only hostile that turns Akedra's weapon state into a live spacing question instead of a passive stat check
-- While the spear is `HELD`, it stalks at medium range with cautious lateral movement instead of rushing directly into contact
-- While the spear is `FLYING` or `LANDED`, it gives one short readable alert, then commits to a faster direct hunt until the spear is legitimately recovered
-- It dies to one valid thrown-spear hit, awards `2` points, uses ordinary body contact damage, and does not steal, move, hide, or otherwise manipulate the spear
+- While the spear is `HELD`, it keeps a cautious `72-104` pixel stalking band and uses a short defensive pass-through pounce only when Akedra crowds its personal space
+- While the spear is `FLYING` or `LANDED`, it gives one longer red-eye alert and then commits to a faster direct hunt until the spear is legitimately recovered
+- Each unarmed window grants exactly one committed hunting pounce attempt; a successful hit knocks Akedra back, while a dodge or invulnerability rejection leaves the Prowler in a brief punishable skid/stun recovery
+- It dies to one valid thrown-spear hit, awards `2` points, uses ordinary body contact damage outside its authored attacks, and does not steal, move, hide, or otherwise manipulate the spear
 - It remains ambient-only in Phase 4.5 with a dedicated cap of `1`, its own first-introduction guarantee, and no authored wave membership
 
 ## Enemy behavior
@@ -198,8 +202,9 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - An armed Boomer detonates into a damaging core blast plus a non-damaging outer shockwave, can be triggered early by a valid thrown-spear hit during fuse, and awards no direct score for self-destruction
 - If Akedra is currently in shove-protected forced movement from a successful Shooter shove, the Boomer core blast deals no health damage and does not replace that authored movement with a second knockback impulse
 - A Boomer outer shockwave can lightly nudge an already landed spear by `20` pixels, keeping it in `LANDED`/`FETCH`, clamping it inside the arena, and preserving normal retrieval behavior
-- Prowler: ambient-only weapon-state predator that keeps a `72-104` pixel stalking band while Akedra is armed, then becomes a faster direct hunter after a short `0.14s` alert whenever the spear is not held
-- Recovering the spear returns the Prowler to stalking immediately, so it pressures bad throw timing without making throwing itself universally wrong
+- Prowler: ambient-only weapon-state predator that stalks while Akedra is armed, uses a short defensive personal-space pounce when crowded, then turns red-eyed and aggressive after a `0.28s` unarmed alert whenever the spear is not held
+- Each unarmed cycle grants one committed hunting pounce with player knockback on a valid hit and a brief punishable skid/stun on a dodge or invulnerability rejection
+- Recovering the spear returns the Prowler to stalking immediately unless an already-airborne pounce is finishing, so it pressures bad throw timing without making throwing itself universally wrong
 
 ## Opportunity behavior
 
@@ -464,7 +469,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 
 ## Known limitations
 
-- There are currently five enemy types, all using intentionally simple movement logic
+- There are currently six hostile enemy types plus the separate Heart Runner opportunity system, all built from intentionally readable low-complexity behavior logic
 - Art and music are intentionally simple local placeholder assets rather than a full content pipeline
 - Enemy avoidance is intentionally lightweight and not full pathfinding
 

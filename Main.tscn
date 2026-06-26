@@ -25,11 +25,13 @@
 [ext_resource type="AudioStream" uid="uid://bub78xhwt1lh3" path="res://audio/boomer_land.wav" id="23"]
 [ext_resource type="AudioStream" uid="uid://ceknmab17uguh" path="res://audio/boomer_fuse.wav" id="24"]
 [ext_resource type="AudioStream" uid="uid://chsiu7a6hddk8" path="res://audio/boomer_explosion.wav" id="25"]
-[ext_resource type="AudioStream" path="res://audio/heart_runner_appear.wav" id="26"]
-[ext_resource type="AudioStream" path="res://audio/heart_pickup_spawn.wav" id="27"]
-[ext_resource type="AudioStream" path="res://audio/heart_pickup_collect.wav" id="28"]
-[ext_resource type="AudioStream" path="res://audio/heart_pickup_expire.wav" id="29"]
-[ext_resource type="AudioStream" path="res://audio/heart_runner_alarm.wav" id="30"]
+[ext_resource type="AudioStream" path="res://audio/prowler_alert.wav" id="26"]
+[ext_resource type="AudioStream" path="res://audio/prowler_pounce_hit.wav" id="27"]
+[ext_resource type="AudioStream" path="res://audio/heart_runner_appear.wav" id="28"]
+[ext_resource type="AudioStream" path="res://audio/heart_pickup_spawn.wav" id="29"]
+[ext_resource type="AudioStream" path="res://audio/heart_pickup_collect.wav" id="30"]
+[ext_resource type="AudioStream" path="res://audio/heart_pickup_expire.wav" id="31"]
+[ext_resource type="AudioStream" path="res://audio/heart_runner_alarm.wav" id="32"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -155,30 +157,41 @@ volume_db = -3.0
 max_polyphony = 2
 bus = &"SFX"
 
-[node name="HeartRunnerAppearPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311112]
+[node name="ProwlerAlertPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624184]
 stream = ExtResource("26")
+volume_db = -8.0
+bus = &"SFX"
+
+[node name="ProwlerPounceHitPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624185]
+stream = ExtResource("27")
+volume_db = -5.0
+max_polyphony = 2
+bus = &"SFX"
+
+[node name="HeartRunnerAppearPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311112]
+stream = ExtResource("28")
 volume_db = -11.0
 max_polyphony = 2
 bus = &"SFX"
 
 [node name="HeartRunnerAlarmPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311116]
-stream = ExtResource("30")
+stream = ExtResource("32")
 volume_db = -10.0
 max_polyphony = 2
 bus = &"SFX"
 
 [node name="HeartPickupSpawnPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311113]
-stream = ExtResource("27")
+stream = ExtResource("29")
 volume_db = -8.0
 bus = &"SFX"
 
 [node name="HeartPickupCollectPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311114]
-stream = ExtResource("28")
+stream = ExtResource("30")
 volume_db = -6.0
 bus = &"SFX"
 
 [node name="HeartPickupExpirePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=102311115]
-stream = ExtResource("29")
+stream = ExtResource("31")
 volume_db = -12.0
 bus = &"SFX"
 

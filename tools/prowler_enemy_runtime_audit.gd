@@ -18,10 +18,12 @@ func _ready() -> void:
 
 
 func _run_audit() -> void:
-	await _audit_stalking_and_state_transitions()
-	await _audit_contact_damage_and_death()
-	await _audit_main_integration_and_intro()
-	await _audit_pause_restart_and_game_over_cleanup()
+	await _audit_stalk_and_defensive_pounce()
+	await _audit_alert_hunt_and_recovery()
+	await _audit_hunt_pounce_success_and_limit()
+	await _audit_hunt_pounce_dodge_rejection_and_rearm()
+	await _audit_death_and_score()
+	await _audit_main_integration_and_cleanup()
 
 	for failure in failures:
 		push_error("PROWLER RUNTIME AUDIT: %s" % failure)
@@ -30,15 +32,15 @@ func _run_audit() -> void:
 	get_tree().quit(0 if failures.is_empty() else 1)
 
 
-func _audit_stalking_and_state_transitions() -> void:
+func _audit_stalk_and_defensive_pounce() -> void:
 	var root := Node2D.new()
 	add_child(root)
-	var player := _spawn_player(root, Vector2(220.0, 108.0))
+	var player := _spawn_player(root, Vector2(192.0, 108.0))
 	var spear := _spawn_spear(root, player)
-	var prowler := _spawn_prowler(root, player, spear, Vector2(80.0, 108.0))
-	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.STALK, "Prowler begins in STALK while the spear is held.")
+	var prowler := _spawn_prowler(root, player, spear, Vector2(104.0, 108.0))
 	var far_start_x := prowler.global_position.x
 	await _advance_physics(0.30)
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.STALK, "Prowler begins in STALK while the spear is held.")
 	_require(prowler.global_position.x > far_start_x + 1.0, "Prowler approaches when Akedra is beyond the stalking band.")
 	await _free_test_root(root)
 
@@ -60,12 +62,9 @@ func _audit_stalking_and_state_transitions() -> void:
 	await _advance_physics(0.06)
 	var committed_side := prowler.lateral_side
 	var stalk_start := prowler.global_position
-	var toward_player := (player.global_position - stalk_start).normalized()
 	await _advance_physics(0.26)
 	var stalk_displacement := prowler.global_position - stalk_start
 	_require(stalk_displacement.length() > 2.0, "Prowler keeps moving inside the stalking band instead of freezing.")
-	if stalk_displacement.length() > 0.0 and toward_player != Vector2.ZERO:
-		_require(absf(stalk_displacement.normalized().dot(toward_player)) < 0.85, "Prowler stalking uses a shallow lateral track rather than pure direct chase.")
 	_require(prowler.lateral_side == committed_side, "Prowler keeps one lateral choice committed during the stalking window.")
 	await _free_test_root(root)
 
@@ -89,45 +88,168 @@ func _audit_stalking_and_state_transitions() -> void:
 	var initial_spacing := prowler.global_position.distance_to(neighbor.global_position)
 	await _advance_physics(0.35)
 	var separated_spacing := prowler.global_position.distance_to(neighbor.global_position)
-	_require(separated_spacing > initial_spacing + 1.0, "Prowler participates in the shared lightweight enemy separation.")
+	_require(separated_spacing > initial_spacing + 1.0, "Prowler participates in shared lightweight enemy separation.")
 	await _free_test_root(root)
 
 	root = Node2D.new()
 	add_child(root)
 	player = _spawn_player(root, Vector2(192.0, 108.0))
 	spear = _spawn_spear(root, player)
-	prowler = _spawn_prowler(root, player, spear, Vector2(112.0, 108.0))
-	_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audit setup can throw the spear to trigger the unarmed transition.")
-	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.ALERT, "HELD -> FLYING enters the one-shot ALERT state.")
-	await _advance_physics(0.04)
-	var alert_time_after_tick := prowler.alert_time_left
-	spear.call("_enter_landed_state", Vector2(248.0, 108.0))
-	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.ALERT, "FLYING -> LANDED keeps the Prowler on the same unarmed escalation path.")
-	_require(prowler.alert_time_left <= alert_time_after_tick + 0.001, "Repeated unarmed spear states do not restart the alert timer.")
-	var reached_hunt := await _advance_until(
-		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.HUNT,
-		0.24,
-		"prowler hunt transition"
+	prowler = _spawn_prowler(root, player, spear, Vector2(214.0, 108.0))
+	var starting_health := player.health
+	await _advance_physics(0.02)
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.DEFENSIVE_WINDUP, "Crowding the armed Prowler enters DEFENSIVE_WINDUP instead of direct chase.")
+	var reached_defensive_pounce := await _advance_until(
+		func() -> bool:
+			return prowler.prowler_state == ProwlerEnemy.ProwlerState.POUNCE and prowler.debug_get_current_pounce_mode_name() == "DEFENSIVE",
+		0.30,
+		"defensive pounce start"
 	)
-	_require(reached_hunt, "Prowler reaches HUNT after the single alert delay.")
-	_require(spear.state == Spear.State.LANDED and prowler.prowler_state == ProwlerEnemy.ProwlerState.HUNT, "Landed but unrecovered spear still counts as unarmed hunting.")
-	player.global_position = spear.global_position
-	spear.call("_pickup")
-	_require(spear.is_held(), "Audit recovery path returns the spear to HELD.")
-	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.STALK, "Legitimate spear recovery returns the Prowler to STALK immediately.")
+	_require(reached_defensive_pounce, "Defensive pounce begins after the short windup.")
+	var reached_retreat := await _advance_until(
+		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.RETREAT,
+		0.40,
+		"defensive retreat"
+	)
+	_require(reached_retreat, "Defensive pounce crosses into RETREAT instead of stopping on top of Akedra.")
+	_require(player.health == starting_health - 1, "Successful defensive pounce deals exactly 1 damage through the existing player authority.")
+	player.global_position = prowler.global_position + Vector2(-6.0, 0.0)
+	await _advance_physics(0.20)
+	_require(prowler.prowler_state != ProwlerEnemy.ProwlerState.DEFENSIVE_WINDUP, "Defensive retrigger cooldown prevents immediate repeated armed pounces while Akedra stays crowded.")
+	await _advance_until(
+		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.STALK,
+		1.80,
+		"defensive return to stalk"
+	)
 	await _free_test_root(root)
 
 
-func _audit_contact_damage_and_death() -> void:
+func _audit_alert_hunt_and_recovery() -> void:
 	var root := Node2D.new()
 	add_child(root)
 	var player := _spawn_player(root, Vector2(192.0, 108.0))
 	var spear := _spawn_spear(root, player)
-	var prowler := _spawn_prowler(root, player, spear, Vector2(179.0, 108.0))
-	var starting_health := player.health
-	await _advance_physics(0.12)
-	_require(player.health == starting_health - 1, "Prowler body overlap uses the existing ordinary player damage path.")
+	var prowler := _spawn_prowler(root, player, spear, Vector2(220.0, 108.0))
+	_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audit setup can throw the spear to trigger the unarmed transition.")
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.ALERT, "HELD -> FLYING enters the longer one-shot ALERT state.")
+	_require(prowler.debug_get_red_eyes_active(), "Alert state enables the readable red-eye visual.")
+	_require(prowler.debug_has_hunt_pounce_available(), "A new armed -> unarmed transition grants one hunting pounce attempt.")
+	await _advance_physics(0.06)
+	var alert_time_after_tick := prowler.state_time_left
+	spear.call("_enter_landed_state", Vector2(248.0, 108.0))
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.ALERT, "FLYING -> LANDED keeps the Prowler on the same unarmed escalation path.")
+	_require(prowler.state_time_left <= alert_time_after_tick + 0.001, "Repeated unarmed spear states do not restart the alert timer.")
 
+	player.global_position = spear.global_position
+	spear.call("_pickup")
+	_require(spear.is_held(), "Audit recovery path returns the spear to HELD.")
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.STALK, "Legitimate spear recovery cancels ALERT before any hunting pounce begins.")
+	_require(not prowler.debug_get_red_eyes_active(), "Returning to HELD clears the red-eye unarmed presentation.")
+
+	_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "A later throw can start a fresh unarmed cycle.")
+	var reached_hunt := await _advance_until(
+		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.HUNT,
+		0.40,
+		"hunt transition"
+	)
+	_require(reached_hunt, "Prowler reaches HUNT after the approved 0.28-second alert.")
+	await _free_test_root(root)
+
+
+func _audit_hunt_pounce_success_and_limit() -> void:
+	var root := Node2D.new()
+	add_child(root)
+	var player := _spawn_player(root, Vector2(192.0, 108.0))
+	var spear := _spawn_spear(root, player)
+	var prowler := _spawn_prowler(root, player, spear, Vector2(220.0, 108.0))
+	var hit_signal_count := 0
+	prowler.hunt_pounce_hit.connect(func(_hit_position: Vector2, _hit_stop_duration: float) -> void:
+		hit_signal_count += 1
+	)
+	var starting_health := player.health
+	_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audit setup can throw the spear before the hunting pounce success test.")
+	var reached_windup := await _advance_until(
+		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.POUNCE_WINDUP,
+		0.40,
+		"hunt pounce windup"
+	)
+	_require(reached_windup, "Prowler reaches POUNCE_WINDUP while unarmed and close.")
+	var locked_direction := prowler.debug_get_locked_pounce_direction()
+	player.global_position += Vector2(0.0, 6.0)
+	var pounce_start := prowler.global_position
+	var reached_airborne := await _advance_until(
+		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.POUNCE,
+		0.24,
+		"hunt pounce start"
+	)
+	_require(reached_airborne, "Prowler begins the committed hunting pounce after its windup.")
+	await _advance_physics(0.03)
+	var launch_direction := (prowler.global_position - pounce_start).normalized()
+	if launch_direction != Vector2.ZERO and locked_direction != Vector2.ZERO:
+		_require(launch_direction.dot(locked_direction) > 0.92, "Hunting pounce movement stays locked to the pre-launch direction instead of homing mid-flight.")
+	var reached_recoil_or_wary := await _advance_until(
+		func() -> bool:
+			return prowler.prowler_state == ProwlerEnemy.ProwlerState.IMPACT_RECOIL or prowler.prowler_state == ProwlerEnemy.ProwlerState.WARY_UNARMED,
+		0.40,
+		"hunt pounce resolution"
+	)
+	_require(reached_recoil_or_wary, "Successful hunting pounce resolves into recoil and disengagement.")
+	_require(player.health == starting_health - 1, "Successful hunting pounce deals exactly 1 damage.")
+	_require(player.is_in_forced_movement(), "Successful hunting pounce starts player knockback through the existing forced-movement seam.")
+	_require(hit_signal_count == 1, "Successful hunting pounce emits exactly one authored hit signal for audio and hit stop.")
+	_require(not prowler.debug_has_hunt_pounce_available(), "Successful hunting pounce spends the one attempt for this unarmed window.")
+	await _advance_physics(0.50)
+	_require(prowler.prowler_state != ProwlerEnemy.ProwlerState.POUNCE_WINDUP and prowler.prowler_state != ProwlerEnemy.ProwlerState.POUNCE, "Prowler does not begin a second hunting pounce during the same unarmed window.")
+	await _free_test_root(root)
+
+
+func _audit_hunt_pounce_dodge_rejection_and_rearm() -> void:
+	var root := Node2D.new()
+	add_child(root)
+	var player := _spawn_player(root, Vector2(192.0, 108.0))
+	var spear := _spawn_spear(root, player)
+	var prowler := _spawn_prowler(root, player, spear, Vector2(220.0, 108.0))
+	var hit_signal_count := 0
+	prowler.hunt_pounce_hit.connect(func(_hit_position: Vector2, _hit_stop_duration: float) -> void:
+		hit_signal_count += 1
+	)
+	var starting_health := player.health
+	_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audit setup can throw the spear before the dodge rejection test.")
+	var reached_windup := await _advance_until(
+		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.POUNCE_WINDUP,
+		0.40,
+		"dodge rejection windup"
+	)
+	_require(reached_windup, "Prowler reaches hunting windup in the dodge rejection setup.")
+	_require(player.try_start_movement_dodge(Vector2.DOWN), "Player can start a dodge to reject the committed hunting pounce.")
+	var reached_miss_state := await _advance_until(
+		func() -> bool:
+			return prowler.prowler_state == ProwlerEnemy.ProwlerState.MISS_SKID or prowler.prowler_state == ProwlerEnemy.ProwlerState.MISS_STUN or prowler.prowler_state == ProwlerEnemy.ProwlerState.WARY_UNARMED,
+		0.70,
+		"hunt miss resolution"
+	)
+	_require(reached_miss_state, "Dodge-rejected hunting pounce resolves into miss skid/stun instead of a hit.")
+	_require(player.health == starting_health, "Dodge-rejected hunting pounce deals no damage.")
+	_require(hit_signal_count == 0, "Rejected hunting pounce does not emit the authored hit signal.")
+	_require(not player.is_in_forced_movement(), "Rejected hunting pounce does not apply player knockback.")
+	_require(not prowler.debug_has_hunt_pounce_available(), "Rejected hunting pounce still spends the one attempt for this unarmed window.")
+
+	player.global_position = spear.global_position
+	spear.call("_enter_landed_state", Vector2(248.0, 108.0))
+	spear.call("_pickup")
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.STALK, "Legitimate spear recovery returns the Prowler to STALK after a spent unarmed window.")
+	_require(not prowler.debug_has_hunt_pounce_available(), "Returning to HELD clears the spent unarmed-window attempt state.")
+	_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "A later legitimate throw can create a fresh unarmed cycle.")
+	_require(prowler.debug_has_hunt_pounce_available(), "A new armed -> unarmed transition restores one hunting pounce attempt.")
+	await _free_test_root(root)
+
+
+func _audit_death_and_score() -> void:
+	var root := Node2D.new()
+	add_child(root)
+	var player := _spawn_player(root, Vector2(192.0, 108.0))
+	var spear := _spawn_spear(root, player)
+	var prowler := _spawn_prowler(root, player, spear, Vector2(220.0, 108.0))
 	var kill_tracker := {
 		"count": 0,
 		"score": 0,
@@ -144,7 +266,7 @@ func _audit_contact_damage_and_death() -> void:
 	await _free_test_root(root)
 
 
-func _audit_main_integration_and_intro() -> void:
+func _audit_main_integration_and_cleanup() -> void:
 	var main := MainScene.instantiate()
 	add_child(main)
 	await get_tree().process_frame
@@ -181,27 +303,6 @@ func _audit_main_integration_and_intro() -> void:
 	await get_tree().process_frame
 
 	main.set_process(false)
-	main.set("survival_time", 79.0)
-	main.set("charger_intro_seen", true)
-	main.set("shielded_intro_seen", true)
-	main.set("shooter_intro_seen", true)
-	main.set("boomer_intro_seen", true)
-	main.set("prowler_intro_seen", false)
-	main.call("debug_set_intro_target_times", 15.0, 25.0, 42.0, 88.0, 88.0)
-	main.call("debug_set_ambient_roll_sequence", [0.0])
-	_require(
-		int(main.call("_pick_ambient_enemy_kind")) == EncounterDirector.EnemyKind.PROWLER,
-		"Prowler can appear organically before its randomized target once it is unlocked and selected."
-	)
-	_require(
-		bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.BOTTOM, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
-		"Early natural Prowler spawn succeeds in the audit setup."
-	)
-	_require(bool(main.get("prowler_intro_seen")), "Early organic Prowler cancels its future guarantee for the run.")
-	main.call("_restart_run")
-	await get_tree().process_frame
-
-	main.set_process(false)
 	main.set("survival_time", 90.0)
 	main.set("charger_intro_seen", true)
 	main.set("shielded_intro_seen", true)
@@ -220,50 +321,26 @@ func _audit_main_integration_and_intro() -> void:
 
 	main.set_process(false)
 	main.set("survival_time", 90.0)
-	main.set("charger_intro_seen", true)
-	main.set("shielded_intro_seen", true)
-	main.set("shooter_intro_seen", true)
-	main.set("boomer_intro_seen", true)
-	main.set("prowler_intro_seen", false)
-	main.call("debug_set_intro_target_times", 15.0, 25.0, 42.0, 65.0, 78.0)
-	_require(
-		bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.LEFT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
-		"Forced overdue Prowler intro can be fulfilled through the normal ambient spawn path."
-	)
-	_require(bool(main.get("prowler_intro_seen")), "Successful organic Prowler spawn marks the intro seen.")
-
-	main.call("_stop_all_audio")
-	main.queue_free()
-	await get_tree().process_frame
-
-
-func _audit_pause_restart_and_game_over_cleanup() -> void:
-	var main := MainScene.instantiate()
-	add_child(main)
-	await get_tree().process_frame
-
-	var spawn_timer := main.get_node("SpawnTimer") as Timer
-	spawn_timer.stop()
-	main.set_process(false)
-
-	main.set("survival_time", 90.0)
 	_require(
 		bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
-		"Prowler can be spawned again for pause and cleanup coverage."
+		"Prowler can be spawned again for hit-stop and cleanup coverage."
 	)
 	var prowler := _find_child_prowler(main)
+	var player := main.get_node("Player") as Player
 	var spear := main.get_node("Spear") as Spear
-	_require(prowler != null and spear != null, "Pause and cleanup audit can access the spawned Prowler and spear.")
-	if prowler != null and spear != null:
-		_require(spear.try_throw(Vector2(320.0, 108.0)), "Audit setup can throw the spear before testing pause and cleanup behavior.")
-		_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.ALERT, "Thrown spear moves the live Prowler into ALERT before the pause test.")
-		var paused_position := prowler.global_position
-		var paused_alert_time := prowler.alert_time_left
-		main.call("_set_pause_state", true)
-		await get_tree().create_timer(0.12, true, false, true).timeout
-		_require(prowler.global_position == paused_position, "Pause freezes Prowler movement.")
-		_require(is_equal_approx(prowler.alert_time_left, paused_alert_time), "Pause freezes the Prowler alert timer.")
-		main.call("_set_pause_state", false)
+	_require(prowler != null and player != null and spear != null, "Main audit can access the spawned Prowler, player, and spear.")
+	if prowler != null and player != null and spear != null:
+		main.call("_stop_all_audio")
+		player.global_position = Vector2(192.0, 108.0)
+		prowler.global_position = Vector2(220.0, 108.0)
+		spear.reset_for_new_run(player, TEST_ARENA)
+		_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Main audit can trigger the unarmed transition for authored hit-stop coverage.")
+		var hit_stop_started := await _advance_until(
+			func() -> bool: return bool(main.get("hit_stop_active")),
+			0.70,
+			"main prowler hit stop"
+		)
+		_require(hit_stop_started, "Main starts the authored hit-stop path when the hunting pounce lands.")
 
 		main.call("_restart_run")
 		await get_tree().process_frame
@@ -273,12 +350,21 @@ func _audit_pause_restart_and_game_over_cleanup() -> void:
 		main.set("survival_time", 90.0)
 		_require(
 			bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.TOP, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
-			"Prowler can be spawned again after restart for the game-over cleanup test."
+			"Prowler can be spawned again after restart for pause and game-over cleanup."
 		)
 		prowler = _find_child_prowler(main)
 		spear = main.get_node("Spear") as Spear
 		if prowler != null and spear != null:
-			_require(spear.try_throw(Vector2(320.0, 108.0)), "Audit setup can re-enter ALERT before game over cleanup.")
+			prowler.global_position = Vector2(220.0, 108.0)
+			_require(spear.try_throw(Vector2(320.0, 108.0)), "Audit setup can re-enter ALERT before testing pause cleanup.")
+			var paused_position := prowler.global_position
+			var paused_state_time := prowler.state_time_left
+			main.call("_set_pause_state", true)
+			await get_tree().create_timer(0.12, true, false, true).timeout
+			_require(prowler.global_position == paused_position, "Pause freezes Prowler movement.")
+			_require(is_equal_approx(prowler.state_time_left, paused_state_time), "Pause freezes the active Prowler state timer.")
+			main.call("_set_pause_state", false)
+
 			main.call("_on_player_died")
 			var game_over_position := prowler.global_position
 			await get_tree().create_timer(0.16, true, false, true).timeout

@@ -47,8 +47,9 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 ## Phase 4.5 Prowler
 
 - Prowler adds a new ambient-only hostile built directly around the central one-spear loop.
-- While Akedra holds the spear, the Prowler stays in a cautious stalking band with restrained lateral movement instead of behaving like another Normal.
-- While the spear is `FLYING` or `LANDED`, it gives one short readable alert and then switches into a faster direct hunt until the spear is legitimately recovered.
+- While Akedra holds the spear, the Prowler stays in a cautious stalking band with restrained lateral movement and uses a short defensive pass-through pounce only when Akedra crowds its personal space.
+- While the spear is `FLYING` or `LANDED`, it gives one longer red-eye alert and then switches into a faster direct hunt until the spear is legitimately recovered.
+- Each unarmed cycle grants exactly one committed hunting pounce attempt; a valid hit knocks Akedra back through the existing player authority, while a dodge or invulnerability rejection leads to a brief punishable skid/stun window.
 - Prowler dies to one valid thrown-spear hit for `2` points, uses ordinary contact damage, has a dedicated active cap of `1`, and has no authored-wave membership in this phase.
 - Its first organic appearance reuses the existing randomized intro-target plus persistent overdue-guarantee system rather than adding a new spawn framework.
 - Phase 4.5 deliberately excludes landed-spear theft, ranged behavior, squad logic, and all broader interaction work reserved for Phase 4.6.

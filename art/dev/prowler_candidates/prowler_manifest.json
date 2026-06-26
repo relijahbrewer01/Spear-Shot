@@ -1,0 +1,114 @@
+{
+  "comparison_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_comparison.png",
+  "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\prowler_enemy.png",
+  "candidates": [
+    {
+      "key": "1",
+      "title": "Hookjaw",
+      "file_name": "prowler_variant_1.png",
+      "palette_summary": "dry peat body, pale hooked muzzle, muted sage tail accent",
+      "silhouette_summary": "A low reptile-jackal shape with a hooked snout, narrow forequarters, and a long tail drag.",
+      "body_color": [
+        92,
+        82,
+        60,
+        255
+      ],
+      "accent_color": [
+        138,
+        151,
+        101,
+        255
+      ],
+      "eye_color": [
+        226,
+        212,
+        166,
+        255
+      ],
+      "shadow_color": [
+        44,
+        39,
+        30,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 16,
+      "apparent_body_width": 14,
+      "apparent_body_height": 10,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_variant_1.png"
+    },
+    {
+      "key": "2",
+      "title": "Moss Lynx",
+      "file_name": "prowler_variant_2.png",
+      "palette_summary": "moss-dark back, pale bone muzzle, charcoal legs, muted ochre eye",
+      "silhouette_summary": "A compact low cat-jackal stalker with a shoulder hump, clear head separation, and a narrow trailing tail.",
+      "body_color": [
+        78,
+        89,
+        64,
+        255
+      ],
+      "accent_color": [
+        194,
+        180,
+        136,
+        255
+      ],
+      "eye_color": [
+        235,
+        214,
+        150,
+        255
+      ],
+      "shadow_color": [
+        37,
+        34,
+        29,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 16,
+      "apparent_body_width": 14,
+      "apparent_body_height": 10,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_variant_2.png"
+    },
+    {
+      "key": "3",
+      "title": "Spineback",
+      "file_name": "prowler_variant_3.png",
+      "palette_summary": "dark bark body, dusty olive back-spines, pale eye stripe",
+      "silhouette_summary": "A flatter feral runner with a sharp back ridge, longer body, and a distinctly rear-weighted sprint shape.",
+      "body_color": [
+        83,
+        72,
+        54,
+        255
+      ],
+      "accent_color": [
+        124,
+        136,
+        92,
+        255
+      ],
+      "eye_color": [
+        216,
+        205,
+        162,
+        255
+      ],
+      "shadow_color": [
+        33,
+        29,
+        24,
+        255
+      ],
+      "canvas_width": 16,
+      "canvas_height": 16,
+      "apparent_body_width": 13,
+      "apparent_body_height": 12,
+      "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_variant_3.png"
+    }
+  ]
+}

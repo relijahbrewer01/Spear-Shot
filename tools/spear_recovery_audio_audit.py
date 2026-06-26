@@ -103,7 +103,7 @@ def main() -> int:
         "ROADMAP and TUNING document legitimate recovery semantics",
         failures,
     )
-    require("Spear Shot v0.6.0-alpha.4.1 - Input & Audio Polish" in readme, "Milestone remains Phase 4 Interlude 1", failures)
+    require("Spear Shot v0.6.0-alpha.5 - Prowler" in readme, "Milestone advances to Phase 4.5 Prowler", failures)
 
     if failures:
         print(f"\nSpear recovery audio audit failed with {len(failures)} issue(s).")

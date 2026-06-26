@@ -43,6 +43,12 @@
 | Boomer | `boomer_spawn_chance_growth_per_second` | `0.00035` | `scripts/main.gd` | Chance growth after unlock. |
 | Boomer | `maximum_boomer_spawn_chance` | `0.07` | `scripts/main.gd` | Long-run chance cap. |
 | Boomer | `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Boomer cap. |
+| Prowler | `prowler_unlock_time` | `78.0s` | `scripts/main.gd` | First time Prowler can appear through ambient selection. |
+| Prowler | `prowler_intro_target_time_min/max` | `78.0-88.0s` | `scripts/main.gd` | Per-run randomized first-introduction guarantee target. |
+| Prowler | `prowler_spawn_chance_at_unlock` | `0.03` | `scripts/main.gd` | Starting ambient weight once unlocked. |
+| Prowler | `prowler_spawn_chance_growth_per_second` | `0.00030` | `scripts/main.gd` | Chance growth after unlock. |
+| Prowler | `maximum_prowler_spawn_chance` | `0.08` | `scripts/main.gd` | Long-run chance cap. |
+| Prowler | `prowler_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Prowler cap. |
 
 ## Encounter Director
 
@@ -61,6 +67,7 @@
 | `shielded_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Shielded cap. |
 | `shooter_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated Shooter cap. |
 | `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Boomer cap. |
+| `prowler_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated Prowler cap. |
 | `spawn_safe_radius` | `72.0px` | `scripts/main.gd` | Safe distance from Akedra for enemy spawns. |
 | `landed_spear_spawn_safe_radius` | `36.0px` | `scripts/main.gd` | Safe distance from a landed spear for enemy spawns. |
 | `spawn_retry_interval` | `0.3s` | `scripts/encounter_director.gd` | Retry delay for blocked wave spawn steps. |
@@ -248,6 +255,27 @@
 | `boomer_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Boomer cap. |
 | Spawn and introduction values | `65s`, `65-78s`, `0.025`, `0.00035`, `0.07` | `scripts/main.gd` | Boomer unlock, intro target, starting chance, growth, and max chance. |
 
+## Prowler
+
+| Setting | Current value | Source | Purpose / tuning effect |
+| --- | --- | --- | --- |
+| `score_value` | `2` | `ProwlerEnemy.tscn` | Score for a killed Prowler. |
+| Body sprite canvas dimensions | `16x16px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Compact live canvas for the selected low stalking predator silhouette. |
+| Selected concept | `Moss Lynx` | `art/dev/prowler_candidates/prowler_manifest.json`, `tools/generate_phase4_assets.py` | Final approved candidate with a shoulder-hump profile, pale muzzle, and narrow trailing tail. |
+| Apparent silhouette bounds | About `14x10px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Measured non-transparent Prowler silhouette on the compact canvas. |
+| `body_radius` | `7.0px` | `ProwlerEnemy.tscn` | Fair body footprint. |
+| Collision radius | `7.0px` | `ProwlerEnemy.tscn` | Physics shape size. |
+| `stalk_speed_scale` | `0.82` | `scripts/prowler_enemy.gd` | Cautious stalking speed relative to current enemy speed. |
+| `hunt_speed_scale` | `1.48` | `scripts/prowler_enemy.gd` | Aggressive unarmed hunt speed relative to current enemy speed. |
+| `unarmed_alert_delay` | `0.14s` | `scripts/prowler_enemy.gd` | One-shot readable delay before the unarmed hunt fully commits. |
+| `stalk_distance_min/max` | `72.0-104.0px` | `scripts/prowler_enemy.gd` | Desired stalking band while Akedra is armed; `stalk_distance_min` begins the retreat response and `stalk_distance_max` begins the cautious approach response. |
+| `stalk_dead_zone` | `5.0px` | `scripts/prowler_enemy.gd` | Hysteresis around the stalking band to reduce direction jitter. |
+| `stalk_lateral_commit_duration` | `0.55s` | `scripts/prowler_enemy.gd` | Time a lateral stalking choice stays committed before reevaluation. |
+| `wall_fallback_commit_duration` | `0.35s` | `scripts/prowler_enemy.gd` | Brief wall-tangent fallback commitment when the stalking lane would leave the arena. |
+| `separation_distance` | `20.0px` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing radius. |
+| `separation_strength` | `50.0` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing force. |
+| Spawn and introduction values | `78s`, `78-88s`, `0.03`, `0.00030`, `0.08` | `scripts/main.gd` | Prowler unlock, intro target, starting chance, growth, and max chance. |
+
 ## Heart Runner Opportunity
 
 | Setting | Current value | Source | Purpose / tuning effect |
@@ -335,6 +363,7 @@
 | Make the Shooter attack faster | `aim_duration`, `locked_duration`, `burst_interval`, `attack_cooldown`, `minimum_dart_interval` | Keep one visible lock cue and one locked direction for both darts. |
 | Make darts easier to avoid | `aim_duration`, `locked_duration`, `speed`, `burst_interval` | Dart speed currently stays at `145.0px/s`. |
 | Make Boomers less oppressive | `hop_distance`, `fuse_trigger_distance`, `fuse_duration`, `core_blast_radius`, `outer_shockwave_radius` | Preserve the discrete hop-and-stop rhythm and one-active cap while tuning fairness. |
+| Make the Prowler more or less punishing around throws | `unarmed_alert_delay`, `stalk_speed_scale`, `hunt_speed_scale`, `stalk_distance_min/max`, `stalk_lateral_commit_duration`, `wall_fallback_commit_duration`, `prowler_spawn_chance_at_unlock` | These tune how threatening the unarmed window feels without changing spear authority. |
 | Make Heart Runner opportunities more generous or rarer | `heart_runner_roll_interval_min/max`, `heart_runner_health_3_spawn_chance`, `heart_runner_health_2_spawn_chance`, `heart_runner_health_1_spawn_chance`, `heart_runner_one_health_grace_duration`, `heart_runner_post_resolution_cooldown` | The opportunity system is separate from hostile caps and wave timing. |
 | Reduce Shielded retrieval pressure | `stopped_hit_landing_clearance`, `stagger_duration`, `knockback_distance` | These affect how safe spear recovery feels after a shield stop. |
 | Increase time between waves | `first_wave_time_min/max`, `inter_wave_interval_min/max`, `recovery_duration` | Wave composition is separate from wave cadence. |

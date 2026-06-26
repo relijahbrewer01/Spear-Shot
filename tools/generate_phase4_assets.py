@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SPRITE_DIR = ROOT / "art" / "sprites"
 DEV_SHOOTER_DIR = ROOT / "art" / "dev" / "shooter_candidates"
 DEV_BOOMER_DIR = ROOT / "art" / "dev" / "boomer_candidates"
+DEV_PROWLER_DIR = ROOT / "art" / "dev" / "prowler_candidates"
 DEV_HEART_RUNNER_DIR = ROOT / "art" / "dev" / "heart_runner_candidates"
 DEV_HEART_RUNNER_ANIMATION_DIR = ROOT / "art" / "dev" / "heart_runner_animation"
 ARENA_TEXTURE_PATH = ROOT / "art" / "arena" / "arena_floor.png"
@@ -21,6 +22,7 @@ LABEL_TEXT_COLOR = (239, 242, 230, 255)
 LABEL_SHADOW_COLOR = (17, 20, 18, 220)
 SHOOTER_CANVAS_SIZE = (16, 18)
 BOOMER_CANVAS_SIZE = (16, 18)
+PROWLER_CANVAS_SIZE = (16, 16)
 HEART_RUNNER_CANVAS_SIZE = (16, 16)
 HEART_PICKUP_CANVAS_SIZE = (10, 10)
 HEART_RUNNER_ANIMATION_SHEET_ROWS = ["casual_strut", "startled_hop", "panicked_sprint"]
@@ -74,6 +76,23 @@ class BoomerVariantSpec:
 
 
 @dataclass(frozen=True)
+class ProwlerVariantSpec:
+    key: str
+    title: str
+    file_name: str
+    palette_summary: str
+    silhouette_summary: str
+    body_color: tuple[int, int, int, int]
+    accent_color: tuple[int, int, int, int]
+    eye_color: tuple[int, int, int, int]
+    shadow_color: tuple[int, int, int, int]
+    canvas_width: int = PROWLER_CANVAS_SIZE[0]
+    canvas_height: int = PROWLER_CANVAS_SIZE[1]
+    apparent_body_width: int = 0
+    apparent_body_height: int = 0
+
+
+@dataclass(frozen=True)
 class HeartRunnerVariantSpec:
     key: str
     title: str
@@ -94,6 +113,15 @@ def draw_boomer_enemy(path: Path) -> None:
     image = Image.new("RGBA", BOOMER_CANVAS_SIZE, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     _draw_boomer_variant_silhouette(draw, build_boomer_variant_specs()[1])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def draw_prowler_enemy(path: Path) -> None:
+    image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    _draw_prowler_variant_silhouette(draw, build_prowler_variant_specs()[1])
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
@@ -212,6 +240,44 @@ def build_boomer_variant_specs() -> list[BoomerVariantSpec]:
     ]
 
 
+def build_prowler_variant_specs() -> list[ProwlerVariantSpec]:
+    return [
+        ProwlerVariantSpec(
+            key="1",
+            title="Hookjaw",
+            file_name="prowler_variant_1.png",
+            palette_summary="dry peat body, pale hooked muzzle, muted sage tail accent",
+            silhouette_summary="A low reptile-jackal shape with a hooked snout, narrow forequarters, and a long tail drag.",
+            body_color=(92, 82, 60, 255),
+            accent_color=(138, 151, 101, 255),
+            eye_color=(226, 212, 166, 255),
+            shadow_color=(44, 39, 30, 255),
+        ),
+        ProwlerVariantSpec(
+            key="2",
+            title="Moss Lynx",
+            file_name="prowler_variant_2.png",
+            palette_summary="moss-dark back, pale bone muzzle, charcoal legs, muted ochre eye",
+            silhouette_summary="A compact low cat-jackal stalker with a shoulder hump, clear head separation, and a narrow trailing tail.",
+            body_color=(78, 89, 64, 255),
+            accent_color=(194, 180, 136, 255),
+            eye_color=(235, 214, 150, 255),
+            shadow_color=(37, 34, 29, 255),
+        ),
+        ProwlerVariantSpec(
+            key="3",
+            title="Spineback",
+            file_name="prowler_variant_3.png",
+            palette_summary="dark bark body, dusty olive back-spines, pale eye stripe",
+            silhouette_summary="A flatter feral runner with a sharp back ridge, longer body, and a distinctly rear-weighted sprint shape.",
+            body_color=(83, 72, 54, 255),
+            accent_color=(124, 136, 92, 255),
+            eye_color=(216, 205, 162, 255),
+            shadow_color=(33, 29, 24, 255),
+        ),
+    ]
+
+
 def build_shooter_palette_variant_specs() -> list[ShooterPaletteVariantSpec]:
     return [
         ShooterPaletteVariantSpec(
@@ -310,6 +376,22 @@ def draw_boomer_variant(spec: BoomerVariantSpec, path: Path) -> BoomerVariantSpe
     )
 
 
+def draw_prowler_variant(spec: ProwlerVariantSpec, path: Path) -> ProwlerVariantSpec:
+    image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    _draw_prowler_variant_silhouette(draw, spec)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+    apparent_body_width, apparent_body_height = _measure_nontransparent_bounds(image)
+    return replace(
+        spec,
+        apparent_body_width=apparent_body_width,
+        apparent_body_height=apparent_body_height,
+    )
+
+
 def draw_shooter_palette_variant(spec: ShooterPaletteVariantSpec, path: Path) -> ShooterPaletteVariantSpec:
     image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -376,6 +458,46 @@ def _draw_boomer_variant_silhouette(draw: ImageDraw.ImageDraw, spec: BoomerVaria
     draw.point((6, 8), fill=spec.eye_color)
     draw.line((9, 7, 12, 8), fill=spec.mark_color, width=1)
     draw.line((10, 9, 13, 11), fill=spec.mark_color, width=1)
+
+
+def _draw_prowler_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec) -> None:
+    if spec.key == "1":
+        draw.ellipse((4, 8, 11, 12), fill=spec.body_color)
+        draw.polygon([(9, 7), (12, 6), (14, 7), (12, 9), (9, 9)], fill=spec.accent_color)
+        draw.polygon([(3, 9), (1, 8), (2, 10)], fill=spec.shadow_color)
+        draw.line((2, 8, 1, 7), fill=spec.accent_color, width=1)
+        draw.line((5, 12, 4, 15), fill=spec.shadow_color, width=1)
+        draw.line((8, 12, 9, 15), fill=spec.shadow_color, width=1)
+        draw.line((10, 12, 13, 13), fill=spec.shadow_color, width=1)
+        draw.point((12, 7), fill=spec.eye_color)
+        draw.point((10, 9), fill=spec.shadow_color)
+        return
+
+    if spec.key == "2":
+        draw.ellipse((4, 8, 11, 12), fill=spec.body_color)
+        draw.polygon([(7, 7), (10, 6), (13, 7), (14, 9), (10, 10), (7, 10)], fill=spec.body_color)
+        draw.polygon([(9, 7), (12, 7), (13, 9), (11, 10), (9, 9)], fill=spec.accent_color)
+        draw.line((4, 9, 2, 8), fill=spec.shadow_color, width=1)
+        draw.line((2, 8, 1, 9), fill=spec.shadow_color, width=1)
+        draw.line((5, 12, 4, 15), fill=spec.shadow_color, width=1)
+        draw.line((8, 12, 9, 15), fill=spec.shadow_color, width=1)
+        draw.line((10, 12, 13, 13), fill=spec.shadow_color, width=1)
+        draw.point((11, 8), fill=spec.eye_color)
+        draw.point((12, 8), fill=spec.eye_color)
+        draw.point((9, 9), fill=spec.shadow_color)
+        return
+
+    draw.ellipse((4, 8, 12, 12), fill=spec.body_color)
+    draw.polygon([(7, 7), (10, 6), (13, 7), (14, 9), (12, 10), (8, 10)], fill=spec.body_color)
+    draw.line((6, 7, 8, 5), fill=spec.accent_color, width=1)
+    draw.line((8, 6, 10, 4), fill=spec.accent_color, width=1)
+    draw.line((10, 6, 12, 5), fill=spec.accent_color, width=1)
+    draw.line((4, 9, 2, 10), fill=spec.shadow_color, width=1)
+    draw.line((5, 12, 4, 15), fill=spec.shadow_color, width=1)
+    draw.line((8, 12, 9, 15), fill=spec.shadow_color, width=1)
+    draw.line((10, 12, 13, 13), fill=spec.shadow_color, width=1)
+    draw.point((11, 8), fill=spec.eye_color)
+    draw.point((9, 9), fill=spec.shadow_color)
 
 
 def _draw_palette_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ShooterPaletteVariantSpec) -> None:
@@ -598,6 +720,33 @@ def generate_boomer_candidate_assets() -> dict[str, object]:
     return manifest
 
 
+def generate_prowler_candidate_assets() -> dict[str, object]:
+    DEV_PROWLER_DIR.mkdir(parents=True, exist_ok=True)
+    comparison_path = DEV_PROWLER_DIR / "prowler_comparison.png"
+    manifest_path = DEV_PROWLER_DIR / "prowler_manifest.json"
+
+    variant_specs: list[ProwlerVariantSpec] = []
+    manifest_candidates: list[dict[str, object]] = []
+
+    for spec in build_prowler_variant_specs():
+        variant_path = DEV_PROWLER_DIR / spec.file_name
+        finalized_spec = draw_prowler_variant(spec, variant_path)
+        variant_specs.append(finalized_spec)
+        manifest_candidates.append({
+            **asdict(finalized_spec),
+            "path": str(variant_path),
+        })
+
+    draw_prowler_comparison(variant_specs, comparison_path)
+    manifest = {
+        "comparison_path": str(comparison_path),
+        "active_reference_path": str(SPRITE_DIR / "prowler_enemy.png"),
+        "candidates": manifest_candidates,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
+
+
 def generate_heart_runner_candidate_assets() -> dict[str, object]:
     DEV_HEART_RUNNER_DIR.mkdir(parents=True, exist_ok=True)
     comparison_path = DEV_HEART_RUNNER_DIR / "heart_runner_comparison.png"
@@ -723,6 +872,43 @@ def draw_boomer_comparison(
         ("Variant 1", DEV_BOOMER_DIR / variant_specs[0].file_name, (96, 194)),
         ("Variant 2", DEV_BOOMER_DIR / variant_specs[1].file_name, (192, 194)),
         ("Variant 3", DEV_BOOMER_DIR / variant_specs[2].file_name, (288, 194)),
+    ]
+
+    for label, sprite_path, feet_position in benchmark_row:
+        _paste_grounded_sprite(background, sprite_path, feet_position)
+        _draw_label(draw, (feet_position[0] - 16, feet_position[1] + 4), label, font)
+
+    for label, sprite_path, feet_position in variant_row:
+        _paste_grounded_sprite(background, sprite_path, feet_position)
+        _draw_label(draw, (feet_position[0] - 22, feet_position[1] + 4), label, font)
+
+    comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    background.save(comparison_path)
+
+
+def draw_prowler_comparison(
+    variant_specs: list[ProwlerVariantSpec], comparison_path: Path
+) -> None:
+    background = _load_arena_background()
+    draw = ImageDraw.Draw(background)
+    font = ImageFont.load_default()
+
+    _draw_label(draw, (8, 8), "Prowler Candidate Comparison", font)
+    _draw_label(draw, (8, 20), "Low stalking predator scale against the live arena and current roster", font)
+
+    benchmark_row = [
+        ("Akedra", ROOT / "art" / "sprites" / "player_hunter.png", (28, 116)),
+        ("Normal", ROOT / "art" / "sprites" / "enemy_creature.png", (76, 116)),
+        ("Shielded", ROOT / "art" / "sprites" / "shielded_enemy.png", (124, 116)),
+        ("Shooter", ROOT / "art" / "sprites" / "shooter_enemy.png", (172, 116)),
+        ("Boomer", ROOT / "art" / "sprites" / "boomer_enemy.png", (220, 116)),
+        ("Runner", ROOT / "art" / "sprites" / "heart_runner.png", (268, 116)),
+        ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (332, 116)),
+    ]
+    variant_row = [
+        ("Variant 1", DEV_PROWLER_DIR / variant_specs[0].file_name, (96, 194)),
+        ("Variant 2", DEV_PROWLER_DIR / variant_specs[1].file_name, (192, 194)),
+        ("Variant 3", DEV_PROWLER_DIR / variant_specs[2].file_name, (288, 194)),
     ]
 
     for label, sprite_path, feet_position in benchmark_row:
@@ -1010,6 +1196,7 @@ def draw_standard_assets() -> None:
     draw_shielded_enemy(SPRITE_DIR / "shielded_enemy.png")
     draw_shooter_enemy(SPRITE_DIR / "shooter_enemy.png")
     draw_boomer_enemy(SPRITE_DIR / "boomer_enemy.png")
+    draw_prowler_enemy(SPRITE_DIR / "prowler_enemy.png")
     draw_heart_runner(SPRITE_DIR / "heart_runner.png")
     draw_heart_runner_animation_sheet(SPRITE_DIR / "heart_runner_sheet.png")
     draw_heart_pickup(SPRITE_DIR / "heart_pickup.png")
@@ -1026,6 +1213,11 @@ def parse_args() -> argparse.Namespace:
         "--generate-dev-boomer-concepts",
         action="store_true",
         help="Generate temporary Boomer candidate outputs and comparison board.",
+    )
+    parser.add_argument(
+        "--generate-dev-prowler-concepts",
+        action="store_true",
+        help="Generate temporary Prowler candidate outputs and comparison board.",
     )
     parser.add_argument(
         "--generate-dev-heart-runner-concepts",
@@ -1050,6 +1242,7 @@ def main() -> None:
     if args.all or (
         not args.generate_dev_shooter_concepts
         and not args.generate_dev_boomer_concepts
+        and not args.generate_dev_prowler_concepts
         and not args.generate_dev_heart_runner_concepts
     ):
         draw_standard_assets()
@@ -1057,6 +1250,8 @@ def main() -> None:
         generate_shooter_candidate_assets()
     if args.all or args.generate_dev_boomer_concepts:
         generate_boomer_candidate_assets()
+    if args.all or args.generate_dev_prowler_concepts:
+        generate_prowler_candidate_assets()
     if args.all or args.generate_dev_heart_runner_concepts:
         generate_heart_runner_candidate_assets()
     if args.all or args.generate_dev_heart_runner_animations:

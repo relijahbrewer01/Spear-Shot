@@ -29,8 +29,8 @@ def main() -> int:
     roadmap_text = read_text("ROADMAP.md")
 
     require(
-        'Current milestone: `Spear Shot v0.6.0-alpha.4.1 - Input & Audio Polish`' in readme_text,
-        "README milestone remains v0.6.0-alpha.4.1 Input & Audio Polish",
+        'Current milestone: `Spear Shot v0.6.0-alpha.5 - Prowler`' in readme_text,
+        "README milestone is updated to v0.6.0-alpha.5 Prowler",
         failures,
     )
     require("signal dodge_started" in player_script and "signal dodge_ended" in player_script and "signal dodge_ready" in player_script, "Player exposes dodge start/end/ready hooks", failures)

@@ -89,6 +89,16 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 		not _is_ambient_enemy_available(main, director, EncounterDirector.EnemyKind.BOOMER),
 		"Boomer is unavailable before 65 seconds."
 	)
+	main.set("survival_time", 78.0)
+	_require(
+		_is_ambient_enemy_available(main, director, EncounterDirector.EnemyKind.PROWLER),
+		"Prowler is eligible at 78 seconds."
+	)
+	main.set("survival_time", 77.9)
+	_require(
+		not _is_ambient_enemy_available(main, director, EncounterDirector.EnemyKind.PROWLER),
+		"Prowler is unavailable before 78 seconds."
+	)
 
 	main.set("survival_time", 15.0)
 	_require(
@@ -149,6 +159,21 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 	_require(
 		is_equal_approx(float(main.call("_get_current_boomer_spawn_chance")), 0.07),
 		"Boomer spawn chance caps at 0.07."
+	)
+	main.set("survival_time", 78.0)
+	_require(
+		is_equal_approx(float(main.call("_get_current_prowler_spawn_chance")), 0.03),
+		"Prowler spawn chance starts at 0.03 at unlock."
+	)
+	main.set("survival_time", 88.0)
+	_require(
+		is_equal_approx(float(main.call("_get_current_prowler_spawn_chance")), 0.033),
+		"Prowler spawn chance grows by 0.00030 per second after unlock."
+	)
+	main.set("survival_time", 1000.0)
+	_require(
+		is_equal_approx(float(main.call("_get_current_prowler_spawn_chance")), 0.08),
+		"Prowler spawn chance caps at 0.08."
 	)
 
 	director.reset_for_new_run()
@@ -226,6 +251,18 @@ func _audit_pacing_and_timer_contract(main_scene: PackedScene) -> void:
 		not director.can_spawn_enemy(EncounterDirector.EnemyKind.BOOMER, 80.0),
 		"Boomer active cap remains one."
 	)
+	director.reset_for_new_run()
+	var prowler := Node.new()
+	main.add_child(prowler)
+	director.register_enemy(
+		prowler,
+		EncounterDirector.EnemyKind.PROWLER,
+		EncounterDirector.INVALID_WAVE_ID
+	)
+	_require(
+		not director.can_spawn_enemy(EncounterDirector.EnemyKind.PROWLER, 90.0),
+		"Prowler active cap remains one."
+	)
 
 	main.set_process(true)
 	main.set("survival_time", 10.0)
@@ -258,6 +295,7 @@ func _audit_randomized_intro_contract(main_scene: PackedScene) -> void:
 	await _audit_early_natural_intro_cancels_guarantee(main_scene)
 	await _audit_pending_intro_forces_next_valid_ambient_attempt(main_scene)
 	await _audit_boomer_intro_contract(main_scene)
+	await _audit_prowler_intro_contract(main_scene)
 	await _audit_intro_defers_through_waves(main_scene)
 	await _audit_intro_defers_through_caps(main_scene)
 	await _audit_intro_defers_after_safe_spawn_failure(main_scene)
@@ -376,6 +414,70 @@ func _audit_boomer_intro_contract(main_scene: PackedScene) -> void:
 		"Seen Shielded returns to ordinary weighted selection after its target."
 	)
 
+	await _free_intro_audit_main(main)
+
+
+func _audit_prowler_intro_contract(main_scene: PackedScene) -> void:
+	var main := await _spawn_main_for_intro_audit(main_scene)
+	var director := main.get_node("EncounterDirector") as EncounterDirector
+	main.call("debug_set_intro_target_times", 15.0, 25.0, 42.0, 65.0, 88.0)
+	main.set("charger_intro_seen", true)
+	main.set("shielded_intro_seen", true)
+	main.set("shooter_intro_seen", true)
+	main.set("boomer_intro_seen", true)
+	main.set("survival_time", 79.0)
+	for enemy_kind in [
+		EncounterDirector.EnemyKind.CHARGER,
+		EncounterDirector.EnemyKind.CHARGER,
+		EncounterDirector.EnemyKind.SHIELDED,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.EnemyKind.BOOMER,
+	]:
+		var placeholder := Node.new()
+		main.add_child(placeholder)
+		director.register_enemy(placeholder, enemy_kind, EncounterDirector.INVALID_WAVE_ID)
+	main.call("debug_set_ambient_roll_sequence", [0.0])
+	var early_prowler_kind := int(main.call("_pick_ambient_enemy_kind"))
+	_require(
+		early_prowler_kind == EncounterDirector.EnemyKind.PROWLER,
+		"Prowler can appear randomly after unlock but before its target once earlier special slots are unavailable."
+	)
+	_require(
+		_try_spawn_for_audit(main, early_prowler_kind, SPAWN_SOURCE_AMBIENT),
+		"Early random Prowler can be spawned organically."
+	)
+	_require(bool(main.get("prowler_intro_seen")), "Early organic Prowler cancels its guarantee.")
+	await _free_intro_audit_main(main)
+
+	main = await _spawn_main_for_intro_audit(main_scene)
+	director = main.get_node("EncounterDirector") as EncounterDirector
+	main.call("debug_set_intro_target_times", 15.0, 25.0, 42.0, 65.0, 78.0)
+	main.set("charger_intro_seen", true)
+	main.set("shielded_intro_seen", true)
+	main.set("shooter_intro_seen", true)
+	main.set("boomer_intro_seen", true)
+	main.set("survival_time", 90.0)
+	for enemy_kind in [
+		EncounterDirector.EnemyKind.CHARGER,
+		EncounterDirector.EnemyKind.CHARGER,
+		EncounterDirector.EnemyKind.SHIELDED,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.EnemyKind.BOOMER,
+	]:
+		var placeholder := Node.new()
+		main.add_child(placeholder)
+		director.register_enemy(placeholder, enemy_kind, EncounterDirector.INVALID_WAVE_ID)
+	var pending_prowler_kind := int(main.call("_pick_ambient_enemy_kind"))
+	_require(
+		pending_prowler_kind == EncounterDirector.EnemyKind.PROWLER,
+		"Pending Prowler intro remains overdue until a successful ambient spawn fulfills it."
+	)
+	_require(
+		not bool(main.get("prowler_intro_seen")),
+		"Overdue Prowler intro is still unseen before its organic spawn succeeds."
+	)
 	await _free_intro_audit_main(main)
 
 
@@ -672,6 +774,11 @@ func _is_ambient_enemy_available(main: Node, director: EncounterDirector, enemy_
 		EncounterDirector.EnemyKind.BOOMER:
 			return (
 				current_survival_time >= float(main.get("boomer_unlock_time"))
+				and director.can_spawn_enemy(enemy_kind, current_survival_time)
+			)
+		EncounterDirector.EnemyKind.PROWLER:
+			return (
+				current_survival_time >= float(main.get("prowler_unlock_time"))
 				and director.can_spawn_enemy(enemy_kind, current_survival_time)
 			)
 

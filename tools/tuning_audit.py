@@ -41,6 +41,7 @@ def main() -> int:
         "## Shielded",
         "## Blowgun Shooter",
         "## Boomer",
+        "## Prowler",
         "## Heart Runner Opportunity",
         "## Dart Projectile",
         "## HUD And Feedback",
@@ -59,6 +60,7 @@ def main() -> int:
         "shielded_unlock_time",
         "shooter_unlock_time",
         "boomer_unlock_time",
+        "prowler_unlock_time",
         "heart_runner_unlock_time",
         "heart_runner_roll_interval_min/max",
         "heart_runner_health_3_spawn_chance",
@@ -110,6 +112,13 @@ def main() -> int:
         "core_blast_radius",
         "outer_shockwave_radius",
         "landed_spear_shockwave_displacement",
+        "unarmed_alert_delay",
+        "stalk_speed_scale",
+        "hunt_speed_scale",
+        "stalk_distance_min",
+        "stalk_distance_max",
+        "stalk_lateral_commit_duration",
+        "wall_fallback_commit_duration",
         "DAMAGE_SOURCE_EXPLOSION",
         "PROJECTILE_KIND_DART",
         "DAMAGE_SOURCE_DART",
@@ -143,6 +152,11 @@ def main() -> int:
         "`core_blast_radius` | `29.0px`",
         "`outer_shockwave_radius` | `54.0px`",
         "`landed_spear_shockwave_displacement` | `20.0px`",
+        "`prowler_unlock_time` | `78.0s`",
+        "`unarmed_alert_delay` | `0.14s`",
+        "`stalk_speed_scale` | `0.82`",
+        "`hunt_speed_scale` | `1.48`",
+        "`stalk_distance_min/max` | `72.0-104.0px`",
         "`heart_runner_unlock_time` | `20.0s`",
         "`heart_runner_roll_interval_min/max` | `8.0-12.0s`",
         "`heart_runner_health_3_spawn_chance` | `0.01`",
@@ -166,6 +180,7 @@ def main() -> int:
     require("[`TUNING.md`](TUNING.md)" in roadmap, "ROADMAP links to TUNING.md", failures)
     require("## Phase 4.6 Enemy Interaction And Formation Pass" in roadmap, "ROADMAP documents Phase 4.6 design direction", failures)
     require("Heart Runner" in readme and "Heart Runner" in roadmap, "Docs mention the implemented Heart Runner opportunity", failures)
+    require("Prowler" in readme and "Prowler" in roadmap, "Docs mention the implemented Prowler phase", failures)
     require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
     require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)
     require("## Phase 4 Interlude 1 — Input & Audio Polish" in roadmap, "ROADMAP documents the bounded input/audio interlude", failures)

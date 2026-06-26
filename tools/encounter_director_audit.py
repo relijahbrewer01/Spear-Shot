@@ -97,6 +97,7 @@ def main() -> int:
     require("shielded_hostile_cap := 1" in director, "Shielded safety cap is tunable from one", failures)
     require("shooter_hostile_cap := 2" in director, "Shooter safety cap is tunable from two", failures)
     require("boomer_hostile_cap := 1" in director, "Boomer safety cap is tunable from one", failures)
+    require("prowler_hostile_cap := 1" in director, "Prowler safety cap is tunable from one", failures)
     require("HEART_RUNNER" not in director, "Heart Runner remains outside EncounterDirector hostile accounting", failures)
     require(
         "first_minute_charger_cap := 1" in director,
@@ -119,11 +120,17 @@ def main() -> int:
         failures,
     )
     require(
+        "get_prowler_hostile_count() < prowler_hostile_cap" in director,
+        "Prowler enemies use their own cap while still counting in total hostile cap",
+        failures,
+    )
+    require(
         "SpawnStep.new" in director
         and "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1]
         and "EnemyKind.SHOOTER" not in director.split("func _build_wave_definitions", 1)[1]
-        and "EnemyKind.BOOMER" not in director.split("func _build_wave_definitions", 1)[1],
-        "Authored waves contain no Shielded, Shooter, or Boomer spawn steps",
+        and "EnemyKind.BOOMER" not in director.split("func _build_wave_definitions", 1)[1]
+        and "EnemyKind.PROWLER" not in director.split("func _build_wave_definitions", 1)[1],
+        "Authored waves contain no Shielded, Shooter, Boomer, or Prowler spawn steps",
         failures,
     )
 
@@ -223,7 +230,7 @@ def main() -> int:
         and "boomer_spawn_chance_at_unlock := 0.025" in main_script
         and "boomer_spawn_chance_growth_per_second := 0.00035" in main_script
         and "maximum_boomer_spawn_chance := 0.07" in main_script,
-        "Boomer ambient tuning arrives last and stays uncommon",
+        "Boomer ambient tuning stays late-run and uncommon",
         failures,
     )
     require(
@@ -232,6 +239,22 @@ def main() -> int:
         and "boomer_intro_seen" in main_script
         and "boomer_intro_target_time = rng.randf_range" in main_script,
         "Boomer first intro uses a randomized per-run target",
+        failures,
+    )
+    require(
+        "prowler_unlock_time := 78.0" in main_script
+        and "prowler_spawn_chance_at_unlock := 0.03" in main_script
+        and "prowler_spawn_chance_growth_per_second := 0.00030" in main_script
+        and "maximum_prowler_spawn_chance := 0.08" in main_script,
+        "Prowler ambient tuning arrives latest and stays uncommon",
+        failures,
+    )
+    require(
+        "prowler_intro_target_time_min := 78.0" in main_script
+        and "prowler_intro_target_time_max := 88.0" in main_script
+        and "prowler_intro_seen" in main_script
+        and "prowler_intro_target_time = rng.randf_range" in main_script,
+        "Prowler first intro uses a randomized per-run target",
         failures,
     )
     require(

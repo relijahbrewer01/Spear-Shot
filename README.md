@@ -1,6 +1,6 @@
 # Spear Shot
 
-Current milestone: `Spear Shot v0.6.0-alpha.4.1 - Input & Audio Polish`
+Current milestone: `Spear Shot v0.6.0-alpha.5 - Prowler`
 
 ## Game concept
 
@@ -41,6 +41,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Temporary Shooter live-test hook: `2` debug-spawns one Blowgun Shooter while `DEBUG_SHOOTER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - Temporary Boomer live-test hook: `3` debug-spawns one Boomer while `DEBUG_BOOMER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - Temporary Heart Runner live-test hook: `4` debug-spawns one Heart Runner opportunity while `DEBUG_HEART_RUNNER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
+- Temporary Prowler live-test hook: `5` debug-spawns one Prowler enemy while `DEBUG_PROWLER_SPAWN_ENABLED` is `true` in `scripts/main.gd`
 - These are intentionally separate from normal player controls and can be disabled by setting their constants to `false`
 
 ## HUD layout
@@ -58,6 +59,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Blowgun Shooters use a small wiry hooded-forager silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
 - The approved final Shooter body uses a coherent moss-hood palette with a pale face, charcoal-brown torso, and restrained rust pouch on the roomier `16x18` canvas, keeping it small, readable, and distinct from the melee cast at `384x216`
 - Heart Runner opportunities use a tiny red pulse-beast silhouette on a compact `16x16` frame, now played through a live four-frame calm strut, four-frame startled hop, and four-frame panic sprint while keeping the body readable and distinct from the hostile roster
+- Prowlers use a small low predatory silhouette with a shoulder-hump profile and readable crouched-versus-leaning posture changes, so the armed stalking state and unarmed hunt state stay legible without UI callouts
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -88,6 +90,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
 - `art/sprites/boomer_enemy.png`: active Boomer sprite chosen from the local concept pass and kept on the same small readable scale as the rest of the special roster
+- `art/sprites/prowler_enemy.png`: active Prowler sprite chosen from the local three-candidate comparison board as the final low stalking predator silhouette
 - `art/sprites/heart_runner.png`: approved Heart Runner base silhouette chosen from the local three-variant comparison board
 - `art/sprites/heart_runner_sheet.png`: live `4x3` Heart Runner animation sheet containing the approved calm strut, startled hop, and panic sprint
 - `art/sprites/heart_pickup.png`: temporary heart pickup sprite used after a Runner defeat
@@ -113,7 +116,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/heart_pickup_collect.wav`: local recovery cue for collecting the heart pickup
 - `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
-- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, and Heart Runner sprites, the live Heart Runner animation sheet, and the temporary local comparison outputs for the Phase 4 concept passes
+- `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, Prowler, and Heart Runner sprites, the live Heart Runner animation sheet, and the temporary local comparison outputs for the Phase 4 concept passes
 - `tools/generate_music.py`: synthesizes both background loops locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -131,6 +134,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
 - `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
+- `ProwlerEnemy.tscn` and `scripts/prowler_enemy.gd`: ambient-only weapon-state predator that stalks while Akedra is armed, flashes through a short alert, then hunts aggressively whenever the spear is not held
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
 - `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile opportunity runner with visible calm entry, limited wandering, proximity-triggered panic, locked casual-or-panic exit routing, explicit spear-hit handling, authored displacement support, and currently locked route exit-plane cleanup
 - `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
@@ -155,6 +159,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/ShooterEnemyRuntimeAudit.tscn`: runtime audit for Shooter movement, aim locking, darts, damage rules, cleanup, and intro integration
 - `tools/boomer_enemy_audit.py`: static Phase 4.3 Boomer contract audit
 - `tools/BoomerEnemyRuntimeAudit.tscn`: runtime audit for Boomer movement, fuse, detonation, scoring, cleanup, and intro integration
+- `tools/prowler_enemy_audit.py`: static Phase 4.5 Prowler contract audit
+- `tools/ProwlerEnemyRuntimeAudit.tscn`: runtime audit for Prowler stalking, alert/hunt transitions, intro integration, cleanup, and cap behavior
 - `tools/heart_runner_audit.py`: static Phase 4.4 opportunity-system, pickup, audio, and contract audit
 - `tools/HeartRunnerRuntimeAudit.tscn`: runtime audit for Heart Runner spawning, state-driven animation, cleanup, pickup, cooldown, and pause/restart behavior
 - `tools/PlayerForcedMovementRuntimeAudit.tscn`: runtime audit for authored player forced movement, dodge interruption, and intent preservation
@@ -164,6 +170,14 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/music_cycling_audit.py`: static loop format, import, loudness, generation, fallback, and run-cycling audit
 - `tools/spear_recovery_audio_audit.py`: static recovery-state, PCM, import, generator, cleanup, RNG-isolation, and documentation audit
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
+
+## Phase 4.5 - Prowler
+
+- Prowler is an ambient-only hostile that turns Akedra's weapon state into a live spacing question instead of a passive stat check
+- While the spear is `HELD`, it stalks at medium range with cautious lateral movement instead of rushing directly into contact
+- While the spear is `FLYING` or `LANDED`, it gives one short readable alert, then commits to a faster direct hunt until the spear is legitimately recovered
+- It dies to one valid thrown-spear hit, awards `2` points, uses ordinary body contact damage, and does not steal, move, hide, or otherwise manipulate the spear
+- It remains ambient-only in Phase 4.5 with a dedicated cap of `1`, its own first-introduction guarantee, and no authored wave membership
 
 ## Enemy behavior
 
@@ -184,6 +198,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - An armed Boomer detonates into a damaging core blast plus a non-damaging outer shockwave, can be triggered early by a valid thrown-spear hit during fuse, and awards no direct score for self-destruction
 - If Akedra is currently in shove-protected forced movement from a successful Shooter shove, the Boomer core blast deals no health damage and does not replace that authored movement with a second knockback impulse
 - A Boomer outer shockwave can lightly nudge an already landed spear by `20` pixels, keeping it in `LANDED`/`FETCH`, clamping it inside the arena, and preserving normal retrieval behavior
+- Prowler: ambient-only weapon-state predator that keeps a `72-104` pixel stalking band while Akedra is armed, then becomes a faster direct hunter after a short `0.14s` alert whenever the spear is not held
+- Recovering the spear returns the Prowler to stalking immediately, so it pressures bad throw timing without making throwing itself universally wrong
 
 ## Opportunity behavior
 
@@ -215,12 +231,14 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
 - Shooter enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals, Chargers, or Shielded
 - Boomers count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals, Chargers, Shielded, or Shooters
+- Prowlers count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals, Chargers, Shielded, Shooters, or Boomers
 - Heart Runner opportunities sit outside EncounterDirector hostile accounting and use their own unlock, roll, and resolution-cooldown system
 - Charger ambient spawns unlock around `15` seconds with a small capped weight
 - Shielded ambient spawns unlock around `25` seconds with a smaller capped weight, and capped/locked Shielded candidates are removed before choosing among remaining ambient types
 - Shooter ambient spawns unlock around `42` seconds with an even smaller capped weight, and capped/locked Shooter candidates are removed before choosing among remaining ambient types
 - Boomer ambient spawns unlock around `65` seconds with the smallest capped weight, and capped/locked Boomer candidates are removed before choosing among remaining ambient types
-- Each run also rolls first-introduction targets: Charger between `15-21` seconds, Shielded between `25-30` seconds, Shooter between `42-52` seconds, and Boomer between `65-78` seconds
+- Prowler ambient spawns unlock around `78` seconds with a still-small capped weight, and capped/locked Prowler candidates are removed before choosing among remaining ambient types
+- Each run also rolls first-introduction targets: Charger between `15-21` seconds, Shielded between `25-30` seconds, Shooter between `42-52` seconds, Boomer between `65-78` seconds, and Prowler between `78-88` seconds
 - Before a target, specials can appear naturally through the existing weights; after an unseen target is overdue, the next valid ambient opportunity prioritizes that enemy until it successfully appears
 - After each special enemy has appeared once through organic play, it permanently returns to its ordinary long-term weighted selection for that run
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
@@ -235,6 +253,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Blowgun Shooter score: `2`
 - Boomer safe kill score: `2`
 - Boomer self-detonation score: `0` direct points; any enemies killed by the blast still use their ordinary score values
+- Prowler score: `2`
 - Heart Runner score: `1`, plus one temporary heart pickup on defeat
 - Charger score: `3`
 - High score is saved locally in `user://highscore.save`

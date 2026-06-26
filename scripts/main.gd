@@ -5,6 +5,7 @@ const ChargerScene := preload("res://Charger.tscn")
 const ShieldedScene := preload("res://ShieldedEnemy.tscn")
 const ShooterScene := preload("res://ShooterEnemy.tscn")
 const BoomerScene := preload("res://BoomerEnemy.tscn")
+const ProwlerScene := preload("res://ProwlerEnemy.tscn")
 const HeartRunnerScene := preload("res://HeartRunner.tscn")
 const HeartPickupScene := preload("res://HeartPickup.tscn")
 const BoomerBlastEffectScene := preload("res://BoomerBlastEffect.tscn")
@@ -14,6 +15,7 @@ const NO_AMBIENT_ENEMY_KIND := -1
 const DEBUG_SHIELDED_SPAWN_ENABLED := true
 const DEBUG_SHOOTER_SPAWN_ENABLED := true
 const DEBUG_BOOMER_SPAWN_ENABLED := true
+const DEBUG_PROWLER_SPAWN_ENABLED := true
 const DEBUG_HEART_RUNNER_SPAWN_ENABLED := true
 const PLAYER_ACTION_THROW := &"throw"
 const PLAYER_ACTION_DODGE := &"dodge"
@@ -90,6 +92,12 @@ enum SpawnSource {
 @export var maximum_boomer_spawn_chance := 0.07
 @export var boomer_intro_target_time_min := 65.0
 @export var boomer_intro_target_time_max := 78.0
+@export var prowler_unlock_time := 78.0
+@export var prowler_spawn_chance_at_unlock := 0.03
+@export var prowler_spawn_chance_growth_per_second := 0.00030
+@export var maximum_prowler_spawn_chance := 0.08
+@export var prowler_intro_target_time_min := 78.0
+@export var prowler_intro_target_time_max := 88.0
 @export var heart_runner_unlock_time := 20.0
 @export var heart_runner_roll_interval_min := 8.0
 @export var heart_runner_roll_interval_max := 12.0
@@ -111,10 +119,12 @@ var charger_intro_target_time := 15.0
 var shielded_intro_target_time := 25.0
 var shooter_intro_target_time := 42.0
 var boomer_intro_target_time := 65.0
+var prowler_intro_target_time := 78.0
 var charger_intro_seen := false
 var shielded_intro_seen := false
 var shooter_intro_seen := false
 var boomer_intro_seen := false
+var prowler_intro_seen := false
 var pause_active := false
 var run_state: RunState = RunState.RUNNING
 var shake_left := 0.0
@@ -302,6 +312,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if DEBUG_BOOMER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_boomer"):
 		_debug_spawn_boomer_enemy()
 		return
+	if DEBUG_PROWLER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_prowler"):
+		_debug_spawn_prowler_enemy()
+		return
 	if DEBUG_HEART_RUNNER_SPAWN_ENABLED and event.is_action_pressed("debug_spawn_heart_runner"):
 		_debug_spawn_heart_runner()
 		return
@@ -409,6 +422,8 @@ func _try_spawn_enemy(
 		return false
 
 	enemy.setup(player, arena.get_play_rect(), _get_current_enemy_speed())
+	if enemy.has_method("set_tracked_spear"):
+		enemy.call("set_tracked_spear", spear)
 	enemy.global_position = spawn_position
 
 	var enemy_id := enemy.get_instance_id()
@@ -474,6 +489,19 @@ func _debug_spawn_boomer_enemy() -> void:
 		print("DEBUG: spawned Boomer enemy with key 3.")
 	else:
 		print("DEBUG: Boomer enemy spawn failed; cap or safe spawn search blocked it.")
+
+
+func _debug_spawn_prowler_enemy() -> void:
+	var spawned := _try_spawn_enemy(
+		EncounterDirector.EnemyKind.PROWLER,
+		arena.get_random_spawn_edge(),
+		EncounterDirector.INVALID_WAVE_ID,
+		SpawnSource.DEBUG
+	)
+	if spawned:
+		print("DEBUG: spawned Prowler enemy with key 5.")
+	else:
+		print("DEBUG: Prowler enemy spawn failed; cap or safe spawn search blocked it.")
 
 
 func _debug_spawn_heart_runner() -> void:
@@ -709,6 +737,8 @@ func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 		return ShooterScene
 	if enemy_kind == EncounterDirector.EnemyKind.BOOMER:
 		return BoomerScene
+	if enemy_kind == EncounterDirector.EnemyKind.PROWLER:
+		return ProwlerScene
 	return EnemyScene
 
 
@@ -749,6 +779,10 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 		survival_time >= boomer_unlock_time
 		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.BOOMER, survival_time)
 	)
+	var prowler_available := (
+		survival_time >= prowler_unlock_time
+		and encounter_director.can_spawn_enemy(EncounterDirector.EnemyKind.PROWLER, survival_time)
+	)
 
 	if (
 		not normal_available
@@ -756,6 +790,7 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 		and not shielded_available
 		and not shooter_available
 		and not boomer_available
+		and not prowler_available
 	):
 		return NO_AMBIENT_ENEMY_KIND
 
@@ -798,8 +833,20 @@ func _pick_weighted_ambient_enemy_kind() -> int:
 
 	if boomer_available and non_charger_roll < boomer_spawn_chance:
 		return EncounterDirector.EnemyKind.BOOMER
+	var non_boomer_roll := non_charger_roll
+	if boomer_available and boomer_spawn_chance < 1.0:
+		non_boomer_roll = (non_charger_roll - boomer_spawn_chance) / (1.0 - boomer_spawn_chance)
+
+	var prowler_spawn_chance := 0.0
+	if prowler_available:
+		prowler_spawn_chance = _get_current_prowler_spawn_chance()
+
+	if prowler_available and non_boomer_roll < prowler_spawn_chance:
+		return EncounterDirector.EnemyKind.PROWLER
 	if normal_available:
 		return EncounterDirector.EnemyKind.NORMAL
+	if prowler_available:
+		return EncounterDirector.EnemyKind.PROWLER
 	if boomer_available:
 		return EncounterDirector.EnemyKind.BOOMER
 	if charger_available:
@@ -830,6 +877,11 @@ func _pick_pending_intro_enemy_kind() -> int:
 		pending_candidates.append({
 			"enemy_kind": EncounterDirector.EnemyKind.BOOMER,
 			"target_time": boomer_intro_target_time,
+		})
+	if _is_intro_pending_and_available(EncounterDirector.EnemyKind.PROWLER):
+		pending_candidates.append({
+			"enemy_kind": EncounterDirector.EnemyKind.PROWLER,
+			"target_time": prowler_intro_target_time,
 		})
 
 	if pending_candidates.is_empty():
@@ -870,6 +922,12 @@ func _is_intro_pending_and_available(enemy_kind: int) -> bool:
 				and survival_time >= boomer_intro_target_time
 				and _is_enemy_kind_available_for_ambient(enemy_kind)
 			)
+		EncounterDirector.EnemyKind.PROWLER:
+			return (
+				not prowler_intro_seen
+				and survival_time >= prowler_intro_target_time
+				and _is_enemy_kind_available_for_ambient(enemy_kind)
+			)
 
 	return false
 
@@ -896,6 +954,11 @@ func _is_enemy_kind_available_for_ambient(enemy_kind: int) -> bool:
 		EncounterDirector.EnemyKind.BOOMER:
 			return (
 				survival_time >= boomer_unlock_time
+				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
+			)
+		EncounterDirector.EnemyKind.PROWLER:
+			return (
+				survival_time >= prowler_unlock_time
 				and encounter_director.can_spawn_enemy(enemy_kind, survival_time)
 			)
 
@@ -930,11 +993,19 @@ func _get_current_boomer_spawn_chance() -> float:
 	return min(boomer_spawn_chance, maximum_boomer_spawn_chance)
 
 
+func _get_current_prowler_spawn_chance() -> float:
+	var prowler_spawn_chance := prowler_spawn_chance_at_unlock + (
+		(survival_time - prowler_unlock_time) * prowler_spawn_chance_growth_per_second
+	)
+	return min(prowler_spawn_chance, maximum_prowler_spawn_chance)
+
+
 func _reset_intro_state() -> void:
 	charger_intro_seen = false
 	shielded_intro_seen = false
 	shooter_intro_seen = false
 	boomer_intro_seen = false
+	prowler_intro_seen = false
 	_generate_intro_target_times()
 
 
@@ -947,6 +1018,10 @@ func _generate_intro_target_times() -> void:
 			shielded_intro_target_time = target_quad.y
 			shooter_intro_target_time = target_quad.z
 			boomer_intro_target_time = target_quad.w
+			prowler_intro_target_time = rng.randf_range(
+				prowler_intro_target_time_min,
+				prowler_intro_target_time_max
+			)
 			return
 		if target_values is Vector3:
 			var target_triple: Vector3 = target_values
@@ -956,6 +1031,10 @@ func _generate_intro_target_times() -> void:
 			boomer_intro_target_time = rng.randf_range(
 				boomer_intro_target_time_min,
 				boomer_intro_target_time_max
+			)
+			prowler_intro_target_time = rng.randf_range(
+				prowler_intro_target_time_min,
+				prowler_intro_target_time_max
 			)
 			return
 		if target_values is Vector2:
@@ -970,14 +1049,31 @@ func _generate_intro_target_times() -> void:
 				boomer_intro_target_time_min,
 				boomer_intro_target_time_max
 			)
+			prowler_intro_target_time = rng.randf_range(
+				prowler_intro_target_time_min,
+				prowler_intro_target_time_max
+			)
+			return
+		if target_values is Array and target_values.size() >= 5:
+			charger_intro_target_time = float(target_values[0])
+			shielded_intro_target_time = float(target_values[1])
+			shooter_intro_target_time = float(target_values[2])
+			boomer_intro_target_time = float(target_values[3])
+			prowler_intro_target_time = float(target_values[4])
 			return
 		if target_values is Array and target_values.size() >= 4:
 			charger_intro_target_time = float(target_values[0])
 			shielded_intro_target_time = float(target_values[1])
 			shooter_intro_target_time = float(target_values[2])
 			boomer_intro_target_time = float(target_values[3])
+			prowler_intro_target_time = rng.randf_range(
+				prowler_intro_target_time_min,
+				prowler_intro_target_time_max
+			)
 			return
-		push_warning("Intro target audit values must be Vector2, Vector3, Vector4, or an Array of four floats.")
+		push_warning(
+			"Intro target audit values must be Vector2, Vector3, Vector4, or an Array of four or five floats."
+		)
 		_generate_random_intro_target_times()
 		return
 
@@ -1001,6 +1097,10 @@ func _generate_random_intro_target_times() -> void:
 		boomer_intro_target_time_min,
 		boomer_intro_target_time_max
 	)
+	prowler_intro_target_time = rng.randf_range(
+		prowler_intro_target_time_min,
+		prowler_intro_target_time_max
+	)
 
 
 func _mark_intro_seen_for_spawn(enemy_kind: int, spawn_source: int) -> void:
@@ -1016,6 +1116,8 @@ func _mark_intro_seen_for_spawn(enemy_kind: int, spawn_source: int) -> void:
 			shooter_intro_seen = true
 		EncounterDirector.EnemyKind.BOOMER:
 			boomer_intro_seen = true
+		EncounterDirector.EnemyKind.PROWLER:
+			prowler_intro_seen = true
 
 
 func _get_ambient_selection_roll() -> float:
@@ -1029,7 +1131,8 @@ func debug_set_intro_target_times(
 	new_charger_intro_target_time: float,
 	new_shielded_intro_target_time: float,
 	new_shooter_intro_target_time: float = -1.0,
-	new_boomer_intro_target_time: float = -1.0
+	new_boomer_intro_target_time: float = -1.0,
+	new_prowler_intro_target_time: float = -1.0
 ) -> void:
 	charger_intro_target_time = new_charger_intro_target_time
 	shielded_intro_target_time = new_shielded_intro_target_time
@@ -1037,6 +1140,8 @@ func debug_set_intro_target_times(
 		shooter_intro_target_time = new_shooter_intro_target_time
 	if new_boomer_intro_target_time >= 0.0:
 		boomer_intro_target_time = new_boomer_intro_target_time
+	if new_prowler_intro_target_time >= 0.0:
+		prowler_intro_target_time = new_prowler_intro_target_time
 
 
 func debug_set_intro_target_sequence(new_intro_target_sequence: Array) -> void:
@@ -1780,6 +1885,7 @@ func _ensure_input_actions() -> void:
 	_add_key_action("debug_spawn_shooter", KEY_2)
 	_add_key_action("debug_spawn_boomer", KEY_3)
 	_add_key_action("debug_spawn_heart_runner", KEY_4)
+	_add_key_action("debug_spawn_prowler", KEY_5)
 	_remove_mouse_button_action("throw_spear", MOUSE_BUTTON_RIGHT)
 	_add_mouse_button_action("throw_spear", MOUSE_BUTTON_LEFT)
 	_add_mouse_button_action("move_to_cursor", MOUSE_BUTTON_RIGHT)

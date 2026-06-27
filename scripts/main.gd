@@ -145,6 +145,9 @@ var last_dodge_sfx_index := -1
 var last_hurt_sfx_index := -1
 var current_music_track_index := 0
 var original_music_stream: AudioStream
+var debug_prowler_alert_play_count := 0
+var debug_prowler_defensive_attack_play_count := 0
+var debug_prowler_hunt_impact_play_count := 0
 var debug_intro_target_sequence: Array = []
 var debug_ambient_roll_sequence: Array = []
 var debug_heart_runner_roll_sequence: Array = []
@@ -187,6 +190,7 @@ var active_heart_pickup: HeartPickup
 @onready var boomer_fuse_player: AudioStreamPlayer = $AudioPlayers/BoomerFusePlayer
 @onready var boomer_explosion_player: AudioStreamPlayer = $AudioPlayers/BoomerExplosionPlayer
 @onready var prowler_alert_player: AudioStreamPlayer = $AudioPlayers/ProwlerAlertPlayer
+@onready var prowler_defensive_attack_player: AudioStreamPlayer = $AudioPlayers/ProwlerDefensiveAttackPlayer
 @onready var prowler_pounce_hit_player: AudioStreamPlayer = $AudioPlayers/ProwlerPounceHitPlayer
 @onready var heart_runner_appear_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAppearPlayer
 @onready var heart_runner_alarm_player: AudioStreamPlayer = $AudioPlayers/HeartRunnerAlarmPlayer
@@ -261,6 +265,7 @@ func _reset_runtime_state() -> void:
 	shake_duration = 0.0
 	_clear_buffered_spear_throw()
 	_cancel_hit_stop()
+	debug_reset_prowler_audio_metrics()
 
 	for child in enemy_container.get_children():
 		child.queue_free()
@@ -452,6 +457,10 @@ func _try_spawn_enemy(
 		enemy.connect(&"detonated", _on_boomer_enemy_detonated)
 	if enemy.has_signal("alert_started"):
 		enemy.connect(&"alert_started", _on_prowler_alert_started)
+	if enemy.has_signal("alert_voice_requested"):
+		enemy.connect(&"alert_voice_requested", _on_prowler_alert_voice_requested)
+	if enemy.has_signal("defensive_pounce_committed"):
+		enemy.connect(&"defensive_pounce_committed", _on_prowler_defensive_pounce_committed)
 	if enemy.has_signal("hunt_pounce_hit"):
 		enemy.connect(&"hunt_pounce_hit", _on_prowler_hunt_pounce_hit)
 	enemy_container.add_child(enemy)
@@ -1421,7 +1430,21 @@ func _on_prowler_alert_started() -> void:
 	if run_state != RunState.RUNNING:
 		return
 
+
+func _on_prowler_alert_voice_requested() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
 	_play_sfx(prowler_alert_player)
+	debug_prowler_alert_play_count += 1
+
+
+func _on_prowler_defensive_pounce_committed() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(prowler_defensive_attack_player)
+	debug_prowler_defensive_attack_play_count += 1
 
 
 func _on_prowler_hunt_pounce_hit(_hit_position: Vector2, hit_stop_duration: float) -> void:
@@ -1429,6 +1452,7 @@ func _on_prowler_hunt_pounce_hit(_hit_position: Vector2, hit_stop_duration: floa
 		return
 
 	_play_sfx(prowler_pounce_hit_player)
+	debug_prowler_hunt_impact_play_count += 1
 	_try_start_authored_hit_stop(hit_stop_duration, 0.03)
 
 
@@ -1739,6 +1763,20 @@ func debug_get_current_music_stream_path() -> String:
 	return music_player.stream.resource_path
 
 
+func debug_reset_prowler_audio_metrics() -> void:
+	debug_prowler_alert_play_count = 0
+	debug_prowler_defensive_attack_play_count = 0
+	debug_prowler_hunt_impact_play_count = 0
+
+
+func debug_get_prowler_audio_metrics() -> Dictionary:
+	return {
+		"alert": debug_prowler_alert_play_count,
+		"defensive": debug_prowler_defensive_attack_play_count,
+		"impact": debug_prowler_hunt_impact_play_count,
+	}
+
+
 func debug_load_music_stream_for_path(track_path: String) -> AudioStream:
 	return _load_music_stream_or_fallback(track_path)
 
@@ -1763,6 +1801,7 @@ func _stop_all_audio() -> void:
 		boomer_fuse_player,
 		boomer_explosion_player,
 		prowler_alert_player,
+		prowler_defensive_attack_player,
 		prowler_pounce_hit_player,
 		heart_runner_appear_player,
 		heart_runner_alarm_player,
@@ -1794,6 +1833,7 @@ func _stop_gameplay_sfx() -> void:
 		boomer_fuse_player,
 		boomer_explosion_player,
 		prowler_alert_player,
+		prowler_defensive_attack_player,
 		prowler_pounce_hit_player,
 		heart_runner_appear_player,
 		heart_runner_alarm_player,

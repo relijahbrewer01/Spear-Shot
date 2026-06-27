@@ -3,6 +3,8 @@ class_name ProwlerEnemy
 
 signal state_changed(new_state: int)
 signal alert_started
+signal alert_voice_requested
+signal defensive_pounce_committed
 signal hunt_pounce_hit(hit_position: Vector2, hit_stop_duration: float)
 
 enum ProwlerState {
@@ -27,13 +29,14 @@ enum PounceMode {
 
 const ANIMATION_FRAME_COUNT := 4
 const ANIMATION_ROW_STALK := 0
-const ANIMATION_ROW_ALERT := 1
-const ANIMATION_ROW_HUNT := 2
-const ANIMATION_ROW_POUNCE := 3
-const ANIMATION_ROW_RECOVERY := 4
-const STALK_FRAME_DURATION := 0.18
+const ANIMATION_ROW_DEFENSIVE := 1
+const ANIMATION_ROW_ALERT := 2
+const ANIMATION_ROW_HUNT := 3
+const ANIMATION_ROW_HUNT_POUNCE := 4
+const ANIMATION_ROW_RECOVERY := 5
+const STALK_FRAME_DURATION := 0.16
 const ALERT_FRAME_DURATION := 0.08
-const HUNT_FRAME_DURATION := 0.10
+const HUNT_FRAME_DURATION := 0.09
 const POUNCE_FRAME_DURATION := 0.05
 const RECOVERY_FRAME_DURATION := 0.12
 const ALERT_TWITCH_DURATION := 0.10
@@ -43,6 +46,7 @@ const RETREAT_END_DISTANCE := 10.0
 @export var stalk_speed_scale := 0.82
 @export var hunt_speed_scale := 1.48
 @export var unarmed_alert_delay := 0.28
+@export var alert_voice_delay := 0.06
 @export var stalk_distance_min := 72.0
 @export var stalk_distance_max := 104.0
 @export var stalk_dead_zone := 5.0
@@ -73,6 +77,7 @@ var tracked_spear: Spear
 var base_behavior_speed := 42.0
 var tracked_spear_is_held := true
 var hunt_pounce_available := false
+var alert_voice_emitted := false
 var state_time_left := 0.0
 var state_elapsed := 0.0
 var alert_twitch_left := 0.0
@@ -296,6 +301,9 @@ func _process_alert_state(delta: float) -> void:
 	var direction_to_player := _get_direction_to_player()
 	if direction_to_player != Vector2.ZERO:
 		_update_facing_from_reference(direction_to_player)
+	if not alert_voice_emitted and state_elapsed >= alert_voice_delay:
+		alert_voice_emitted = true
+		alert_voice_requested.emit()
 	if state_time_left == 0.0:
 		_enter_hunt_state()
 
@@ -475,6 +483,7 @@ func _enter_stalk_state(reset_commit: bool) -> void:
 	pounce_mode = PounceMode.NONE
 	pounce_hit_resolved = false
 	pounce_damage_accepted = false
+	alert_voice_emitted = false
 	state_time_left = 0.0
 	alert_twitch_left = 0.0
 	wall_fallback_left = 0.0
@@ -488,6 +497,7 @@ func _enter_stalk_state(reset_commit: bool) -> void:
 
 func _enter_defensive_windup_state() -> void:
 	pounce_mode = PounceMode.DEFENSIVE
+	alert_voice_emitted = false
 	pounce_locked_direction = _get_direction_to_player()
 	if pounce_locked_direction == Vector2.ZERO:
 		pounce_locked_direction = Vector2.LEFT if facing_left else Vector2.RIGHT
@@ -504,6 +514,7 @@ func _enter_alert_state() -> void:
 		pounce_locked_direction = Vector2.LEFT if facing_left else Vector2.RIGHT
 	pounce_hit_resolved = false
 	pounce_damage_accepted = false
+	alert_voice_emitted = false
 	state_time_left = unarmed_alert_delay
 	alert_twitch_left = ALERT_TWITCH_DURATION
 	velocity = Vector2.ZERO
@@ -513,6 +524,7 @@ func _enter_alert_state() -> void:
 
 func _enter_hunt_state() -> void:
 	pounce_mode = PounceMode.HUNT
+	alert_voice_emitted = false
 	state_time_left = 0.0
 	alert_twitch_left = 0.0
 	velocity = Vector2.ZERO
@@ -521,6 +533,7 @@ func _enter_hunt_state() -> void:
 
 func _enter_hunt_pounce_windup_state() -> void:
 	pounce_mode = PounceMode.HUNT
+	alert_voice_emitted = false
 	pounce_locked_direction = _get_direction_to_player()
 	if pounce_locked_direction == Vector2.ZERO:
 		pounce_locked_direction = Vector2.LEFT if facing_left else Vector2.RIGHT
@@ -543,20 +556,25 @@ func _start_pounce(
 	pounce_total_duration = duration
 	pounce_hit_resolved = false
 	pounce_damage_accepted = false
+	alert_voice_emitted = false
 	state_time_left = duration
 	if pounce_mode == PounceMode.HUNT:
 		hunt_pounce_available = false
+	elif pounce_mode == PounceMode.DEFENSIVE:
+		defensive_pounce_committed.emit()
 	velocity = Vector2.ZERO
 	_set_prowler_state(ProwlerState.POUNCE)
 
 
 func _enter_impact_recoil_state() -> void:
+	alert_voice_emitted = false
 	state_time_left = hunt_prowler_recoil_duration
 	velocity = Vector2.ZERO
 	_set_prowler_state(ProwlerState.IMPACT_RECOIL)
 
 
 func _enter_miss_skid_state() -> void:
+	alert_voice_emitted = false
 	state_time_left = miss_skid_duration
 	miss_skid_direction = pounce_locked_direction
 	velocity = Vector2.ZERO
@@ -564,12 +582,14 @@ func _enter_miss_skid_state() -> void:
 
 
 func _enter_miss_stun_state() -> void:
+	alert_voice_emitted = false
 	state_time_left = miss_stun_duration
 	velocity = Vector2.ZERO
 	_set_prowler_state(ProwlerState.MISS_STUN)
 
 
 func _enter_retreat_state() -> void:
+	alert_voice_emitted = false
 	var away_from_player := _get_direction_away_from_player()
 	if away_from_player == Vector2.ZERO:
 		away_from_player = -pounce_locked_direction
@@ -584,6 +604,7 @@ func _enter_wary_unarmed_state() -> void:
 	pounce_mode = PounceMode.NONE
 	pounce_hit_resolved = false
 	pounce_damage_accepted = false
+	alert_voice_emitted = false
 	state_time_left = 0.0
 	velocity = Vector2.ZERO
 	_set_prowler_state(ProwlerState.WARY_UNARMED)
@@ -842,6 +863,7 @@ func _set_prowler_state(new_state: ProwlerState) -> void:
 
 
 func _clear_state_timers() -> void:
+	alert_voice_emitted = false
 	state_time_left = 0.0
 	state_elapsed = 0.0
 	alert_twitch_left = 0.0
@@ -986,19 +1008,21 @@ func _get_animation_frame_coords() -> Vector2i:
 		ProwlerState.STALK, ProwlerState.RETREAT:
 			return Vector2i(_get_looping_frame(STALK_FRAME_DURATION), ANIMATION_ROW_STALK)
 		ProwlerState.DEFENSIVE_WINDUP:
-			return Vector2i(mini(int(floor(_get_finite_state_progress(defensive_windup_duration) * 4.0)), 3), ANIMATION_ROW_ALERT)
+			return Vector2i(mini(int(floor(_get_finite_state_progress(defensive_windup_duration) * 2.0)), 1), ANIMATION_ROW_DEFENSIVE)
 		ProwlerState.ALERT:
 			return Vector2i(mini(int(floor(_get_finite_state_progress(unarmed_alert_delay) * 4.0)), 3), ANIMATION_ROW_ALERT)
 		ProwlerState.HUNT, ProwlerState.WARY_UNARMED:
 			return Vector2i(_get_looping_frame(HUNT_FRAME_DURATION), ANIMATION_ROW_HUNT)
 		ProwlerState.POUNCE_WINDUP:
-			return Vector2i(mini(int(floor(_get_finite_state_progress(hunt_pounce_windup_duration) * 2.0)), 1), ANIMATION_ROW_POUNCE)
+			return Vector2i(mini(int(floor(_get_finite_state_progress(hunt_pounce_windup_duration) * 2.0)), 1), ANIMATION_ROW_HUNT_POUNCE)
 		ProwlerState.POUNCE:
-			return Vector2i(2 + mini(int(floor(_get_finite_state_progress(pounce_total_duration) * 2.0)), 1), ANIMATION_ROW_POUNCE)
+			if pounce_mode == PounceMode.DEFENSIVE:
+				return Vector2i(2 + mini(int(floor(_get_finite_state_progress(pounce_total_duration) * 2.0)), 1), ANIMATION_ROW_DEFENSIVE)
+			return Vector2i(2 + mini(int(floor(_get_finite_state_progress(pounce_total_duration) * 2.0)), 1), ANIMATION_ROW_HUNT_POUNCE)
 		ProwlerState.IMPACT_RECOIL:
-			return Vector2i(3, ANIMATION_ROW_POUNCE)
+			return Vector2i(3, ANIMATION_ROW_HUNT_POUNCE)
 		ProwlerState.MISS_SKID:
-			return Vector2i(_get_looping_frame(RECOVERY_FRAME_DURATION), ANIMATION_ROW_RECOVERY)
+			return Vector2i(mini(int(floor(_get_finite_state_progress(miss_skid_duration) * 2.0)), 1), ANIMATION_ROW_RECOVERY)
 		ProwlerState.MISS_STUN:
 			return Vector2i(2 + mini(int(floor(_get_finite_state_progress(miss_stun_duration) * 2.0)), 1), ANIMATION_ROW_RECOVERY)
 	return Vector2i.ZERO

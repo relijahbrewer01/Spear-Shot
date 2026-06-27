@@ -260,15 +260,16 @@
 | Setting | Current value | Source | Purpose / tuning effect |
 | --- | --- | --- | --- |
 | `score_value` | `2` | `ProwlerEnemy.tscn` | Score for a killed Prowler. |
-| Body sprite canvas dimensions | `16x16px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Compact live base canvas for the selected low stalking predator silhouette. |
-| Live animation sheet layout | `4x5` frames on `64x80px` | `ProwlerEnemy.tscn`, `art/sprites/prowler_enemy_sheet.png`, `tools/generate_phase4_assets.py` | Single Sprite2D sheet for stalking, alert, hunting, pounce, and recovery states. |
-| Selected concept | `Moss Lynx` | `art/dev/prowler_candidates/prowler_manifest.json`, `tools/generate_phase4_assets.py` | Final approved candidate with a shoulder-hump profile, pale muzzle, red-eye hunt state, and narrow trailing tail. |
-| Apparent silhouette bounds | About `14x10px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Measured non-transparent Prowler silhouette on the compact base canvas. |
+| Body sprite canvas dimensions | `20x18px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Roomier live base canvas for the selected stylized `Bonejaw Prowler` silhouette. |
+| Live animation sheet layout | `4x6` frames on `80x108px` | `ProwlerEnemy.tscn`, `art/sprites/prowler_enemy_sheet.png`, `tools/generate_phase4_assets.py` | Single Sprite2D sheet mapping eight readable beats across six rows: stalk, defensive wind-up, defensive launch, alert, hunt, hunt leap, impact/recoil, and miss/stun. |
+| Selected concept | `Bonejaw Prowler` | `art/dev/prowler_candidates/prowler_manifest.json`, `tools/generate_phase4_assets.py` | Final approved low predator with a hooked pale jaw plate, dry mane ridge, and the clearest authored stalking-versus-hunting posture split. |
+| Apparent silhouette bounds | About `19x13px` | `art/sprites/prowler_enemy.png`, `tools/generate_phase4_assets.py` | Measured non-transparent Prowler silhouette on the live base canvas. |
 | `body_radius` | `7.0px` | `ProwlerEnemy.tscn` | Fair body footprint. |
 | Collision radius | `7.0px` | `ProwlerEnemy.tscn` | Physics shape size. |
 | `stalk_speed_scale` | `0.82` | `scripts/prowler_enemy.gd` | Cautious stalking speed relative to current enemy speed. |
 | `hunt_speed_scale` | `1.48` | `scripts/prowler_enemy.gd` | Aggressive unarmed hunt speed relative to current enemy speed. |
 | `unarmed_alert_delay` | `0.28s` | `scripts/prowler_enemy.gd` | One-shot readable red-eye delay before the unarmed hunt fully commits. |
+| `alert_voice_delay` | `0.06s` | `scripts/prowler_enemy.gd` | Small authored offset that separates the hostile growl from the throw sound without delaying the gameplay alert state. |
 | `stalk_distance_min/max` | `72.0-104.0px` | `scripts/prowler_enemy.gd` | Desired stalking band while Akedra is armed; `stalk_distance_min` begins the retreat response and `stalk_distance_max` begins the cautious approach response. |
 | `stalk_dead_zone` | `5.0px` | `scripts/prowler_enemy.gd` | Hysteresis around the stalking band to reduce direction jitter. |
 | `stalk_lateral_commit_duration` | `0.55s` | `scripts/prowler_enemy.gd` | Time a lateral stalking choice stays committed before reevaluation. |
@@ -289,8 +290,10 @@
 | One hunting pounce per unarmed cycle | `1` committed attempt between `HELD -> unheld` and the next legitimate recovery | `scripts/prowler_enemy.gd`, `scripts/spear.gd` | Prevents repeated leap spam during one throw/recovery window. |
 | `separation_distance` | `20.0px` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing radius. |
 | `separation_strength` | `50.0` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing force. |
-| `audio/prowler_alert.wav` | `0.34s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_alert.wav`, `tools/generate_sfx.py` | Territorial growl that plays once on a real armed-to-unarmed transformation. |
-| `audio/prowler_pounce_hit.wav` | `0.13s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_pounce_hit.wav`, `tools/generate_sfx.py` | Physical bite/body-impact cue that plays only after a valid hunting pounce hit. |
+| `audio/prowler_alert.wav` | `0.37s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_alert.wav`, `tools/generate_sfx.py` | Live `Bone-Throat Snarl` cue: a deeper territorial jaw-rattle alert that plays once on a real armed-to-unarmed transformation after the small `alert_voice_delay` offset. |
+| `audio/prowler_defensive_attack.wav` | `0.17s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_defensive_attack.wav`, `tools/generate_sfx.py` | Live `Bone-Click Burst` cue: a compact frightened-aggression launch sound that plays once when the armed defensive pass-through pounce commits. |
+| `audio/prowler_pounce_hit.wav` | `0.12s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_pounce_hit.wav`, `tools/generate_sfx.py` | Live `Bone Plate Thud` cue: a physical jaw-and-shoulder impact that plays only after a valid hunting pounce hit. |
+| Review audio candidates | `3` alert + `3` defensive + `3` impact WAVs | `audio/dev/prowler_candidates`, `tools/generate_sfx.py` | Kept review-pass candidate set used to choose the final Bonejaw alert, defensive, and impact sounds without external assets. |
 | Spawn and introduction values | `78s`, `78-88s`, `0.03`, `0.00030`, `0.08` | `scripts/main.gd` | Prowler unlock, intro target, starting chance, growth, and max chance. |
 
 ## Heart Runner Opportunity

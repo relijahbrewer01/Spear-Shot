@@ -120,6 +120,15 @@ def main() -> int:
     ]:
         audit_png(png_path, failures)
 
+    prowler_base = Image.open(ROOT / "art/sprites/prowler_enemy.png")
+    prowler_sheet = Image.open(ROOT / "art/sprites/prowler_enemy_sheet.png")
+    prowler_comparison = Image.open(ROOT / "art/dev/prowler_candidates/prowler_comparison.png")
+    prowler_behavior = Image.open(ROOT / "art/dev/prowler_candidates/prowler_behavior_board.png")
+    require(prowler_base.size == (20, 18), "Prowler base sprite uses the approved 20x18 canvas", failures)
+    require(prowler_sheet.size == (80, 108), "Prowler live sheet uses the approved 80x108 4x6 layout", failures)
+    require(prowler_comparison.size == (384, 216), "Prowler comparison board renders at native arena scale", failures)
+    require(prowler_behavior.size == (384, 216), "Prowler behavior board renders at native arena scale", failures)
+
     if failures:
         print(f"\nPixel render audit failed with {len(failures)} issue(s).")
         return 1

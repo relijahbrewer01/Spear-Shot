@@ -32,6 +32,7 @@
 [ext_resource type="AudioStream" path="res://audio/heart_pickup_collect.wav" id="30"]
 [ext_resource type="AudioStream" path="res://audio/heart_pickup_expire.wav" id="31"]
 [ext_resource type="AudioStream" path="res://audio/heart_runner_alarm.wav" id="32"]
+[ext_resource type="AudioStream" path="res://audio/prowler_defensive_attack.wav" id="33"]
 
 [node name="Main" type="Node2D" unique_id=571157940]
 script = ExtResource("1")
@@ -159,7 +160,12 @@ bus = &"SFX"
 
 [node name="ProwlerAlertPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624184]
 stream = ExtResource("26")
-volume_db = -8.0
+volume_db = -4.0
+bus = &"SFX"
+
+[node name="ProwlerDefensiveAttackPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624186]
+stream = ExtResource("33")
+volume_db = -4.5
 bus = &"SFX"
 
 [node name="ProwlerPounceHitPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=571624185]

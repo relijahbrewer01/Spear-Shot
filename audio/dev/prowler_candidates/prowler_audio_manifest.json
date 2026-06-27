@@ -1,0 +1,109 @@
+{
+  "directory": "C:\\Users\\Elijah\\Documents\\Spear Shot\\audio\\dev\\prowler_candidates",
+  "selected": {
+    "alert": {
+      "key": "2",
+      "title": "Bone-Throat Snarl",
+      "file_name": "prowler_alert_candidate_2.wav",
+      "selected": true,
+      "description": "Deeper chesty snarl with a stronger rattling jaw accent; selected for the live Bonejaw identity.",
+      "duration_seconds": 0.37
+    },
+    "defensive": {
+      "key": "1",
+      "title": "Bone-Click Burst",
+      "file_name": "prowler_defensive_candidate_1.wav",
+      "selected": true,
+      "description": "Fast reed-swipe launch with a compact jaw click; selected for the live defensive pounce.",
+      "duration_seconds": 0.17
+    },
+    "impact": {
+      "key": "1",
+      "title": "Bone Plate Thud",
+      "file_name": "prowler_impact_candidate_1.wav",
+      "selected": true,
+      "description": "Physical jaw-and-shoulder body hit with a concise bone click; selected for the live hunting impact.",
+      "duration_seconds": 0.12
+    }
+  },
+  "candidates": {
+    "alert": [
+      {
+        "key": "1",
+        "title": "Jaw-Rattle Bark",
+        "file_name": "prowler_alert_candidate_1.wav",
+        "selected": false,
+        "description": "Short territorial bark with a clear bone-jaw chatter on the front edge.",
+        "duration_seconds": 0.33
+      },
+      {
+        "key": "2",
+        "title": "Bone-Throat Snarl",
+        "file_name": "prowler_alert_candidate_2.wav",
+        "selected": true,
+        "description": "Deeper chesty snarl with a stronger rattling jaw accent; selected for the live Bonejaw identity.",
+        "duration_seconds": 0.37
+      },
+      {
+        "key": "3",
+        "title": "Hollow Warning Yip",
+        "file_name": "prowler_alert_candidate_3.wav",
+        "selected": false,
+        "description": "Sharper nasal warning call with less weight and a slightly more feral yip-like top end.",
+        "duration_seconds": 0.31
+      }
+    ],
+    "defensive": [
+      {
+        "key": "1",
+        "title": "Bone-Click Burst",
+        "file_name": "prowler_defensive_candidate_1.wav",
+        "selected": true,
+        "description": "Fast reed-swipe launch with a compact jaw click; selected for the live defensive pounce.",
+        "duration_seconds": 0.17
+      },
+      {
+        "key": "2",
+        "title": "Reed Lash Lunge",
+        "file_name": "prowler_defensive_candidate_2.wav",
+        "selected": false,
+        "description": "Airier lash-forward cue with more hiss and less bony snap.",
+        "duration_seconds": 0.18
+      },
+      {
+        "key": "3",
+        "title": "Jaw-Rasp Feint",
+        "file_name": "prowler_defensive_candidate_3.wav",
+        "selected": false,
+        "description": "More abrasive jaw-rasp burst that reads mean but slightly noisier than the chosen live cue.",
+        "duration_seconds": 0.16
+      }
+    ],
+    "impact": [
+      {
+        "key": "1",
+        "title": "Bone Plate Thud",
+        "file_name": "prowler_impact_candidate_1.wav",
+        "selected": true,
+        "description": "Physical jaw-and-shoulder body hit with a concise bone click; selected for the live hunting impact.",
+        "duration_seconds": 0.12
+      },
+      {
+        "key": "2",
+        "title": "Jaw Crack Snap",
+        "file_name": "prowler_impact_candidate_2.wav",
+        "selected": false,
+        "description": "Sharper contact crack with less body weight and more top-end snap.",
+        "duration_seconds": 0.11
+      },
+      {
+        "key": "3",
+        "title": "Shoulder Slam",
+        "file_name": "prowler_impact_candidate_3.wav",
+        "selected": false,
+        "description": "Heavier bodily slam with less bone articulation and a duller landing read.",
+        "duration_seconds": 0.14
+      }
+    ]
+  }
+}

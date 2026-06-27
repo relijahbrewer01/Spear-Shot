@@ -23,6 +23,7 @@ func _run_audit() -> void:
 	await _audit_hunt_pounce_success_and_limit()
 	await _audit_hunt_pounce_dodge_rejection_and_rearm()
 	await _audit_death_and_score()
+	await _audit_audio_hooks()
 	await _audit_main_integration_and_cleanup()
 
 	for failure in failures:
@@ -264,6 +265,184 @@ func _audit_death_and_score() -> void:
 	_require(int(kill_tracker["count"]) == 1, "Prowler death emits exactly one killed signal.")
 	_require(int(kill_tracker["score"]) == 2, "Prowler death awards exactly 2 score points.")
 	await _free_test_root(root)
+
+
+func _audit_audio_hooks() -> void:
+	var main := MainScene.instantiate()
+	add_child(main)
+	await get_tree().process_frame
+
+	var spawn_timer := main.get_node("SpawnTimer") as Timer
+	spawn_timer.stop()
+	main.set_process(false)
+
+	var alert_player := main.get_node("AudioPlayers/ProwlerAlertPlayer") as AudioStreamPlayer
+	var defensive_player := main.get_node("AudioPlayers/ProwlerDefensiveAttackPlayer") as AudioStreamPlayer
+	var impact_player := main.get_node("AudioPlayers/ProwlerPounceHitPlayer") as AudioStreamPlayer
+	var player := main.get_node("Player") as Player
+	var spear := main.get_node("Spear") as Spear
+
+	main.call("_stop_all_audio")
+	main.call("debug_reset_prowler_audio_metrics")
+	var startup_metrics := main.call("debug_get_prowler_audio_metrics") as Dictionary
+	_require(int(startup_metrics.get("alert", -1)) == 0, "Main startup does not play the Prowler alert cue.")
+	_require(int(startup_metrics.get("defensive", -1)) == 0, "Main startup does not play the Prowler defensive cue.")
+	_require(int(startup_metrics.get("impact", -1)) == 0, "Main startup does not play the Prowler impact cue.")
+
+	main.set("survival_time", 90.0)
+	_require(
+		bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
+		"Audio audit can spawn a Prowler through the ordinary ambient path."
+	)
+	var prowler := _find_child_prowler(main)
+	_require(prowler != null and player != null and spear != null, "Audio audit can access the spawned Prowler, player, and spear.")
+	if prowler != null and player != null and spear != null:
+		player.global_position = Vector2(192.0, 108.0)
+		prowler.global_position = Vector2(220.0, 108.0)
+		spear.reset_for_new_run(player, TEST_ARENA)
+		main.call("_stop_all_audio")
+		main.call("debug_reset_prowler_audio_metrics")
+
+		_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audio audit can throw the spear to start the hostile alert cue.")
+		await _advance_physics(0.04)
+		var early_alert_metrics := main.call("debug_get_prowler_audio_metrics") as Dictionary
+		_require(int(early_alert_metrics.get("alert", -1)) == 0, "Prowler alert cue does not fire before the small authored delay.")
+		var alert_started := await _advance_until(
+			func() -> bool:
+				return int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("alert", 0)) == 1,
+			0.20,
+			"prowler alert cue"
+		)
+		_require(alert_started, "Prowler alert cue fires exactly once after a real HELD-to-unheld transition.")
+		_require(alert_player != null and alert_player.playing, "Prowler alert AudioStreamPlayer enters playback after the real hostile transition.")
+		var alert_count_before_landed := int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("alert", 0))
+		spear.call("_enter_landed_state", Vector2(248.0, 108.0))
+		await _advance_physics(0.12)
+		_require(int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("alert", 0)) == alert_count_before_landed, "FLYING to LANDED does not replay the Prowler alert cue.")
+		player.global_position = spear.global_position
+		spear.call("_pickup")
+		await _advance_physics(0.02)
+		_require(not alert_player.playing, "Legitimate spear recovery stops any still-playing alert cue cleanly.")
+
+		main.call("_restart_run")
+		await get_tree().process_frame
+		var restart_metrics := main.call("debug_get_prowler_audio_metrics") as Dictionary
+		_require(int(restart_metrics.get("alert", -1)) == 0 and int(restart_metrics.get("defensive", -1)) == 0 and int(restart_metrics.get("impact", -1)) == 0, "Restart resets the Prowler audio metrics without replaying any cue.")
+
+		main.set_process(false)
+		main.set("survival_time", 90.0)
+		_require(
+			bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
+			"Audio audit can spawn a second Prowler for defensive-cue coverage."
+		)
+		prowler = _find_child_prowler(main)
+		player = main.get_node("Player") as Player
+		spear = main.get_node("Spear") as Spear
+		if prowler != null and player != null and spear != null:
+			player.global_position = Vector2(192.0, 108.0)
+			prowler.global_position = Vector2(214.0, 108.0)
+			spear.reset_for_new_run(player, TEST_ARENA)
+			main.call("_stop_all_audio")
+			main.call("debug_reset_prowler_audio_metrics")
+			var defensive_started := await _advance_until(
+				func() -> bool:
+					return int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("defensive", 0)) == 1,
+				0.40,
+				"prowler defensive cue"
+			)
+			_require(defensive_started, "Prowler defensive cue fires once when the defensive pounce commits.")
+			_require(defensive_player != null and defensive_player.playing, "Prowler defensive AudioStreamPlayer enters playback on the committed defensive launch.")
+			_require(int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("defensive", 0)) == 1, "Committed defensive pounce does not duplicate its cue.")
+
+		main.call("_restart_run")
+		await get_tree().process_frame
+		main.set_process(false)
+		main.set("survival_time", 90.0)
+		main.call("debug_reset_prowler_audio_metrics")
+		_require(
+			bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
+			"Audio audit can spawn a third Prowler for cancelled-windup coverage."
+		)
+		prowler = _find_child_prowler(main)
+		player = main.get_node("Player") as Player
+		spear = main.get_node("Spear") as Spear
+		if prowler != null and player != null and spear != null:
+			player.global_position = Vector2(192.0, 108.0)
+			prowler.global_position = Vector2(214.0, 108.0)
+			spear.reset_for_new_run(player, TEST_ARENA)
+			var entered_defensive_windup := await _advance_until(
+				func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.DEFENSIVE_WINDUP,
+				0.12,
+				"defensive windup before cancellation"
+			)
+			_require(entered_defensive_windup, "Audio audit can reach DEFENSIVE_WINDUP before cancelling it.")
+			_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Throwing during defensive windup can cancel the defensive launch.")
+			await _advance_physics(0.24)
+			_require(int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("defensive", 0)) == 0, "Cancelled defensive windup does not play the defensive cue.")
+
+		main.call("_restart_run")
+		await get_tree().process_frame
+		main.set_process(false)
+		main.set("survival_time", 90.0)
+		main.call("debug_reset_prowler_audio_metrics")
+		_require(
+			bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
+			"Audio audit can spawn a fourth Prowler for hunting-impact coverage."
+		)
+		prowler = _find_child_prowler(main)
+		player = main.get_node("Player") as Player
+		spear = main.get_node("Spear") as Spear
+		if prowler != null and player != null and spear != null:
+			player.global_position = Vector2(192.0, 108.0)
+			prowler.global_position = Vector2(220.0, 108.0)
+			spear.reset_for_new_run(player, TEST_ARENA)
+			main.call("_stop_all_audio")
+			main.call("debug_reset_prowler_audio_metrics")
+			_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audio audit can re-enter the unarmed cycle for hunting-impact coverage.")
+			var impact_started := await _advance_until(
+				func() -> bool:
+					return int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("impact", 0)) == 1,
+				0.80,
+				"prowler impact cue"
+			)
+			_require(impact_started, "Successful hunting pounce impact plays the dedicated impact cue once.")
+			_require(impact_player != null and impact_player.playing, "Prowler impact AudioStreamPlayer enters playback on a valid hunting-pounce hit.")
+
+		main.call("_restart_run")
+		await get_tree().process_frame
+		main.set_process(false)
+		main.set("survival_time", 90.0)
+		main.call("debug_reset_prowler_audio_metrics")
+		_require(
+			bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.PROWLER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
+			"Audio audit can spawn a fifth Prowler for hunting-miss coverage."
+		)
+		prowler = _find_child_prowler(main)
+		player = main.get_node("Player") as Player
+		spear = main.get_node("Spear") as Spear
+		if prowler != null and player != null and spear != null:
+			player.global_position = Vector2(192.0, 108.0)
+			prowler.global_position = Vector2(220.0, 108.0)
+			spear.reset_for_new_run(player, TEST_ARENA)
+			main.call("_stop_all_audio")
+			main.call("debug_reset_prowler_audio_metrics")
+			_require(spear.try_throw(player.global_position + Vector2(120.0, 0.0)), "Audio audit can re-enter the unarmed cycle for hunting-miss coverage.")
+			var reached_windup := await _advance_until(
+				func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.POUNCE_WINDUP,
+				0.40,
+				"hunt windup before dodge"
+			)
+			_require(reached_windup, "Audio audit can reach hunting windup before the dodge rejection.")
+			_require(player.try_start_movement_dodge(Vector2.DOWN), "Player can dodge the hunting pounce during the audio miss audit.")
+			await _advance_physics(0.70)
+			_require(int((main.call("debug_get_prowler_audio_metrics") as Dictionary).get("impact", 0)) == 0, "Dodged hunting pounce miss does not play the impact cue.")
+
+		main.call("_stop_all_audio")
+		await _advance_physics(0.02)
+		_require(not alert_player.playing and not defensive_player.playing and not impact_player.playing, "Explicit audio cleanup stops all active Prowler playback.")
+
+	main.queue_free()
+	await get_tree().process_frame
 
 
 func _audit_main_integration_and_cleanup() -> void:

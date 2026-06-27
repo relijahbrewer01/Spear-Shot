@@ -59,7 +59,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Blowgun Shooters use a small wiry hooded-forager silhouette with a runtime-rotated reed blowgun, keeping the body collision stable while the aimed weapon remains readable
 - The approved final Shooter body uses a coherent moss-hood palette with a pale face, charcoal-brown torso, and restrained rust pouch on the roomier `16x18` canvas, keeping it small, readable, and distinct from the melee cast at `384x216`
 - Heart Runner opportunities use a tiny red pulse-beast silhouette on a compact `16x16` frame, now played through a live four-frame calm strut, four-frame startled hop, and four-frame panic sprint while keeping the body readable and distinct from the hostile roster
-- Prowlers use a small low predatory silhouette with a shoulder-hump profile and readable crouched-versus-leaning posture changes, so the armed stalking state and unarmed hunt state stay legible without UI callouts
+- Prowlers now use the selected `Bonejaw Prowler` direction on a roomier `20x18` canvas: a low shoulder wedge, hooked pale jaw plate, dry mane ridge, and clear crouched-versus-leaning body language so the armed stalking state and unarmed hunt state stay legible without UI callouts
 - The Charger telegraph stays intentionally high-contrast so deaths read as timing mistakes rather than surprise collisions
 - Charger visuals, shadow, and telegraph now stay synchronized to the same moving gameplay body instead of running on separate transform paths
 
@@ -90,8 +90,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `art/sprites/shielded_enemy.png`: compact broad Shielded enemy body sprite
 - `art/sprites/shooter_enemy.png`: final approved Blowgun Shooter body sprite on a small `16x18` canvas using the cleaned moss-hood palette
 - `art/sprites/boomer_enemy.png`: active Boomer sprite chosen from the local concept pass and kept on the same small readable scale as the rest of the special roster
-- `art/sprites/prowler_enemy.png`: active Prowler base sprite chosen from the local three-candidate comparison board as the final Moss Lynx predator silhouette
-- `art/sprites/prowler_enemy_sheet.png`: live `4x5` Prowler animation sheet covering stalking, alert, hunting, pounce, and recovery states
+- `art/sprites/prowler_enemy.png`: active Prowler base sprite chosen from the local three-candidate comparison board as the final `Bonejaw Prowler` silhouette on a `20x18` canvas
+- `art/sprites/prowler_enemy_sheet.png`: live `4x6` Prowler animation sheet whose rows cover stalking, defensive wind-up plus launch, alert, hunt, hunt pounce plus impact/recoil, and miss-recovery states
 - `art/sprites/heart_runner.png`: approved Heart Runner base silhouette chosen from the local three-variant comparison board
 - `art/sprites/heart_runner_sheet.png`: live `4x3` Heart Runner animation sheet containing the approved calm strut, startled hop, and panic sprint
 - `art/sprites/heart_pickup.png`: temporary heart pickup sprite used after a Runner defeat
@@ -111,8 +111,10 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/boomer_land.wav`: local physical landing cue for the Boomer
 - `audio/boomer_fuse.wav`: local three-pulse fuse escalation cue for the Boomer
 - `audio/boomer_explosion.wav`: local physical blast cue for the Boomer
-- `audio/prowler_alert.wav`: local territorial growl cue for the Prowler's armed-to-unarmed transformation
+- `audio/prowler_alert.wav`: local territorial growl cue for the Prowler's armed-to-unarmed hostile transformation
+- `audio/prowler_defensive_attack.wav`: local frightened-aggression launch cue for the Prowler's armed defensive pass-through pounce
 - `audio/prowler_pounce_hit.wav`: local physical bite/body-impact cue for a successful hunting pounce
+- `audio/dev/prowler_candidates/`: kept review-pass candidate WAVs plus manifest for the three alert, three defensive, and three impact Prowler sound directions used to choose the live Bonejaw set
 - `audio/heart_runner_appear.wav`: local skittering arrival cue for the Heart Runner
 - `audio/heart_runner_alarm.wav`: local startled alarm cue for the Heart Runner's panic trigger
 - `audio/heart_pickup_spawn.wav`: local reward-pop cue for a spawned heart pickup
@@ -120,6 +122,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/heart_pickup_expire.wav`: quiet warning cue used during the pickup's final expiration window
 - `tools/generate_phase1_assets.py`: reproduces the arena and sprite art assets locally
 - `tools/generate_phase4_assets.py`: reproduces the Shielded, Shooter, Boomer, Prowler, and Heart Runner sprites, the live Prowler and Heart Runner animation sheets, and the temporary local comparison/behavior-board outputs for the Phase 4 concept passes
+- `tools/generate_sfx.py`: synthesizes the local gameplay SFX, including the live Prowler cues and the kept Bonejaw review-candidate WAV set
 - `tools/generate_music.py`: synthesizes both background loops locally as uncompressed `44.1 kHz`, `16-bit`, stereo `.wav`
 
 ## Scene/script structure
@@ -180,6 +183,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - While the spear is `HELD`, it keeps a cautious `72-104` pixel stalking band and uses a short defensive pass-through pounce only when Akedra crowds its personal space
 - While the spear is `FLYING` or `LANDED`, it gives one longer red-eye alert and then commits to a faster direct hunt until the spear is legitimately recovered
 - Each unarmed window grants exactly one committed hunting pounce attempt; a successful hit knocks Akedra back, while a dodge or invulnerability rejection leaves the Prowler in a brief punishable skid/stun recovery
+- The approved live presentation now uses the selected `Bonejaw Prowler` concept on a `20x18` frame with a `4x6` animation sheet, mapping eight readable animation beats across the six live rows: stalk, defensive wind-up, defensive launch, alert, hunt, hunt leap, impact/recoil, and miss/stun
+- Its three live Prowler cues now come from the kept review-pass candidate set: `Bone-Throat Snarl` for the real armed-to-unarmed alert, `Bone-Click Burst` for the defensive launch, and `Bone Plate Thud` for successful hunting impact
 - It dies to one valid thrown-spear hit, awards `2` points, uses ordinary body contact damage outside its authored attacks, and does not steal, move, hide, or otherwise manipulate the spear
 - It remains ambient-only in Phase 4.5 with a dedicated cap of `1`, its own first-introduction guarantee, and no authored wave membership
 
@@ -351,6 +356,12 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `maximum_boomer_spawn_chance`
   - `boomer_intro_target_time_min`
   - `boomer_intro_target_time_max`
+  - `prowler_unlock_time`
+  - `prowler_spawn_chance_at_unlock`
+  - `prowler_spawn_chance_growth_per_second`
+  - `maximum_prowler_spawn_chance`
+  - `prowler_intro_target_time_min`
+  - `prowler_intro_target_time_max`
   - `heart_runner_unlock_time`
   - `heart_runner_roll_interval_min`
   - `heart_runner_roll_interval_max`
@@ -433,6 +444,34 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `charger_core_knockback_duration`
   - `charger_shockwave_knockback_distance`
   - `charger_shockwave_knockback_duration`
+- `scripts/prowler_enemy.gd`
+  - `stalk_speed_scale`
+  - `hunt_speed_scale`
+  - `unarmed_alert_delay`
+  - `alert_voice_delay`
+  - `stalk_distance_min`
+  - `stalk_distance_max`
+  - `stalk_dead_zone`
+  - `stalk_lateral_commit_duration`
+  - `wall_fallback_commit_duration`
+  - `band_radial_correction_strength`
+  - `defensive_trigger_radius`
+  - `defensive_windup_duration`
+  - `defensive_pounce_distance`
+  - `defensive_pounce_duration`
+  - `defensive_retreat_distance`
+  - `defensive_retrigger_cooldown`
+  - `hunt_pounce_trigger_distance`
+  - `hunt_pounce_windup_duration`
+  - `hunt_pounce_distance`
+  - `hunt_pounce_duration`
+  - `hunt_player_knockback_distance`
+  - `hunt_player_knockback_duration`
+  - `hunt_prowler_recoil_distance`
+  - `hunt_prowler_recoil_duration`
+  - `hunt_hit_stop_duration`
+  - `miss_skid_duration`
+  - `miss_stun_duration`
 - `scripts/heart_runner.gd`
   - `move_speed`
   - `score_value`

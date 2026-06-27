@@ -22,10 +22,10 @@ LABEL_TEXT_COLOR = (239, 242, 230, 255)
 LABEL_SHADOW_COLOR = (17, 20, 18, 220)
 SHOOTER_CANVAS_SIZE = (16, 18)
 BOOMER_CANVAS_SIZE = (16, 18)
-PROWLER_CANVAS_SIZE = (16, 16)
+PROWLER_CANVAS_SIZE = (20, 18)
 HEART_RUNNER_CANVAS_SIZE = (16, 16)
 HEART_PICKUP_CANVAS_SIZE = (10, 10)
-PROWLER_ANIMATION_SHEET_ROWS = ["stalk", "alert", "hunt", "pounce", "recovery"]
+PROWLER_ANIMATION_SHEET_ROWS = ["stalk", "defensive", "alert", "hunt", "hunt_pounce", "recovery"]
 HEART_RUNNER_ANIMATION_SHEET_ROWS = ["casual_strut", "startled_hop", "panicked_sprint"]
 SHOOTER_BLOWGUN_LENGTH = 14
 SHOOTER_BLOWGUN_WIDTH = 1
@@ -83,8 +83,11 @@ class ProwlerVariantSpec:
     file_name: str
     palette_summary: str
     silhouette_summary: str
+    signature_motif: str
+    weakness_summary: str
     body_color: tuple[int, int, int, int]
-    accent_color: tuple[int, int, int, int]
+    midtone_color: tuple[int, int, int, int]
+    bone_color: tuple[int, int, int, int]
     eye_color: tuple[int, int, int, int]
     shadow_color: tuple[int, int, int, int]
     canvas_width: int = PROWLER_CANVAS_SIZE[0]
@@ -120,10 +123,7 @@ def draw_boomer_enemy(path: Path) -> None:
 
 
 def draw_prowler_enemy(path: Path) -> None:
-    image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    _draw_prowler_variant_silhouette(draw, build_prowler_variant_specs()[1])
-
+    image = _render_selected_prowler_frame("stalk", 1)
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
 
@@ -138,7 +138,7 @@ def draw_prowler_animation_sheet(path: Path) -> None:
 
     for row_index, sequence_key in enumerate(PROWLER_ANIMATION_SHEET_ROWS):
         for frame_index in range(4):
-            frame_image = _render_prowler_animation_frame(sequence_key, frame_index)
+            frame_image = _render_selected_prowler_frame(sequence_key, frame_index)
             image.alpha_composite(
                 frame_image,
                 (frame_index * frame_width, row_index * frame_height),
@@ -265,36 +265,45 @@ def build_prowler_variant_specs() -> list[ProwlerVariantSpec]:
     return [
         ProwlerVariantSpec(
             key="1",
-            title="Hookjaw",
+            title="Bonejaw Prowler",
             file_name="prowler_variant_1.png",
-            palette_summary="dry peat body, pale hooked muzzle, muted sage tail accent",
-            silhouette_summary="A low reptile-jackal shape with a hooked snout, narrow forequarters, and a long tail drag.",
-            body_color=(92, 82, 60, 255),
-            accent_color=(138, 151, 101, 255),
-            eye_color=(226, 212, 166, 255),
-            shadow_color=(44, 39, 30, 255),
+            palette_summary="peat-black hide, dry reed mane, pale hooked jaw plate, hot ember eye",
+            silhouette_summary="Low shoulder wedge, heavy pale jaw hook, and the clearest stylized predator read without growing beyond the approved gameplay footprint.",
+            signature_motif="Oversized hooked lower jaw plate that hangs below the snout like scavenged bone armor.",
+            weakness_summary="Most readable overall, but it gives up some of Variant B's mane flair to keep the body mass compact and gameplay-legible.",
+            body_color=(43, 40, 35, 255),
+            midtone_color=(108, 101, 76, 255),
+            bone_color=(214, 201, 164, 255),
+            eye_color=(246, 70, 58, 255),
+            shadow_color=(21, 20, 18, 255),
         ),
         ProwlerVariantSpec(
             key="2",
-            title="Moss Lynx",
+            title="Bristlemane Prowler",
             file_name="prowler_variant_2.png",
-            palette_summary="moss-dark back, pale bone muzzle, charcoal legs, muted ochre eye",
-            silhouette_summary="A compact low cat-jackal stalker with a shoulder hump, clear head separation, and a narrow trailing tail.",
-            body_color=(78, 89, 64, 255),
-            accent_color=(194, 180, 136, 255),
-            eye_color=(235, 214, 150, 255),
-            shadow_color=(37, 34, 29, 255),
+            palette_summary="charred bark hide, thorn-bristle mane, muted bone muzzle, blood-red hostile eye",
+            silhouette_summary="A reed-backed skirmisher with the strongest mane profile and the roughest wild-dog outline of the three candidates.",
+            signature_motif="Tall bristled mane ridge that makes the cautious crouch and aggressive lean easy to separate.",
+            weakness_summary="The mane reads well, but the head becomes slightly more generic from a distance and the body risks blending into dark ground tiles.",
+            body_color=(45, 39, 34, 255),
+            midtone_color=(124, 111, 73, 255),
+            bone_color=(192, 182, 146, 255),
+            eye_color=(240, 68, 56, 255),
+            shadow_color=(23, 19, 18, 255),
         ),
         ProwlerVariantSpec(
             key="3",
-            title="Spineback",
+            title="Hollow Hound",
             file_name="prowler_variant_3.png",
-            palette_summary="dark bark body, dusty olive back-spines, pale eye stripe",
-            silhouette_summary="A flatter feral runner with a sharp back ridge, longer body, and a distinctly rear-weighted sprint shape.",
-            body_color=(83, 72, 54, 255),
-            accent_color=(124, 136, 92, 255),
-            eye_color=(216, 205, 162, 255),
-            shadow_color=(33, 29, 24, 255),
+            palette_summary="cold charcoal hide, hollow bone mask, dusty sage back plane, ember socket eye",
+            silhouette_summary="A gaunter skull-faced tracker with the eeriest head read and the narrowest ribcage of the three.",
+            signature_motif="Bone mask head with a hollow socket cut and tucked, almost carrion-bird neck posture.",
+            weakness_summary="Memorable face silhouette, but it drifts a little too spectral compared with the grounded physicality of the selected live direction.",
+            body_color=(49, 44, 40, 255),
+            midtone_color=(89, 92, 74, 255),
+            bone_color=(206, 193, 160, 255),
+            eye_color=(236, 74, 60, 255),
+            shadow_color=(20, 18, 19, 255),
         ),
     ]
 
@@ -398,10 +407,7 @@ def draw_boomer_variant(spec: BoomerVariantSpec, path: Path) -> BoomerVariantSpe
 
 
 def draw_prowler_variant(spec: ProwlerVariantSpec, path: Path) -> ProwlerVariantSpec:
-    image = Image.new("RGBA", (spec.canvas_width, spec.canvas_height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    _draw_prowler_variant_silhouette(draw, spec)
-
+    image = _render_prowler_candidate_pose(spec, "stalk")
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
 
@@ -483,53 +489,19 @@ def _draw_boomer_variant_silhouette(draw: ImageDraw.ImageDraw, spec: BoomerVaria
 
 def _draw_prowler_variant_silhouette(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec) -> None:
     if spec.key == "1":
-        draw.ellipse((4, 8, 11, 12), fill=spec.body_color)
-        draw.polygon([(9, 7), (12, 6), (14, 7), (12, 9), (9, 9)], fill=spec.accent_color)
-        draw.polygon([(3, 9), (1, 8), (2, 10)], fill=spec.shadow_color)
-        draw.line((2, 8, 1, 7), fill=spec.accent_color, width=1)
-        draw.line((5, 12, 4, 15), fill=spec.shadow_color, width=1)
-        draw.line((8, 12, 9, 15), fill=spec.shadow_color, width=1)
-        draw.line((10, 12, 13, 13), fill=spec.shadow_color, width=1)
-        draw.point((12, 7), fill=spec.eye_color)
-        draw.point((10, 9), fill=spec.shadow_color)
+        _draw_grave_hound_preview(draw, spec, False)
         return
-
     if spec.key == "2":
-        draw.ellipse((4, 8, 11, 12), fill=spec.body_color)
-        draw.polygon([(7, 7), (10, 6), (13, 7), (14, 9), (10, 10), (7, 10)], fill=spec.body_color)
-        draw.polygon([(9, 7), (12, 7), (13, 9), (11, 10), (9, 9)], fill=spec.accent_color)
-        draw.line((4, 9, 2, 8), fill=spec.shadow_color, width=1)
-        draw.line((2, 8, 1, 9), fill=spec.shadow_color, width=1)
-        draw.line((5, 12, 4, 15), fill=spec.shadow_color, width=1)
-        draw.line((8, 12, 9, 15), fill=spec.shadow_color, width=1)
-        draw.line((10, 12, 13, 13), fill=spec.shadow_color, width=1)
-        draw.point((11, 8), fill=spec.eye_color)
-        draw.point((12, 8), fill=spec.eye_color)
-        draw.point((9, 9), fill=spec.shadow_color)
+        _draw_marsh_hound_preview(draw, spec, False)
         return
-
-    draw.ellipse((4, 8, 12, 12), fill=spec.body_color)
-    draw.polygon([(7, 7), (10, 6), (13, 7), (14, 9), (12, 10), (8, 10)], fill=spec.body_color)
-    draw.line((6, 7, 8, 5), fill=spec.accent_color, width=1)
-    draw.line((8, 6, 10, 4), fill=spec.accent_color, width=1)
-    draw.line((10, 6, 12, 5), fill=spec.accent_color, width=1)
-    draw.line((4, 9, 2, 10), fill=spec.shadow_color, width=1)
-    draw.line((5, 12, 4, 15), fill=spec.shadow_color, width=1)
-    draw.line((8, 12, 9, 15), fill=spec.shadow_color, width=1)
-    draw.line((10, 12, 13, 13), fill=spec.shadow_color, width=1)
-    draw.point((11, 8), fill=spec.eye_color)
-    draw.point((9, 9), fill=spec.shadow_color)
+    _draw_crooked_prowler_preview(draw, spec, False)
 
 
 def _render_prowler_animation_frame(
     sequence_key: str,
     frame_index: int,
 ) -> Image.Image:
-    image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    spec = build_prowler_variant_specs()[1]
-    _draw_prowler_animation_silhouette(draw, spec, sequence_key, frame_index)
-    return image
+    return _render_selected_prowler_frame(sequence_key, frame_index)
 
 
 def _draw_prowler_animation_silhouette(
@@ -538,6 +510,9 @@ def _draw_prowler_animation_silhouette(
     sequence_key: str,
     frame_index: int,
 ) -> None:
+    _draw_selected_marsh_hound_frame(draw, spec, sequence_key, frame_index)
+    return
+
     red_eye = (232, 78, 74, 255)
     muzzle_color = spec.accent_color
     back_color = spec.body_color
@@ -1009,14 +984,27 @@ def generate_prowler_candidate_assets() -> dict[str, object]:
             "path": str(variant_path),
         })
 
-    draw_prowler_comparison(variant_specs, comparison_path)
-    draw_prowler_behavior_board(behavior_board_path)
+    draw_replacement_prowler_comparison(variant_specs, comparison_path)
+    draw_replacement_prowler_behavior_board(behavior_board_path)
     manifest = {
         "comparison_path": str(comparison_path),
         "behavior_board_path": str(behavior_board_path),
         "active_reference_path": str(SPRITE_DIR / "prowler_enemy.png"),
         "active_sheet_path": str(SPRITE_DIR / "prowler_enemy_sheet.png"),
-        "selected_concept": "Moss Lynx",
+        "selected_concept": "Bonejaw Prowler",
+        "signature_motif": "Hooked pale jaw plate under a low shoulder wedge, with a dry mane ridge that stays readable in both stalking and hunting poses.",
+        "selected_reasons": [
+            "keeps the prowler visually small while giving it a sharper, more authored identity than the generic marsh-hound pass",
+            "the hooked jaw reads instantly at native scale and stays distinct from Charger, Boomer, Heart Runner, and Akedra's spear",
+            "its low cautious crouch and forward hunting lean separate clearly without needing UI help or oversized effects",
+            "the compact body still supports the approved defensive and hunting pounce frames without looking boss-sized",
+        ],
+        "rejected_weaknesses": {
+            "Bristlemane Prowler": "Strong neck silhouette, but the heavier mane risks muddying the face read and makes the body feel more generic from a distance.",
+            "Hollow Hound": "Memorable skull-mask head, but it leans too eerie and airy compared with the grounded physical combat roster.",
+        },
+        "frame_size": [PROWLER_CANVAS_SIZE[0], PROWLER_CANVAS_SIZE[1]],
+        "sheet_layout": [4, len(PROWLER_ANIMATION_SHEET_ROWS)],
         "candidates": manifest_candidates,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -1203,60 +1191,971 @@ def build_prowler_animation_sequences() -> dict[str, dict[str, object]]:
     return {
         "stalk": {
             "title": "Stalk",
-            "description": "Low cautious pacing while Akedra is armed.",
+            "description": "Low bone-jaw stalk with restrained footfalls while Akedra is armed.",
+        },
+        "defensive": {
+            "title": "Defensive",
+            "description": "Crouched defensive wind-up into the frightened pass-through launch.",
         },
         "alert": {
             "title": "Alert",
-            "description": "Red-eye territorial snap on HELD -> unheld.",
+            "description": "Hostile jaw-snap and red-eye flare on the real HELD-to-unarmed change.",
         },
         "hunt": {
             "title": "Hunt",
-            "description": "Forward-leaning aggressive chase with faster cadence.",
+            "description": "Forward-leaning aggressive chase with a faster, more predatory cadence.",
         },
-        "pounce": {
-            "title": "Pounce",
-            "description": "Committed defensive or hunting launch frames.",
+        "hunt_pounce": {
+            "title": "Hunt Pounce",
+            "description": "Committed hunting wind-up, airborne leap, and impact/recoil handoff.",
         },
         "recovery": {
             "title": "Recovery",
-            "description": "Miss skid, punishable stun, and wary reset frames.",
+            "description": "Miss skid, punishable stun, and the wary end of the failed lunge.",
         },
     }
 
 
 def draw_prowler_behavior_board(board_path: Path) -> None:
+    draw_replacement_prowler_behavior_board(board_path)
+
+
+def _render_selected_prowler_frame(sequence_key: str, frame_index: int) -> Image.Image:
+    image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    _draw_selected_bonejaw_frame(draw, build_prowler_variant_specs()[0], sequence_key, frame_index)
+    return image
+
+
+def _render_prowler_candidate_pose(
+    spec: ProwlerVariantSpec,
+    pose_key: str,
+) -> Image.Image:
+    image = Image.new("RGBA", PROWLER_CANVAS_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    if spec.key == "1":
+        var_frame_map = {
+            "stalk": ("stalk", 1),
+            "alert": ("alert", 2),
+            "hunt": ("hunt", 1),
+            "defensive": ("defensive", 2),
+        }
+        sequence_key, frame_index = var_frame_map.get(pose_key, ("stalk", 1))
+        _draw_selected_bonejaw_frame(draw, spec, sequence_key, frame_index)
+    elif spec.key == "2":
+        _draw_bristlemane_preview(draw, spec, pose_key)
+    else:
+        _draw_hollow_hound_preview(draw, spec, pose_key)
+    return image
+
+
+def _offset_prowler_shape(
+    shape: dict[str, object],
+    ox: int,
+    oy: int,
+) -> dict[str, object]:
+    offset_shape: dict[str, object] = {}
+    for key, value in shape.items():
+        if key == "hostile":
+            offset_shape[key] = value
+        elif key in {"body", "flank", "mane", "head", "head_mid", "jaw", "tail", "back", "eyes", "shadow_points"}:
+            offset_shape[key] = [(point[0] + ox, point[1] + oy) for point in value]
+        elif key in {"front", "hind", "spikes", "bone_marks"}:
+            offset_shape[key] = [
+                ((line[0][0] + ox, line[0][1] + oy), (line[1][0] + ox, line[1][1] + oy))
+                for line in value
+            ]
+        else:
+            offset_shape[key] = value
+    return offset_shape
+
+
+def _draw_prowler_pose_shape(
+    draw: ImageDraw.ImageDraw,
+    spec: ProwlerVariantSpec,
+    shape: dict[str, object],
+) -> None:
+    hostile = bool(shape.get("hostile", False))
+    tail = shape.get("tail", [])
+    if len(tail) >= 2:
+        draw.line(tail, fill=spec.shadow_color, width=1)
+    for leg in shape.get("hind", []):
+        draw.line(leg, fill=spec.shadow_color, width=1)
+    for leg in shape.get("front", []):
+        draw.line(leg, fill=spec.shadow_color, width=1)
+    if shape.get("flank"):
+        draw.polygon(shape["flank"], fill=spec.midtone_color)
+    if shape.get("mane"):
+        draw.polygon(shape["mane"], fill=spec.midtone_color)
+    draw.polygon(shape["body"], fill=spec.body_color)
+    if shape.get("head_mid"):
+        draw.polygon(shape["head_mid"], fill=spec.midtone_color)
+    draw.polygon(shape["head"], fill=spec.body_color)
+    draw.polygon(shape["jaw"], fill=spec.bone_color)
+    if shape.get("back"):
+        draw.line(shape["back"], fill=spec.shadow_color, width=1)
+    for spike in shape.get("spikes", []):
+        draw.line(spike, fill=spec.midtone_color, width=1)
+    for mark in shape.get("bone_marks", []):
+        draw.line(mark, fill=spec.shadow_color, width=1)
+    for point in shape.get("shadow_points", []):
+        draw.point(point, fill=spec.shadow_color)
+    eye_fill = spec.eye_color if hostile else spec.shadow_color
+    for eye in shape.get("eyes", []):
+        draw.point(eye, fill=eye_fill)
+    if hostile and len(shape.get("eyes", [])) == 1:
+        only_eye = shape["eyes"][0]
+        draw.point((only_eye[0] + 1, only_eye[1]), fill=spec.eye_color)
+
+
+def _draw_selected_bonejaw_frame(
+    draw: ImageDraw.ImageDraw,
+    spec: ProwlerVariantSpec,
+    sequence_key: str,
+    frame_index: int,
+) -> None:
+    pose_library: dict[str, dict[str, object]] = {
+        "stalk_low": {
+            "body": [(4, 10), (6, 7), (10, 6), (14, 7), (16, 8), (16, 10), (14, 11), (10, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (11, 9), (15, 9), (14, 11), (10, 13), (7, 12)],
+            "mane": [(6, 7), (8, 5), (11, 5), (13, 6), (12, 7), (8, 7)],
+            "head": [(14, 8), (17, 7), (18, 8), (17, 10), (14, 10)],
+            "head_mid": [(14, 8), (16, 7), (17, 8), (16, 9), (14, 9)],
+            "jaw": [(14, 9), (19, 9), (18, 11), (15, 12), (13, 11)],
+            "front": [((11, 11), (12, 15)), ((13, 11), (14, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (9, 15))],
+            "tail": [(4, 10), (2, 9), (1, 10)],
+            "back": [(6, 7), (10, 6), (14, 7)],
+            "spikes": [((8, 5), (8, 4)), ((10, 5), (10, 4))],
+            "bone_marks": [((16, 10), (17, 10)), ((15, 11), (17, 11))],
+            "eyes": [(16, 8)],
+            "hostile": False,
+        },
+        "stalk_step": {
+            "body": [(4, 9), (6, 6), (10, 5), (14, 6), (16, 7), (16, 9), (14, 10), (10, 11), (6, 11), (4, 10)],
+            "flank": [(7, 9), (11, 8), (15, 8), (14, 10), (10, 12), (7, 11)],
+            "mane": [(6, 6), (8, 4), (11, 4), (13, 5), (12, 6), (8, 6)],
+            "head": [(14, 7), (17, 6), (18, 7), (17, 9), (14, 9)],
+            "head_mid": [(14, 7), (16, 6), (17, 7), (16, 8), (14, 8)],
+            "jaw": [(14, 8), (19, 8), (18, 10), (15, 11), (13, 10)],
+            "front": [((11, 10), (11, 15)), ((13, 10), (15, 13))],
+            "hind": [((7, 11), (6, 14)), ((9, 11), (10, 15))],
+            "tail": [(4, 9), (2, 8), (1, 9)],
+            "back": [(6, 6), (10, 5), (14, 6)],
+            "spikes": [((8, 4), (8, 3)), ((10, 4), (11, 3))],
+            "bone_marks": [((16, 9), (17, 9)), ((15, 10), (17, 10))],
+            "eyes": [(16, 7)],
+            "hostile": False,
+        },
+        "defensive_crouch": {
+            "body": [(4, 11), (6, 8), (10, 7), (13, 7), (15, 8), (15, 10), (13, 11), (9, 12), (5, 12), (3, 12)],
+            "flank": [(6, 11), (10, 10), (14, 10), (13, 12), (9, 13), (5, 13)],
+            "mane": [(6, 8), (8, 6), (11, 5), (12, 6), (11, 7), (8, 8)],
+            "head": [(13, 8), (16, 7), (17, 8), (16, 10), (13, 10)],
+            "head_mid": [(13, 8), (15, 7), (16, 8), (15, 9), (13, 9)],
+            "jaw": [(13, 9), (18, 8), (19, 9), (18, 11), (14, 12)],
+            "front": [((10, 11), (11, 15)), ((12, 11), (14, 14))],
+            "hind": [((6, 12), (5, 15)), ((8, 12), (9, 15))],
+            "tail": [(3, 12), (2, 11), (1, 12)],
+            "back": [(6, 8), (10, 7), (14, 7)],
+            "spikes": [((8, 6), (7, 5)), ((10, 5), (10, 4)), ((12, 6), (13, 5))],
+            "bone_marks": [((15, 9), (17, 9)), ((14, 10), (17, 10))],
+            "eyes": [(15, 8)],
+            "hostile": False,
+        },
+        "defensive_launch": {
+            "body": [(5, 10), (9, 8), (13, 8), (16, 8), (18, 9), (17, 10), (13, 11), (9, 11), (6, 11), (4, 11)],
+            "flank": [(8, 10), (12, 9), (16, 9), (15, 11), (10, 12), (7, 11)],
+            "mane": [(8, 8), (10, 6), (13, 6), (15, 7), (13, 8), (10, 8)],
+            "head": [(16, 8), (18, 7), (19, 8), (18, 10), (16, 10)],
+            "head_mid": [(16, 8), (17, 7), (18, 8), (17, 9), (16, 9)],
+            "jaw": [(16, 9), (19, 9), (18, 11), (15, 12), (13, 11)],
+            "front": [((13, 11), (16, 13)), ((16, 10), (18, 12))],
+            "hind": [((8, 11), (7, 15)), ((10, 11), (12, 14))],
+            "tail": [(4, 11), (2, 10), (1, 11)],
+            "back": [(8, 8), (12, 7), (16, 8)],
+            "spikes": [((10, 6), (10, 5)), ((12, 6), (13, 5))],
+            "bone_marks": [((17, 9), (18, 9)), ((16, 10), (18, 10))],
+            "eyes": [(17, 8)],
+            "hostile": False,
+        },
+        "alert_snap": {
+            "body": [(4, 10), (6, 7), (10, 6), (14, 7), (16, 8), (16, 10), (14, 11), (10, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (11, 9), (15, 9), (14, 11), (10, 13), (7, 12)],
+            "mane": [(6, 7), (8, 4), (11, 4), (14, 6), (13, 7), (8, 7)],
+            "head": [(14, 7), (17, 6), (18, 7), (17, 10), (14, 10)],
+            "head_mid": [(14, 7), (16, 6), (17, 7), (16, 8), (14, 8)],
+            "jaw": [(14, 8), (19, 8), (18, 11), (15, 12), (13, 10)],
+            "front": [((11, 11), (12, 15)), ((13, 11), (14, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (9, 15))],
+            "tail": [(4, 10), (2, 11), (1, 10)],
+            "back": [(6, 7), (10, 6), (14, 7)],
+            "spikes": [((8, 4), (7, 3)), ((10, 4), (10, 3)), ((12, 5), (13, 4))],
+            "bone_marks": [((16, 9), (18, 9)), ((15, 10), (17, 11))],
+            "eyes": [(16, 7)],
+            "hostile": True,
+        },
+        "alert_rear": {
+            "body": [(4, 10), (6, 7), (10, 5), (14, 6), (16, 8), (16, 10), (14, 11), (10, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (11, 8), (15, 8), (14, 10), (10, 13), (7, 12)],
+            "mane": [(6, 7), (8, 3), (11, 3), (14, 5), (13, 6), (8, 6)],
+            "head": [(14, 6), (17, 5), (18, 6), (18, 9), (15, 9)],
+            "head_mid": [(14, 6), (16, 5), (17, 6), (16, 7), (14, 7)],
+            "jaw": [(15, 8), (19, 7), (19, 9), (17, 11), (14, 10)],
+            "front": [((11, 11), (12, 15)), ((13, 10), (14, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 15))],
+            "tail": [(4, 10), (2, 11), (1, 10)],
+            "back": [(6, 7), (10, 5), (14, 6)],
+            "spikes": [((8, 3), (7, 2)), ((10, 3), (10, 2)), ((12, 4), (13, 3))],
+            "bone_marks": [((16, 8), (18, 8)), ((15, 9), (17, 10))],
+            "eyes": [(16, 6)],
+            "hostile": True,
+        },
+        "hunt_stride_a": {
+            "body": [(4, 10), (7, 7), (11, 6), (15, 7), (17, 8), (17, 10), (14, 11), (10, 12), (6, 12), (4, 11)],
+            "flank": [(8, 10), (12, 9), (16, 9), (15, 11), (10, 13), (7, 12)],
+            "mane": [(7, 7), (9, 4), (12, 4), (15, 6), (13, 7), (9, 7)],
+            "head": [(15, 7), (18, 6), (19, 7), (18, 9), (15, 9)],
+            "head_mid": [(15, 7), (17, 6), (18, 7), (17, 8), (15, 8)],
+            "jaw": [(15, 8), (19, 8), (18, 10), (15, 11), (13, 10)],
+            "front": [((12, 11), (14, 15)), ((15, 10), (17, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 14))],
+            "tail": [(4, 10), (2, 11), (1, 10)],
+            "back": [(7, 7), (11, 6), (15, 7)],
+            "spikes": [((9, 4), (8, 3)), ((11, 4), (11, 3)), ((13, 5), (14, 4))],
+            "bone_marks": [((16, 8), (18, 8)), ((15, 9), (17, 10))],
+            "eyes": [(17, 7)],
+            "hostile": True,
+        },
+        "hunt_stride_b": {
+            "body": [(4, 10), (7, 7), (11, 6), (15, 7), (17, 8), (17, 10), (14, 11), (10, 12), (6, 12), (4, 11)],
+            "flank": [(8, 10), (12, 9), (16, 9), (15, 11), (10, 13), (7, 12)],
+            "mane": [(7, 7), (9, 4), (12, 4), (15, 6), (13, 7), (9, 7)],
+            "head": [(15, 7), (18, 6), (19, 7), (18, 9), (15, 9)],
+            "head_mid": [(15, 7), (17, 6), (18, 7), (17, 8), (15, 8)],
+            "jaw": [(15, 8), (19, 8), (18, 10), (15, 11), (13, 10)],
+            "front": [((12, 11), (13, 14)), ((15, 10), (16, 15))],
+            "hind": [((7, 12), (7, 15)), ((9, 12), (11, 14))],
+            "tail": [(4, 10), (2, 11), (1, 10)],
+            "back": [(7, 7), (11, 6), (15, 7)],
+            "spikes": [((9, 4), (8, 3)), ((11, 4), (11, 3)), ((13, 5), (14, 4))],
+            "bone_marks": [((16, 8), (18, 8)), ((15, 9), (17, 10))],
+            "eyes": [(17, 7)],
+            "hostile": True,
+        },
+        "hunt_windup": {
+            "body": [(4, 11), (6, 8), (10, 7), (14, 7), (16, 8), (16, 10), (14, 11), (10, 12), (6, 12), (4, 12)],
+            "flank": [(7, 11), (11, 10), (15, 10), (14, 12), (10, 13), (7, 12)],
+            "mane": [(6, 8), (8, 5), (11, 5), (14, 6), (13, 7), (8, 7)],
+            "head": [(14, 8), (17, 7), (18, 8), (17, 10), (14, 10)],
+            "head_mid": [(14, 8), (16, 7), (17, 8), (16, 9), (14, 9)],
+            "jaw": [(14, 9), (19, 8), (19, 10), (17, 12), (14, 11)],
+            "front": [((11, 12), (13, 15)), ((14, 11), (16, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 15))],
+            "tail": [(4, 12), (2, 11), (1, 12)],
+            "back": [(6, 8), (10, 7), (14, 7)],
+            "spikes": [((8, 5), (7, 4)), ((10, 5), (10, 4)), ((12, 5), (13, 4))],
+            "bone_marks": [((16, 9), (18, 9)), ((15, 10), (17, 11))],
+            "eyes": [(16, 8)],
+            "hostile": True,
+        },
+        "hunt_leap": {
+            "body": [(6, 10), (10, 7), (14, 7), (17, 8), (19, 8), (18, 9), (14, 10), (10, 10), (7, 10), (5, 11)],
+            "flank": [(10, 10), (14, 9), (18, 9), (17, 11), (12, 11), (8, 11)],
+            "mane": [(10, 7), (12, 4), (15, 4), (17, 6), (15, 7), (12, 7)],
+            "head": [(17, 8), (19, 7), (19, 8), (19, 10), (17, 10)],
+            "head_mid": [(17, 8), (18, 7), (19, 8), (18, 9), (17, 9)],
+            "jaw": [(17, 9), (19, 9), (18, 11), (16, 12), (14, 11)],
+            "front": [((14, 10), (17, 12)), ((17, 10), (19, 11))],
+            "hind": [((10, 10), (9, 15)), ((12, 10), (14, 14))],
+            "tail": [(5, 11), (3, 10), (2, 11)],
+            "back": [(10, 7), (14, 7), (17, 8)],
+            "spikes": [((12, 4), (11, 3)), ((14, 4), (14, 3)), ((16, 5), (17, 4))],
+            "bone_marks": [((17, 9), (18, 9)), ((16, 10), (18, 10))],
+            "eyes": [(18, 8)],
+            "hostile": True,
+        },
+        "hunt_impact": {
+            "body": [(8, 10), (12, 8), (16, 8), (18, 9), (18, 11), (15, 12), (11, 12), (8, 12), (6, 11)],
+            "flank": [(10, 11), (14, 10), (18, 10), (17, 12), (12, 13), (8, 12)],
+            "mane": [(12, 8), (14, 5), (17, 5), (18, 7), (16, 8), (14, 8)],
+            "head": [(16, 9), (18, 8), (19, 9), (18, 11), (16, 11)],
+            "head_mid": [(16, 9), (17, 8), (18, 9), (17, 10), (16, 10)],
+            "jaw": [(16, 10), (19, 9), (18, 11), (15, 12), (13, 11)],
+            "front": [((11, 12), (10, 15)), ((14, 11), (15, 15))],
+            "hind": [((10, 12), (9, 15)), ((12, 12), (13, 15))],
+            "tail": [(6, 11), (4, 10), (3, 11)],
+            "back": [(12, 8), (16, 8), (18, 9)],
+            "spikes": [((14, 5), (13, 4)), ((16, 5), (16, 4)), ((17, 6), (18, 5))],
+            "bone_marks": [((17, 10), (18, 10)), ((16, 11), (17, 11))],
+            "eyes": [(17, 9)],
+            "hostile": True,
+        },
+        "hunt_recoil": {
+            "body": [(7, 10), (10, 8), (14, 8), (17, 9), (17, 11), (14, 12), (10, 12), (7, 12), (5, 11)],
+            "flank": [(9, 11), (13, 10), (17, 10), (16, 12), (11, 13), (8, 12)],
+            "mane": [(10, 8), (12, 5), (15, 5), (17, 7), (15, 8), (12, 8)],
+            "head": [(15, 9), (17, 8), (18, 9), (17, 11), (15, 11)],
+            "head_mid": [(15, 9), (16, 8), (17, 9), (16, 10), (15, 10)],
+            "jaw": [(15, 10), (18, 9), (17, 11), (14, 12), (12, 11)],
+            "front": [((10, 12), (9, 15)), ((13, 11), (14, 15))],
+            "hind": [((8, 12), (7, 15)), ((10, 12), (11, 15))],
+            "tail": [(5, 11), (3, 12), (2, 11)],
+            "back": [(10, 8), (14, 8), (17, 9)],
+            "spikes": [((12, 5), (11, 4)), ((14, 5), (14, 4)), ((16, 6), (17, 5))],
+            "bone_marks": [((16, 10), (17, 10)), ((15, 11), (16, 11))],
+            "eyes": [(16, 9)],
+            "hostile": True,
+        },
+        "recovery_skid": {
+            "body": [(7, 11), (10, 9), (14, 9), (16, 10), (15, 12), (12, 13), (9, 13), (6, 12), (5, 12)],
+            "flank": [(9, 12), (12, 11), (16, 11), (15, 13), (10, 14), (7, 13)],
+            "mane": [(10, 9), (12, 7), (15, 7), (16, 8), (14, 9), (12, 9)],
+            "head": [(14, 10), (17, 9), (18, 10), (17, 12), (14, 12)],
+            "head_mid": [(14, 10), (16, 9), (17, 10), (16, 11), (14, 11)],
+            "jaw": [(14, 11), (18, 10), (17, 12), (14, 13), (12, 12)],
+            "front": [((9, 13), (8, 15)), ((12, 13), (13, 15))],
+            "hind": [((7, 13), (6, 15)), ((9, 13), (10, 15))],
+            "tail": [(5, 12), (3, 13), (2, 12)],
+            "back": [(10, 9), (14, 9), (16, 10)],
+            "spikes": [((12, 7), (11, 6)), ((14, 7), (14, 6))],
+            "bone_marks": [((15, 11), (17, 11)), ((14, 12), (16, 12))],
+            "eyes": [(16, 10)],
+            "hostile": True,
+        },
+        "recovery_stun": {
+            "body": [(6, 11), (9, 9), (13, 9), (15, 10), (15, 12), (12, 13), (9, 13), (6, 12), (4, 12)],
+            "flank": [(8, 12), (12, 11), (15, 11), (14, 13), (10, 14), (7, 13)],
+            "mane": [(9, 9), (11, 6), (14, 6), (15, 8), (13, 9), (11, 9)],
+            "head": [(13, 10), (16, 9), (17, 10), (16, 12), (13, 12)],
+            "head_mid": [(13, 10), (15, 9), (16, 10), (15, 11), (13, 11)],
+            "jaw": [(13, 11), (17, 10), (16, 12), (13, 13), (11, 12)],
+            "front": [((8, 13), (7, 15)), ((11, 13), (12, 15))],
+            "hind": [((6, 13), (5, 15)), ((8, 13), (9, 15))],
+            "tail": [(4, 12), (2, 13), (1, 12)],
+            "back": [(9, 9), (13, 9), (15, 10)],
+            "spikes": [((11, 6), (10, 5)), ((13, 6), (13, 5))],
+            "bone_marks": [((14, 11), (16, 11)), ((13, 12), (15, 12))],
+            "eyes": [(15, 10)],
+            "hostile": True,
+        },
+    }
+
+    frame_map = {
+        "stalk": [("stalk_low", (0, 0)), ("stalk_step", (0, 0)), ("stalk_low", (0, 0)), ("stalk_step", (0, 0))],
+        "defensive": [("defensive_crouch", (0, 0)), ("defensive_crouch", (0, 1)), ("defensive_launch", (1, 0)), ("defensive_launch", (2, 0))],
+        "alert": [("alert_snap", (0, 0)), ("alert_snap", (0, -1)), ("alert_rear", (0, -1)), ("alert_rear", (0, -2))],
+        "hunt": [("hunt_stride_a", (0, 0)), ("hunt_stride_b", (-1, 0)), ("hunt_stride_a", (0, 0)), ("hunt_stride_b", (-1, 0))],
+        "hunt_pounce": [("hunt_windup", (0, 1)), ("hunt_leap", (0, 1)), ("hunt_impact", (2, 0)), ("hunt_recoil", (1, 0))],
+        "recovery": [("recovery_skid", (1, 1)), ("recovery_skid", (0, 1)), ("recovery_stun", (0, 1)), ("recovery_stun", (0, 1))],
+    }
+
+    pose_name, offset = frame_map[sequence_key][frame_index]
+    _draw_prowler_pose_shape(
+        draw,
+        spec,
+        _offset_prowler_shape(pose_library[pose_name], offset[0], offset[1]),
+    )
+
+
+def _draw_bristlemane_preview(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec, pose_key: str) -> None:
+    pose_shapes = {
+        "stalk": {
+            "body": [(4, 10), (6, 7), (10, 6), (14, 7), (16, 8), (16, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (11, 9), (15, 9), (14, 11), (10, 13), (7, 12)],
+            "mane": [(6, 7), (8, 4), (10, 3), (12, 4), (14, 6), (12, 7), (8, 7)],
+            "head": [(14, 8), (17, 7), (18, 8), (17, 10), (14, 10)],
+            "head_mid": [(14, 8), (16, 7), (17, 8), (16, 9), (14, 9)],
+            "jaw": [(14, 9), (18, 9), (17, 11), (14, 12), (12, 11)],
+            "front": [((11, 11), (12, 15)), ((13, 11), (14, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 15))],
+            "tail": [(4, 10), (2, 9), (1, 10)],
+            "back": [(6, 7), (10, 6), (14, 7)],
+            "spikes": [((8, 4), (7, 3)), ((10, 3), (10, 2)), ((12, 4), (13, 3)), ((14, 6), (15, 5))],
+            "bone_marks": [((15, 10), (17, 10))],
+            "eyes": [(16, 8)],
+            "hostile": False,
+        },
+        "alert": {
+            "body": [(4, 10), (6, 7), (10, 5), (14, 6), (16, 8), (16, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (11, 8), (15, 8), (14, 10), (10, 13), (7, 12)],
+            "mane": [(6, 7), (8, 3), (10, 2), (12, 3), (15, 5), (13, 6), (8, 6)],
+            "head": [(14, 7), (17, 6), (18, 7), (17, 10), (14, 10)],
+            "head_mid": [(14, 7), (16, 6), (17, 7), (16, 8), (14, 8)],
+            "jaw": [(14, 8), (18, 8), (18, 10), (16, 12), (13, 10)],
+            "front": [((11, 11), (12, 15)), ((13, 10), (14, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 15))],
+            "tail": [(4, 10), (2, 11), (1, 10)],
+            "back": [(6, 7), (10, 5), (14, 6)],
+            "spikes": [((8, 3), (7, 2)), ((10, 2), (10, 1)), ((12, 3), (13, 2)), ((14, 5), (15, 4))],
+            "bone_marks": [((15, 9), (17, 9)), ((14, 10), (16, 11))],
+            "eyes": [(16, 7)],
+            "hostile": True,
+        },
+        "hunt": {
+            "body": [(4, 10), (7, 7), (11, 6), (15, 7), (17, 8), (17, 10), (14, 11), (10, 12), (6, 12), (4, 11)],
+            "flank": [(8, 10), (12, 9), (16, 9), (15, 11), (10, 13), (7, 12)],
+            "mane": [(7, 7), (9, 3), (11, 2), (13, 3), (16, 5), (14, 7), (9, 7)],
+            "head": [(15, 7), (18, 6), (19, 7), (18, 9), (15, 9)],
+            "head_mid": [(15, 7), (17, 6), (18, 7), (17, 8), (15, 8)],
+            "jaw": [(15, 8), (19, 8), (18, 10), (15, 11), (13, 10)],
+            "front": [((12, 11), (14, 15)), ((15, 10), (17, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 14))],
+            "tail": [(4, 10), (2, 11), (1, 10)],
+            "back": [(7, 7), (11, 6), (15, 7)],
+            "spikes": [((9, 3), (8, 2)), ((11, 2), (11, 1)), ((13, 3), (14, 2)), ((15, 5), (16, 4))],
+            "bone_marks": [((16, 8), (18, 8)), ((15, 9), (17, 10))],
+            "eyes": [(17, 7)],
+            "hostile": True,
+        },
+        "defensive": {
+            "body": [(5, 10), (7, 8), (11, 7), (14, 7), (16, 8), (16, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(8, 10), (12, 9), (15, 9), (14, 11), (10, 13), (7, 12)],
+            "mane": [(7, 8), (9, 4), (11, 3), (13, 4), (15, 6), (13, 7), (9, 7)],
+            "head": [(14, 8), (17, 7), (18, 8), (17, 10), (14, 10)],
+            "head_mid": [(14, 8), (16, 7), (17, 8), (16, 9), (14, 9)],
+            "jaw": [(14, 9), (18, 8), (19, 9), (18, 11), (15, 12)],
+            "front": [((12, 11), (15, 13)), ((15, 10), (17, 12))],
+            "hind": [((8, 12), (7, 15)), ((10, 12), (12, 14))],
+            "tail": [(4, 11), (2, 10), (1, 11)],
+            "back": [(7, 8), (11, 7), (15, 7)],
+            "spikes": [((9, 4), (8, 3)), ((11, 3), (11, 2)), ((13, 4), (14, 3)), ((15, 6), (16, 5))],
+            "bone_marks": [((15, 9), (17, 9)), ((14, 10), (17, 10))],
+            "eyes": [(16, 8)],
+            "hostile": False,
+        },
+    }
+    _draw_prowler_pose_shape(draw, spec, pose_shapes.get(pose_key, pose_shapes["stalk"]))
+
+
+def _draw_hollow_hound_preview(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec, pose_key: str) -> None:
+    pose_shapes = {
+        "stalk": {
+            "body": [(5, 10), (7, 7), (10, 6), (13, 7), (15, 8), (15, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (10, 9), (14, 9), (13, 11), (9, 13), (6, 12)],
+            "mane": [(7, 7), (9, 5), (11, 5), (13, 6), (12, 7), (9, 7)],
+            "head": [(13, 8), (16, 7), (17, 8), (16, 10), (13, 10)],
+            "head_mid": [(13, 8), (15, 7), (16, 8), (15, 9), (13, 9)],
+            "jaw": [(13, 9), (18, 9), (17, 11), (14, 12), (12, 11)],
+            "front": [((10, 11), (11, 15)), ((12, 11), (13, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 15))],
+            "tail": [(4, 11), (2, 10), (1, 11)],
+            "back": [(7, 7), (10, 6), (13, 7)],
+            "spikes": [((9, 5), (8, 4)), ((11, 5), (11, 4))],
+            "bone_marks": [((14, 9), (16, 10)), ((15, 8), (15, 8))],
+            "shadow_points": [(15, 8)],
+            "eyes": [(16, 8)],
+            "hostile": False,
+        },
+        "alert": {
+            "body": [(5, 10), (7, 7), (10, 5), (13, 6), (15, 8), (15, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (10, 8), (14, 8), (13, 10), (9, 13), (6, 12)],
+            "mane": [(7, 7), (9, 4), (11, 4), (13, 5), (12, 6), (9, 6)],
+            "head": [(13, 7), (16, 6), (17, 7), (16, 10), (13, 10)],
+            "head_mid": [(13, 7), (15, 6), (16, 7), (15, 8), (13, 8)],
+            "jaw": [(13, 8), (18, 8), (17, 11), (14, 12), (12, 10)],
+            "front": [((10, 11), (11, 15)), ((12, 10), (13, 14))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (10, 15))],
+            "tail": [(4, 11), (2, 12), (1, 11)],
+            "back": [(7, 7), (10, 5), (13, 6)],
+            "spikes": [((9, 4), (8, 3)), ((11, 4), (11, 3))],
+            "bone_marks": [((14, 8), (16, 9)), ((15, 7), (15, 7))],
+            "shadow_points": [(15, 7)],
+            "eyes": [(16, 7)],
+            "hostile": True,
+        },
+        "hunt": {
+            "body": [(5, 10), (8, 7), (11, 6), (14, 7), (16, 8), (16, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(8, 10), (11, 9), (15, 9), (14, 11), (10, 13), (7, 12)],
+            "mane": [(8, 7), (10, 4), (12, 4), (14, 5), (13, 6), (10, 6)],
+            "head": [(14, 7), (17, 6), (18, 7), (17, 9), (14, 9)],
+            "head_mid": [(14, 7), (16, 6), (17, 7), (16, 8), (14, 8)],
+            "jaw": [(14, 8), (19, 8), (18, 10), (15, 11), (13, 10)],
+            "front": [((11, 11), (13, 15)), ((14, 10), (16, 14))],
+            "hind": [((8, 12), (7, 15)), ((10, 12), (11, 14))],
+            "tail": [(4, 11), (2, 12), (1, 11)],
+            "back": [(8, 7), (11, 6), (14, 7)],
+            "spikes": [((10, 4), (9, 3)), ((12, 4), (12, 3))],
+            "bone_marks": [((15, 8), (17, 9)), ((15, 7), (15, 7))],
+            "shadow_points": [(15, 7)],
+            "eyes": [(17, 7)],
+            "hostile": True,
+        },
+        "defensive": {
+            "body": [(5, 10), (7, 8), (10, 7), (13, 7), (15, 8), (15, 10), (13, 11), (9, 12), (6, 12), (4, 11)],
+            "flank": [(7, 10), (10, 9), (14, 9), (13, 11), (9, 13), (6, 12)],
+            "mane": [(7, 8), (9, 5), (11, 5), (13, 6), (12, 7), (9, 7)],
+            "head": [(13, 8), (16, 7), (17, 8), (16, 10), (13, 10)],
+            "head_mid": [(13, 8), (15, 7), (16, 8), (15, 9), (13, 9)],
+            "jaw": [(13, 9), (18, 8), (18, 10), (15, 12), (13, 11)],
+            "front": [((11, 11), (14, 13)), ((14, 10), (16, 12))],
+            "hind": [((7, 12), (6, 15)), ((9, 12), (11, 14))],
+            "tail": [(4, 11), (2, 10), (1, 11)],
+            "back": [(7, 8), (10, 7), (13, 7)],
+            "spikes": [((9, 5), (8, 4)), ((11, 5), (11, 4))],
+            "bone_marks": [((14, 9), (16, 10)), ((15, 8), (15, 8))],
+            "shadow_points": [(15, 8)],
+            "eyes": [(16, 8)],
+            "hostile": False,
+        },
+    }
+    _draw_prowler_pose_shape(draw, spec, pose_shapes.get(pose_key, pose_shapes["stalk"]))
+
+
+def _draw_grave_hound_preview(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec, hostile: bool) -> None:
+    shoulder = [(5, 8), (7, 6), (11, 5), (13, 7), (13, 9), (10, 11), (6, 10)]
+    rib = [(7, 9), (11, 8), (15, 9), (14, 11), (10, 12), (7, 11)]
+    head = [(13, 8), (17, 7), (18, 8), (17, 10), (14, 10)]
+    jaw = [(14, 9), (18, 9), (17, 11), (14, 11)]
+    front_legs = [((11, 11), (12, 15)), ((13, 10), (15, 14))]
+    hind_legs = [((7, 10), (6, 15)), ((9, 11), (10, 15))]
+    tail = [(5, 9), (3, 8), (2, 9)]
+    back_line = [(7, 6), (10, 5), (13, 7)]
+    eye_positions = [(15, 8)]
+    if hostile:
+        shoulder = [(4, 9), (7, 7), (12, 6), (15, 8), (15, 10), (11, 11), (6, 11)]
+        rib = [(7, 10), (12, 9), (16, 10), (15, 12), (10, 13), (6, 12)]
+        head = [(15, 8), (18, 7), (19, 8), (18, 10), (15, 10)]
+        jaw = [(16, 9), (19, 9), (18, 11), (15, 11)]
+        front_legs = [((12, 11), (14, 15)), ((15, 10), (17, 13))]
+        hind_legs = [((7, 11), (6, 15)), ((10, 11), (11, 15))]
+        tail = [(4, 10), (2, 11), (1, 10)]
+        back_line = [(7, 7), (12, 6), (15, 8)]
+        eye_positions = [(16, 8)]
+    _draw_prowler_pose_parts(draw, spec, shoulder, rib, head, jaw, front_legs, hind_legs, tail, hostile, eye_positions, back_line)
+
+
+def _draw_marsh_hound_preview(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec, hostile: bool) -> None:
+    shoulder = [(4, 9), (7, 6), (12, 6), (15, 8), (15, 10), (12, 11), (7, 11), (4, 10)]
+    rib = [(7, 10), (12, 10), (16, 11), (15, 13), (10, 13), (7, 12)]
+    head = [(15, 10), (18, 9), (19, 10), (18, 11), (15, 11)]
+    jaw = [(16, 11), (19, 10), (18, 12), (15, 12)]
+    front_legs = [((11, 11), (12, 15)), ((13, 11), (14, 15))]
+    hind_legs = [((7, 12), (6, 15)), ((9, 12), (9, 15))]
+    tail = [(4, 10), (2, 9), (1, 10)]
+    back_line = [(6, 7), (11, 6), (15, 8)]
+    eye_positions = [(16, 10)]
+    if hostile:
+        shoulder = [(4, 9), (8, 6), (13, 6), (16, 8), (16, 10), (13, 11), (8, 11), (4, 10)]
+        rib = [(8, 10), (13, 10), (17, 11), (16, 13), (11, 13), (8, 12)]
+        head = [(16, 9), (19, 8), (19, 9), (19, 11), (16, 11)]
+        jaw = [(16, 11), (19, 10), (18, 12), (15, 12)]
+        front_legs = [((12, 11), (14, 15)), ((15, 10), (17, 14))]
+        hind_legs = [((8, 12), (7, 15)), ((10, 12), (10, 15))]
+        tail = [(4, 10), (2, 11), (1, 10)]
+        back_line = [(7, 7), (12, 6), (16, 8)]
+        eye_positions = [(17, 9)]
+    _draw_prowler_pose_parts(draw, spec, shoulder, rib, head, jaw, front_legs, hind_legs, tail, hostile, eye_positions, back_line)
+
+
+def _draw_crooked_prowler_preview(draw: ImageDraw.ImageDraw, spec: ProwlerVariantSpec, hostile: bool) -> None:
+    shoulder = [(5, 9), (7, 6), (11, 6), (13, 7), (12, 9), (10, 11), (6, 11)]
+    rib = [(7, 10), (11, 9), (14, 10), (13, 12), (9, 13), (6, 12)]
+    head = [(13, 9), (16, 8), (17, 9), (16, 11), (13, 10)]
+    jaw = [(14, 10), (17, 9), (16, 12), (13, 11)]
+    front_legs = [((10, 11), (11, 15)), ((12, 10), (14, 14))]
+    hind_legs = [((7, 12), (6, 15)), ((9, 12), (9, 15))]
+    tail = [(5, 10), (3, 11), (2, 10)]
+    back_line = [(6, 7), (8, 5), (12, 7)]
+    eye_positions = [(15, 10)]
+    if hostile:
+        shoulder = [(5, 10), (8, 7), (12, 6), (14, 8), (13, 10), (11, 12), (7, 12)]
+        rib = [(8, 11), (12, 10), (16, 11), (15, 13), (10, 14), (7, 13)]
+        head = [(15, 9), (18, 8), (19, 9), (18, 11), (15, 11)]
+        jaw = [(16, 10), (19, 9), (18, 12), (15, 12)]
+        front_legs = [((11, 12), (12, 15)), ((14, 11), (16, 14))]
+        hind_legs = [((8, 13), (7, 15)), ((10, 13), (10, 15))]
+        tail = [(5, 11), (3, 12), (2, 11)]
+        back_line = [(7, 8), (10, 6), (14, 8)]
+        eye_positions = [(16, 9)]
+    _draw_prowler_pose_parts(draw, spec, shoulder, rib, head, jaw, front_legs, hind_legs, tail, hostile, eye_positions, back_line)
+
+
+def _draw_prowler_pose_parts(
+    draw: ImageDraw.ImageDraw,
+    spec: ProwlerVariantSpec,
+    shoulder: list[tuple[int, int]],
+    rib: list[tuple[int, int]],
+    head: list[tuple[int, int]],
+    jaw: list[tuple[int, int]],
+    front_legs: list[tuple[tuple[int, int], tuple[int, int]]],
+    hind_legs: list[tuple[tuple[int, int], tuple[int, int]]],
+    tail: list[tuple[int, int]],
+    hostile: bool,
+    eye_positions: list[tuple[int, int]],
+    back_line: list[tuple[int, int]],
+) -> None:
+    draw.line(tail, fill=spec.shadow_color, width=1)
+    for leg in hind_legs:
+        draw.line(leg, fill=spec.shadow_color, width=1)
+    for leg in front_legs:
+        draw.line(leg, fill=spec.shadow_color, width=1)
+    draw.polygon(rib, fill=spec.midtone_color)
+    draw.polygon(shoulder, fill=spec.body_color)
+    draw.polygon(head, fill=spec.body_color)
+    draw.polygon(jaw, fill=spec.bone_color)
+    draw.line(back_line, fill=spec.shadow_color, width=1)
+    eye_fill = spec.eye_color if hostile else spec.shadow_color
+    for eye in eye_positions:
+        draw.point(eye, fill=eye_fill)
+    if hostile and len(eye_positions) == 1:
+        draw.point((eye_positions[0][0] + 1, eye_positions[0][1]), fill=spec.eye_color)
+
+
+def _draw_selected_marsh_hound_frame(
+    draw: ImageDraw.ImageDraw,
+    spec: ProwlerVariantSpec,
+    sequence_key: str,
+    frame_index: int,
+) -> None:
+    frame_map = {
+        "stalk": [
+            ("armed", (0, 0)),
+            ("armed", (0, -1)),
+            ("armed", (0, 0)),
+            ("armed", (0, -1)),
+        ],
+        "defensive": [
+            ("defensive_1", (0, 0)),
+            ("defensive_2", (0, 1)),
+            ("defensive_3", (1, 0)),
+            ("defensive_4", (2, 0)),
+        ],
+        "alert": [
+            ("alert_1", (0, 0)),
+            ("alert_2", (0, -1)),
+            ("alert_3", (0, -1)),
+            ("alert_4", (0, -2)),
+        ],
+        "hunt": [
+            ("hostile", (0, 0)),
+            ("hostile", (-1, 0)),
+            ("hostile", (0, 0)),
+            ("hostile", (-1, 0)),
+        ],
+        "hunt_pounce": [
+            ("hunt_pounce_1", (0, 1)),
+            ("hunt_pounce_2", (0, 1)),
+            ("hunt_pounce_3", (2, 0)),
+            ("hunt_pounce_4", (1, 0)),
+        ],
+        "recovery": [
+            ("recovery_1", (1, 1)),
+            ("recovery_2", (0, 1)),
+            ("recovery_3", (0, 1)),
+            ("recovery_4", (0, 1)),
+        ],
+    }
+    pose_key, offset = frame_map[sequence_key][frame_index]
+    _draw_selected_marsh_hound_pose(draw, spec, pose_key, offset)
+
+
+def _draw_selected_marsh_hound_pose(
+    draw: ImageDraw.ImageDraw,
+    spec: ProwlerVariantSpec,
+    pose_key: str,
+    offset: tuple[int, int],
+) -> None:
+    hostile = pose_key != "armed"
+    ox, oy = offset
+
+    pose_shapes = {
+        "armed": {
+            "shoulder": [(4 + ox, 9 + oy), (7 + ox, 6 + oy), (12 + ox, 6 + oy), (15 + ox, 8 + oy), (15 + ox, 10 + oy), (12 + ox, 11 + oy), (7 + ox, 11 + oy), (4 + ox, 10 + oy)],
+            "rib": [(7 + ox, 10 + oy), (12 + ox, 10 + oy), (16 + ox, 11 + oy), (15 + ox, 13 + oy), (10 + ox, 13 + oy), (7 + ox, 12 + oy)],
+            "head": [(15 + ox, 10 + oy), (18 + ox, 9 + oy), (19 + ox, 10 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "jaw": [(16 + ox, 11 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (15 + ox, 12 + oy)],
+            "front": [((11 + ox, 11 + oy), (12 + ox, 15 + oy)), ((13 + ox, 11 + oy), (14 + ox, 15 + oy))],
+            "hind": [((7 + ox, 12 + oy), (6 + ox, 15 + oy)), ((9 + ox, 12 + oy), (9 + ox, 15 + oy))],
+            "tail": [(4 + ox, 10 + oy), (2 + ox, 9 + oy), (1 + ox, 10 + oy)],
+            "back": [(6 + ox, 7 + oy), (11 + ox, 6 + oy), (15 + ox, 8 + oy)],
+            "eyes": [(16 + ox, 10 + oy)],
+        },
+        "hostile": {
+            "shoulder": [(4 + ox, 9 + oy), (8 + ox, 6 + oy), (13 + ox, 6 + oy), (16 + ox, 8 + oy), (16 + ox, 10 + oy), (13 + ox, 11 + oy), (8 + ox, 11 + oy), (4 + ox, 10 + oy)],
+            "rib": [(8 + ox, 10 + oy), (13 + ox, 10 + oy), (17 + ox, 11 + oy), (16 + ox, 13 + oy), (11 + ox, 13 + oy), (8 + ox, 12 + oy)],
+            "head": [(16 + ox, 9 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (19 + ox, 11 + oy), (16 + ox, 11 + oy)],
+            "jaw": [(16 + ox, 11 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (15 + ox, 12 + oy)],
+            "front": [((12 + ox, 11 + oy), (14 + ox, 15 + oy)), ((15 + ox, 10 + oy), (17 + ox, 14 + oy))],
+            "hind": [((8 + ox, 12 + oy), (7 + ox, 15 + oy)), ((10 + ox, 12 + oy), (10 + ox, 15 + oy))],
+            "tail": [(4 + ox, 10 + oy), (2 + ox, 11 + oy), (1 + ox, 10 + oy)],
+            "back": [(7 + ox, 7 + oy), (12 + ox, 6 + oy), (16 + ox, 8 + oy)],
+            "eyes": [(17 + ox, 9 + oy)],
+        },
+        "defensive_1": {
+            "shoulder": [(5 + ox, 10 + oy), (8 + ox, 7 + oy), (12 + ox, 7 + oy), (14 + ox, 8 + oy), (14 + ox, 10 + oy), (11 + ox, 11 + oy), (7 + ox, 11 + oy), (5 + ox, 11 + oy)],
+            "rib": [(8 + ox, 11 + oy), (12 + ox, 11 + oy), (15 + ox, 11 + oy), (14 + ox, 13 + oy), (10 + ox, 13 + oy), (7 + ox, 12 + oy)],
+            "head": [(13 + ox, 10 + oy), (16 + ox, 9 + oy), (17 + ox, 10 + oy), (16 + ox, 11 + oy), (13 + ox, 11 + oy)],
+            "jaw": [(14 + ox, 11 + oy), (17 + ox, 10 + oy), (16 + ox, 12 + oy), (13 + ox, 12 + oy)],
+            "front": [((11 + ox, 11 + oy), (12 + ox, 14 + oy)), ((13 + ox, 11 + oy), (14 + ox, 13 + oy))],
+            "hind": [((8 + ox, 12 + oy), (7 + ox, 15 + oy)), ((10 + ox, 12 + oy), (10 + ox, 15 + oy))],
+            "tail": [(5 + ox, 11 + oy), (3 + ox, 10 + oy), (2 + ox, 11 + oy)],
+            "back": [(8 + ox, 8 + oy), (12 + ox, 7 + oy), (14 + ox, 8 + oy)],
+            "eyes": [(15 + ox, 10 + oy)],
+        },
+        "defensive_2": {
+            "shoulder": [(5 + ox, 11 + oy), (8 + ox, 8 + oy), (12 + ox, 8 + oy), (14 + ox, 9 + oy), (14 + ox, 11 + oy), (11 + ox, 12 + oy), (7 + ox, 12 + oy), (5 + ox, 12 + oy)],
+            "rib": [(8 + ox, 12 + oy), (12 + ox, 12 + oy), (15 + ox, 12 + oy), (14 + ox, 14 + oy), (10 + ox, 14 + oy), (7 + ox, 13 + oy)],
+            "head": [(12 + ox, 11 + oy), (15 + ox, 10 + oy), (16 + ox, 11 + oy), (15 + ox, 12 + oy), (12 + ox, 12 + oy)],
+            "jaw": [(13 + ox, 12 + oy), (16 + ox, 11 + oy), (15 + ox, 13 + oy), (12 + ox, 13 + oy)],
+            "front": [((10 + ox, 12 + oy), (11 + ox, 14 + oy)), ((12 + ox, 12 + oy), (13 + ox, 14 + oy))],
+            "hind": [((8 + ox, 13 + oy), (7 + ox, 15 + oy)), ((10 + ox, 13 + oy), (10 + ox, 15 + oy))],
+            "tail": [(5 + ox, 12 + oy), (3 + ox, 11 + oy), (2 + ox, 12 + oy)],
+            "back": [(8 + ox, 9 + oy), (12 + ox, 8 + oy), (14 + ox, 9 + oy)],
+            "eyes": [(14 + ox, 11 + oy)],
+        },
+        "defensive_3": {
+            "shoulder": [(6 + ox, 10 + oy), (10 + ox, 7 + oy), (14 + ox, 7 + oy), (17 + ox, 8 + oy), (17 + ox, 9 + oy), (13 + ox, 10 + oy), (9 + ox, 10 + oy), (6 + ox, 11 + oy)],
+            "rib": [(9 + ox, 11 + oy), (14 + ox, 10 + oy), (18 + ox, 10 + oy), (17 + ox, 12 + oy), (12 + ox, 12 + oy), (8 + ox, 12 + oy)],
+            "head": [(16 + ox, 9 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (19 + ox, 10 + oy), (16 + ox, 10 + oy)],
+            "jaw": [(16 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "front": [((13 + ox, 10 + oy), (16 + ox, 13 + oy)), ((15 + ox, 10 + oy), (18 + ox, 12 + oy))],
+            "hind": [((9 + ox, 12 + oy), (8 + ox, 15 + oy)), ((11 + ox, 12 + oy), (12 + ox, 15 + oy))],
+            "tail": [(6 + ox, 11 + oy), (4 + ox, 10 + oy), (3 + ox, 11 + oy)],
+            "back": [(10 + ox, 8 + oy), (14 + ox, 7 + oy), (17 + ox, 8 + oy)],
+            "eyes": [(17 + ox, 9 + oy)],
+        },
+        "defensive_4": {
+            "shoulder": [(8 + ox, 10 + oy), (12 + ox, 7 + oy), (16 + ox, 7 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (15 + ox, 10 + oy), (10 + ox, 10 + oy), (8 + ox, 11 + oy)],
+            "rib": [(11 + ox, 11 + oy), (16 + ox, 10 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (14 + ox, 12 + oy), (10 + ox, 12 + oy)],
+            "head": [(18 + ox, 9 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (19 + ox, 10 + oy), (18 + ox, 10 + oy)],
+            "jaw": [(17 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (16 + ox, 11 + oy)],
+            "front": [((15 + ox, 10 + oy), (18 + ox, 12 + oy)), ((17 + ox, 10 + oy), (19 + ox, 11 + oy))],
+            "hind": [((11 + ox, 12 + oy), (10 + ox, 15 + oy)), ((13 + ox, 12 + oy), (14 + ox, 15 + oy))],
+            "tail": [(8 + ox, 11 + oy), (6 + ox, 10 + oy), (5 + ox, 11 + oy)],
+            "back": [(12 + ox, 8 + oy), (16 + ox, 7 + oy), (19 + ox, 8 + oy)],
+            "eyes": [(18 + ox, 9 + oy)],
+        },
+        "alert_1": {
+            "shoulder": [(4 + ox, 9 + oy), (7 + ox, 6 + oy), (12 + ox, 6 + oy), (15 + ox, 8 + oy), (15 + ox, 10 + oy), (12 + ox, 11 + oy), (7 + ox, 11 + oy), (4 + ox, 10 + oy)],
+            "rib": [(7 + ox, 10 + oy), (12 + ox, 10 + oy), (16 + ox, 11 + oy), (15 + ox, 13 + oy), (10 + ox, 13 + oy), (7 + ox, 12 + oy)],
+            "head": [(15 + ox, 10 + oy), (18 + ox, 9 + oy), (19 + ox, 10 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "jaw": [(16 + ox, 11 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (15 + ox, 12 + oy)],
+            "front": [((11 + ox, 11 + oy), (12 + ox, 15 + oy)), ((13 + ox, 11 + oy), (14 + ox, 15 + oy))],
+            "hind": [((7 + ox, 12 + oy), (6 + ox, 15 + oy)), ((9 + ox, 12 + oy), (9 + ox, 15 + oy))],
+            "tail": [(4 + ox, 10 + oy), (2 + ox, 9 + oy), (1 + ox, 10 + oy)],
+            "back": [(6 + ox, 7 + oy), (11 + ox, 6 + oy), (15 + ox, 8 + oy)],
+            "eyes": [(17 + ox, 10 + oy)],
+        },
+        "alert_2": {
+            "shoulder": [(4 + ox, 8 + oy), (7 + ox, 5 + oy), (12 + ox, 5 + oy), (15 + ox, 7 + oy), (15 + ox, 9 + oy), (12 + ox, 10 + oy), (7 + ox, 10 + oy), (4 + ox, 9 + oy)],
+            "rib": [(7 + ox, 9 + oy), (12 + ox, 9 + oy), (16 + ox, 10 + oy), (15 + ox, 12 + oy), (10 + ox, 12 + oy), (7 + ox, 11 + oy)],
+            "head": [(15 + ox, 9 + oy), (18 + ox, 8 + oy), (19 + ox, 9 + oy), (18 + ox, 10 + oy), (15 + ox, 10 + oy)],
+            "jaw": [(16 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "front": [((11 + ox, 10 + oy), (12 + ox, 14 + oy)), ((13 + ox, 10 + oy), (14 + ox, 14 + oy))],
+            "hind": [((7 + ox, 11 + oy), (6 + ox, 14 + oy)), ((9 + ox, 11 + oy), (9 + ox, 14 + oy))],
+            "tail": [(4 + ox, 9 + oy), (2 + ox, 8 + oy), (1 + ox, 9 + oy)],
+            "back": [(6 + ox, 6 + oy), (11 + ox, 5 + oy), (15 + ox, 7 + oy)],
+            "eyes": [(17 + ox, 9 + oy)],
+        },
+        "alert_3": {
+            "shoulder": [(4 + ox, 8 + oy), (8 + ox, 5 + oy), (13 + ox, 5 + oy), (16 + ox, 7 + oy), (16 + ox, 9 + oy), (13 + ox, 10 + oy), (8 + ox, 10 + oy), (4 + ox, 9 + oy)],
+            "rib": [(8 + ox, 9 + oy), (13 + ox, 9 + oy), (17 + ox, 10 + oy), (16 + ox, 12 + oy), (11 + ox, 12 + oy), (8 + ox, 11 + oy)],
+            "head": [(15 + ox, 8 + oy), (18 + ox, 7 + oy), (19 + ox, 8 + oy), (18 + ox, 10 + oy), (15 + ox, 10 + oy)],
+            "jaw": [(16 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "front": [((12 + ox, 10 + oy), (13 + ox, 14 + oy)), ((14 + ox, 10 + oy), (15 + ox, 13 + oy))],
+            "hind": [((8 + ox, 11 + oy), (7 + ox, 14 + oy)), ((10 + ox, 11 + oy), (10 + ox, 14 + oy))],
+            "tail": [(4 + ox, 9 + oy), (2 + ox, 8 + oy), (1 + ox, 8 + oy)],
+            "back": [(7 + ox, 6 + oy), (12 + ox, 5 + oy), (16 + ox, 7 + oy)],
+            "eyes": [(17 + ox, 8 + oy)],
+        },
+        "alert_4": {
+            "shoulder": [(4 + ox, 7 + oy), (8 + ox, 4 + oy), (13 + ox, 4 + oy), (16 + ox, 6 + oy), (16 + ox, 9 + oy), (13 + ox, 10 + oy), (8 + ox, 10 + oy), (4 + ox, 8 + oy)],
+            "rib": [(8 + ox, 8 + oy), (13 + ox, 8 + oy), (17 + ox, 9 + oy), (16 + ox, 12 + oy), (11 + ox, 12 + oy), (8 + ox, 11 + oy)],
+            "head": [(15 + ox, 7 + oy), (18 + ox, 6 + oy), (19 + ox, 7 + oy), (18 + ox, 10 + oy), (15 + ox, 9 + oy)],
+            "jaw": [(16 + ox, 9 + oy), (19 + ox, 8 + oy), (18 + ox, 11 + oy), (15 + ox, 10 + oy)],
+            "front": [((12 + ox, 10 + oy), (13 + ox, 13 + oy)), ((14 + ox, 10 + oy), (15 + ox, 13 + oy))],
+            "hind": [((8 + ox, 11 + oy), (7 + ox, 14 + oy)), ((10 + ox, 11 + oy), (10 + ox, 14 + oy))],
+            "tail": [(4 + ox, 8 + oy), (2 + ox, 7 + oy), (1 + ox, 8 + oy)],
+            "back": [(7 + ox, 5 + oy), (12 + ox, 4 + oy), (16 + ox, 6 + oy)],
+            "eyes": [(17 + ox, 7 + oy)],
+        },
+        "hunt_pounce_1": {
+            "shoulder": [(5 + ox, 10 + oy), (8 + ox, 7 + oy), (13 + ox, 7 + oy), (16 + ox, 8 + oy), (16 + ox, 10 + oy), (13 + ox, 11 + oy), (8 + ox, 11 + oy), (5 + ox, 11 + oy)],
+            "rib": [(8 + ox, 11 + oy), (13 + ox, 11 + oy), (17 + ox, 11 + oy), (16 + ox, 13 + oy), (11 + ox, 13 + oy), (8 + ox, 12 + oy)],
+            "head": [(15 + ox, 10 + oy), (18 + ox, 9 + oy), (19 + ox, 10 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "jaw": [(16 + ox, 11 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (15 + ox, 12 + oy)],
+            "front": [((12 + ox, 11 + oy), (14 + ox, 14 + oy)), ((15 + ox, 10 + oy), (17 + ox, 13 + oy))],
+            "hind": [((8 + ox, 12 + oy), (7 + ox, 15 + oy)), ((10 + ox, 12 + oy), (10 + ox, 15 + oy))],
+            "tail": [(5 + ox, 11 + oy), (3 + ox, 10 + oy), (2 + ox, 11 + oy)],
+            "back": [(8 + ox, 8 + oy), (13 + ox, 7 + oy), (16 + ox, 8 + oy)],
+            "eyes": [(17 + ox, 10 + oy)],
+        },
+        "hunt_pounce_2": {
+            "shoulder": [(5 + ox, 11 + oy), (9 + ox, 8 + oy), (14 + ox, 8 + oy), (17 + ox, 9 + oy), (17 + ox, 10 + oy), (14 + ox, 11 + oy), (9 + ox, 11 + oy), (5 + ox, 12 + oy)],
+            "rib": [(9 + ox, 12 + oy), (14 + ox, 11 + oy), (18 + ox, 11 + oy), (17 + ox, 13 + oy), (12 + ox, 13 + oy), (8 + ox, 13 + oy)],
+            "head": [(16 + ox, 10 + oy), (19 + ox, 9 + oy), (19 + ox, 10 + oy), (19 + ox, 11 + oy), (16 + ox, 11 + oy)],
+            "jaw": [(16 + ox, 11 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (15 + ox, 12 + oy)],
+            "front": [((13 + ox, 11 + oy), (15 + ox, 14 + oy)), ((16 + ox, 10 + oy), (18 + ox, 12 + oy))],
+            "hind": [((9 + ox, 13 + oy), (8 + ox, 15 + oy)), ((11 + ox, 13 + oy), (12 + ox, 15 + oy))],
+            "tail": [(5 + ox, 12 + oy), (3 + ox, 11 + oy), (2 + ox, 12 + oy)],
+            "back": [(9 + ox, 9 + oy), (14 + ox, 8 + oy), (17 + ox, 9 + oy)],
+            "eyes": [(17 + ox, 10 + oy)],
+        },
+        "hunt_pounce_3": {
+            "shoulder": [(7 + ox, 10 + oy), (12 + ox, 7 + oy), (16 + ox, 7 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (15 + ox, 10 + oy), (10 + ox, 10 + oy), (7 + ox, 11 + oy)],
+            "rib": [(10 + ox, 11 + oy), (15 + ox, 10 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (13 + ox, 12 + oy), (9 + ox, 12 + oy)],
+            "head": [(18 + ox, 9 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (19 + ox, 10 + oy), (18 + ox, 10 + oy)],
+            "jaw": [(17 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (16 + ox, 11 + oy)],
+            "front": [((14 + ox, 10 + oy), (17 + ox, 12 + oy)), ((17 + ox, 10 + oy), (19 + ox, 11 + oy))],
+            "hind": [((10 + ox, 12 + oy), (9 + ox, 15 + oy)), ((12 + ox, 12 + oy), (13 + ox, 15 + oy))],
+            "tail": [(7 + ox, 11 + oy), (5 + ox, 10 + oy), (4 + ox, 11 + oy)],
+            "back": [(12 + ox, 8 + oy), (16 + ox, 7 + oy), (19 + ox, 8 + oy)],
+            "eyes": [(18 + ox, 9 + oy)],
+        },
+        "hunt_pounce_4": {
+            "shoulder": [(9 + ox, 10 + oy), (13 + ox, 7 + oy), (17 + ox, 7 + oy), (19 + ox, 8 + oy), (18 + ox, 10 + oy), (14 + ox, 11 + oy), (10 + ox, 11 + oy), (8 + ox, 11 + oy)],
+            "rib": [(11 + ox, 11 + oy), (16 + ox, 10 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (14 + ox, 12 + oy), (10 + ox, 12 + oy)],
+            "head": [(16 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (16 + ox, 11 + oy)],
+            "jaw": [(16 + ox, 11 + oy), (18 + ox, 10 + oy), (17 + ox, 12 + oy), (15 + ox, 12 + oy)],
+            "front": [((11 + ox, 12 + oy), (10 + ox, 15 + oy)), ((14 + ox, 11 + oy), (15 + ox, 15 + oy))],
+            "hind": [((11 + ox, 12 + oy), (12 + ox, 15 + oy)), ((13 + ox, 12 + oy), (15 + ox, 14 + oy))],
+            "tail": [(8 + ox, 11 + oy), (10 + ox, 10 + oy), (12 + ox, 11 + oy)],
+            "back": [(13 + ox, 8 + oy), (17 + ox, 7 + oy), (18 + ox, 8 + oy)],
+            "eyes": [(17 + ox, 10 + oy)],
+        },
+        "recovery_1": {
+            "shoulder": [(9 + ox, 10 + oy), (13 + ox, 8 + oy), (17 + ox, 8 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (14 + ox, 12 + oy), (10 + ox, 12 + oy), (8 + ox, 11 + oy)],
+            "rib": [(11 + ox, 11 + oy), (16 + ox, 10 + oy), (19 + ox, 10 + oy), (18 + ox, 12 + oy), (14 + ox, 13 + oy), (10 + ox, 13 + oy)],
+            "head": [(17 + ox, 9 + oy), (19 + ox, 8 + oy), (19 + ox, 9 + oy), (19 + ox, 10 + oy), (17 + ox, 10 + oy)],
+            "jaw": [(17 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (16 + ox, 11 + oy)],
+            "front": [((12 + ox, 12 + oy), (11 + ox, 15 + oy)), ((15 + ox, 12 + oy), (16 + ox, 15 + oy))],
+            "hind": [((10 + ox, 12 + oy), (9 + ox, 15 + oy)), ((13 + ox, 12 + oy), (14 + ox, 15 + oy))],
+            "tail": [(9 + ox, 11 + oy), (7 + ox, 10 + oy), (5 + ox, 11 + oy)],
+            "back": [(13 + ox, 9 + oy), (17 + ox, 8 + oy), (19 + ox, 9 + oy)],
+            "eyes": [(17 + ox, 9 + oy)],
+        },
+        "recovery_2": {
+            "shoulder": [(8 + ox, 10 + oy), (12 + ox, 8 + oy), (16 + ox, 8 + oy), (18 + ox, 9 + oy), (18 + ox, 11 + oy), (14 + ox, 12 + oy), (10 + ox, 12 + oy), (8 + ox, 11 + oy)],
+            "rib": [(10 + ox, 11 + oy), (15 + ox, 10 + oy), (18 + ox, 10 + oy), (17 + ox, 12 + oy), (13 + ox, 13 + oy), (9 + ox, 13 + oy)],
+            "head": [(16 + ox, 9 + oy), (18 + ox, 8 + oy), (19 + ox, 9 + oy), (18 + ox, 10 + oy), (16 + ox, 10 + oy)],
+            "jaw": [(16 + ox, 10 + oy), (19 + ox, 9 + oy), (18 + ox, 11 + oy), (15 + ox, 11 + oy)],
+            "front": [((11 + ox, 12 + oy), (10 + ox, 15 + oy)), ((14 + ox, 12 + oy), (15 + ox, 15 + oy))],
+            "hind": [((9 + ox, 12 + oy), (8 + ox, 15 + oy)), ((12 + ox, 12 + oy), (13 + ox, 15 + oy))],
+            "tail": [(8 + ox, 11 + oy), (6 + ox, 10 + oy), (4 + ox, 11 + oy)],
+            "back": [(12 + ox, 9 + oy), (16 + ox, 8 + oy), (18 + ox, 9 + oy)],
+            "eyes": [(16 + ox, 9 + oy)],
+        },
+        "recovery_3": {
+            "shoulder": [(7 + ox, 11 + oy), (10 + ox, 9 + oy), (14 + ox, 9 + oy), (16 + ox, 10 + oy), (15 + ox, 12 + oy), (11 + ox, 13 + oy), (8 + ox, 13 + oy), (6 + ox, 12 + oy)],
+            "rib": [(8 + ox, 12 + oy), (12 + ox, 11 + oy), (16 + ox, 11 + oy), (15 + ox, 13 + oy), (10 + ox, 14 + oy), (7 + ox, 14 + oy)],
+            "head": [(14 + ox, 10 + oy), (17 + ox, 9 + oy), (18 + ox, 10 + oy), (17 + ox, 12 + oy), (14 + ox, 12 + oy)],
+            "jaw": [(15 + ox, 11 + oy), (18 + ox, 10 + oy), (17 + ox, 12 + oy), (14 + ox, 12 + oy)],
+            "front": [((9 + ox, 13 + oy), (8 + ox, 15 + oy)), ((12 + ox, 13 + oy), (13 + ox, 15 + oy))],
+            "hind": [((7 + ox, 13 + oy), (6 + ox, 15 + oy)), ((9 + ox, 13 + oy), (10 + ox, 15 + oy))],
+            "tail": [(6 + ox, 12 + oy), (4 + ox, 13 + oy), (3 + ox, 12 + oy)],
+            "back": [(10 + ox, 10 + oy), (14 + ox, 9 + oy), (17 + ox, 10 + oy)],
+            "eyes": [(16 + ox, 10 + oy)],
+        },
+        "recovery_4": {
+            "shoulder": [(7 + ox, 11 + oy), (10 + ox, 9 + oy), (14 + ox, 9 + oy), (16 + ox, 10 + oy), (15 + ox, 12 + oy), (11 + ox, 13 + oy), (8 + ox, 13 + oy), (6 + ox, 12 + oy)],
+            "rib": [(8 + ox, 12 + oy), (12 + ox, 11 + oy), (16 + ox, 11 + oy), (15 + ox, 13 + oy), (10 + ox, 14 + oy), (7 + ox, 14 + oy)],
+            "head": [(13 + ox, 10 + oy), (16 + ox, 9 + oy), (17 + ox, 10 + oy), (16 + ox, 12 + oy), (13 + ox, 12 + oy)],
+            "jaw": [(14 + ox, 11 + oy), (17 + ox, 10 + oy), (16 + ox, 12 + oy), (13 + ox, 12 + oy)],
+            "front": [((9 + ox, 13 + oy), (8 + ox, 15 + oy)), ((12 + ox, 13 + oy), (13 + ox, 15 + oy))],
+            "hind": [((7 + ox, 13 + oy), (6 + ox, 15 + oy)), ((9 + ox, 13 + oy), (10 + ox, 15 + oy))],
+            "tail": [(6 + ox, 12 + oy), (4 + ox, 13 + oy), (3 + ox, 12 + oy)],
+            "back": [(10 + ox, 10 + oy), (14 + ox, 9 + oy), (16 + ox, 10 + oy)],
+            "eyes": [(15 + ox, 10 + oy)],
+        },
+    }
+    shape = pose_shapes[pose_key]
+    _draw_prowler_pose_parts(
+        draw,
+        spec,
+        shape["shoulder"],
+        shape["rib"],
+        shape["head"],
+        shape["jaw"],
+        shape["front"],
+        shape["hind"],
+        shape["tail"],
+        hostile,
+        shape["eyes"],
+        shape["back"],
+    )
+
+
+def draw_replacement_prowler_comparison(
+    variant_specs: list[ProwlerVariantSpec],
+    comparison_path: Path,
+) -> None:
     background = _load_arena_background()
     draw = ImageDraw.Draw(background)
     font = ImageFont.load_default()
-    sequence_specs = build_prowler_animation_sequences()
 
-    _draw_label(draw, (8, 8), "Prowler Behavior Board", font)
-    _draw_label(draw, (8, 20), "Revised Moss Lynx states at native arena scale", font)
+    _draw_label(draw, (8, 8), "Prowler Candidate Comparison", font)
+    _draw_label(draw, (8, 20), "Stylized prowler variants at native gameplay scale on the live arena floor", font)
 
     benchmark_row = [
-        ("Akedra", ROOT / "art" / "sprites" / "player_hunter.png", (34, 92)),
-        ("Normal", ROOT / "art" / "sprites" / "enemy_creature.png", (80, 92)),
-        ("Shielded", ROOT / "art" / "sprites" / "shielded_enemy.png", (126, 92)),
-        ("Shooter", ROOT / "art" / "sprites" / "shooter_enemy.png", (172, 92)),
-        ("Boomer", ROOT / "art" / "sprites" / "boomer_enemy.png", (218, 92)),
-        ("Runner", ROOT / "art" / "sprites" / "heart_runner.png", (264, 92)),
-        ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (330, 92)),
+        ("Akedra", ROOT / "art" / "sprites" / "player_hunter.png", (32, 82)),
+        ("Normal", ROOT / "art" / "sprites" / "enemy_creature.png", (78, 82)),
+        ("Heart Runner", ROOT / "art" / "sprites" / "heart_runner.png", (126, 82)),
+        ("Shooter", ROOT / "art" / "sprites" / "shooter_enemy.png", (176, 82)),
+        ("Shielded", ROOT / "art" / "sprites" / "shielded_enemy.png", (228, 82)),
+        ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (334, 82)),
+    ]
+    for label, sprite_path, feet_position in benchmark_row:
+        _paste_grounded_sprite(background, sprite_path, feet_position)
+        _draw_label(draw, (feet_position[0] - 18, feet_position[1] + 4), label, font)
+
+    column_centers = [82, 192, 302]
+    row_positions = [
+        ("stalk", "stalk", 110),
+        ("alert", "alert", 136),
+        ("hunt", "hunt", 162),
+        ("def", "defensive", 188),
+    ]
+    for index, spec in enumerate(variant_specs):
+        display_title = {
+            "Bonejaw Prowler": "Bonejaw",
+            "Bristlemane Prowler": "Bristlemane",
+            "Hollow Hound": "Hollow",
+        }.get(spec.title, spec.title.replace(" Prowler", ""))
+        _draw_label(draw, (column_centers[index] - 28, 96), display_title, font)
+        for row_label, pose_key, y in row_positions:
+            preview = _render_prowler_candidate_pose(spec, pose_key)
+            background.alpha_composite(preview, (column_centers[index] - preview.width // 2, y - preview.height))
+            _draw_label(draw, (column_centers[index] - 18, y), row_label, font)
+
+    comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    background.save(comparison_path)
+
+
+def draw_replacement_prowler_behavior_board(board_path: Path) -> None:
+    background = _load_arena_background()
+    draw = ImageDraw.Draw(background)
+    font = ImageFont.load_default()
+
+    _draw_label(draw, (8, 8), "Prowler Behavior Board", font)
+    _draw_label(draw, (8, 20), "Selected Bonejaw Prowler animation groups at native arena scale", font)
+
+    benchmark_row = [
+        ("Akedra", ROOT / "art" / "sprites" / "player_hunter.png", (34, 82)),
+        ("Normal", ROOT / "art" / "sprites" / "enemy_creature.png", (86, 82)),
+        ("Shielded", ROOT / "art" / "sprites" / "shielded_enemy.png", (138, 82)),
+        ("Boomer", ROOT / "art" / "sprites" / "boomer_enemy.png", (190, 82)),
+        ("Runner", ROOT / "art" / "sprites" / "heart_runner.png", (242, 82)),
+        ("Charger", ROOT / "art" / "sprites" / "charger_beast.png", (332, 82)),
     ]
     for label, sprite_path, feet_position in benchmark_row:
         _paste_grounded_sprite(background, sprite_path, feet_position)
         _draw_label(draw, (feet_position[0] - 16, feet_position[1] + 4), label, font)
 
-    state_keys = ["stalk", "alert", "hunt", "pounce", "recovery"]
-    state_frames = [1, 3, 1, 2, 2]
-    state_positions = [18, 90, 162, 234, 306]
-    for index, sequence_key in enumerate(state_keys):
-        frame_image = _scale_image_nearest_integer(
-            _render_prowler_animation_frame(sequence_key, state_frames[index]),
-            3,
-        )
-        background.alpha_composite(frame_image, (state_positions[index], 136))
-        _draw_label(draw, (state_positions[index] - 2, 126), sequence_specs[sequence_key]["title"], font)
-        _draw_label(draw, (state_positions[index] - 12, 188), sequence_specs[sequence_key]["description"], font)
+    sequence_specs = [
+        ("Stalk", "stalk", 1, (8, 112)),
+        ("Def Windup", "defensive", 0, (100, 112)),
+        ("Def Pounce", "defensive", 3, (192, 112)),
+        ("Alert", "alert", 3, (284, 112)),
+        ("Hunt", "hunt", 1, (8, 166)),
+        ("Hunt Leap", "hunt_pounce", 1, (100, 166)),
+        ("Impact", "hunt_pounce", 2, (192, 166)),
+        ("Miss/Stun", "recovery", 3, (284, 166)),
+    ]
+    for title, sequence_key, frame_index, position in sequence_specs:
+        frame_image = _scale_image_nearest_integer(_render_selected_prowler_frame(sequence_key, frame_index), 2)
+        background.alpha_composite(frame_image, position)
+        _draw_label(draw, (position[0], position[1] - 10), title, font)
 
     board_path.parent.mkdir(parents=True, exist_ok=True)
     background.save(board_path)

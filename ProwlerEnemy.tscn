@@ -14,15 +14,15 @@ score_value = 2
 body_radius = 7.0
 separation_distance = 20.0
 separation_strength = 50.0
-body_color = Color(0.337255, 0.34902, 0.262745, 1)
-hit_flash_color = Color(0.933333, 0.905882, 0.717647, 1)
-death_particle_color = Color(0.658824, 0.631373, 0.462745, 1)
+body_color = Color(0.321569, 0.345098, 0.298039, 1)
+hit_flash_color = Color(0.945098, 0.909804, 0.792157, 1)
+death_particle_color = Color(0.796078, 0.74902, 0.615686, 1)
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture_filter = 1
 texture = ExtResource("2")
 hframes = 4
-vframes = 5
+vframes = 6
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("1")

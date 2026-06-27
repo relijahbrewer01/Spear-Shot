@@ -6,7 +6,7 @@ spawn_timer_wait_time=2.2
 spawn_timer_one_shot=true
 spawn_timer_autostart=false
 spawn_timer_is_stopped_initial=false
-spawn_timer_time_left_initial=2.03339933333333
+spawn_timer_time_left_initial=2.02248866666667
 spawn_timer_connected_to_main=true
 hud_mouse_filter TimeLabel=2 focus_mode=0
 hud_mouse_filter ScoreLabel=2 focus_mode=0
@@ -20,13 +20,13 @@ scene_instantiated=res://Charger.tscn node=Charger
 play_rect=[P: (16.0, 16.0), S: (352.0, 184.0)]
 spawn_timeout_count_after_2_6s=1
 enemy_count_after_2_6s=1
-after_2_6s_positions=Enemy pos=(47.71088, 130.7028) inside_play_rect=true
+after_2_6s_positions=Enemy pos=(241.1287, 172.875) inside_play_rect=true
 spawn_timeout_count_after_5_2s=2
 enemy_count_after_5_2s=2
-after_5_2s_positions=Enemy pos=(156.2058, 113.6319) inside_play_rect=true | @CharacterBody2D@10 pos=(241.5979, 54.63537) inside_play_rect=true
+after_5_2s_positions=Enemy pos=(191.8246, 107.7684) inside_play_rect=true | @CharacterBody2D@10 pos=(89.08842, 170.338) inside_play_rect=true
 enemy_count_before_manual_spawn=2
 enemy_count_after_manual_spawn=3
-after_manual_spawn_positions=Enemy pos=(156.2058, 113.6319) inside_play_rect=true | @CharacterBody2D@10 pos=(241.5979, 54.63537) inside_play_rect=true | @CharacterBody2D@11 pos=(128.2314, 192.0) inside_play_rect=true
-enemy_child_entered_tree=Enemy pos=(24.0, 134.4338) visible=true
-enemy_child_entered_tree=@CharacterBody2D@10 pos=(270.0709, 24.0) visible=true
-enemy_child_entered_tree=@CharacterBody2D@11 pos=(128.2314, 192.0) visible=true
+after_manual_spawn_positions=Enemy pos=(192.2496, 108.3296) inside_play_rect=true | @CharacterBody2D@10 pos=(89.69403, 169.9712) inside_play_rect=true | @CharacterBody2D@11 pos=(128.1516, 191.3947) inside_play_rect=true
+enemy_child_entered_tree=Enemy pos=(255.6117, 192.0) visible=true
+enemy_child_entered_tree=@CharacterBody2D@10 pos=(53.32798, 192.0) visible=true
+enemy_child_entered_tree=@CharacterBody2D@11 pos=(127.6881, 192.0) visible=true

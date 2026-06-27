@@ -42,7 +42,7 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Spear throw, dodge, and player hurt sounds now use independent three-clip non-repeating pools driven by a dedicated audio random source that does not alter gameplay randomness.
 - Legitimate landed-spear recovery now plays one dedicated ready cue after the spear is held again, including overlap-safe forced landings that use the same pickup authority.
 - A second locally generated calm hunter loop alternates deterministically with the original whenever a fresh run begins through restart.
-- This is a bounded polish interlude and does not replace, renumber, or expand the next Phase 4.5 enemy-development work.
+- This bounded polish interlude sits before the implemented Phase 4.5 enemy work and does not renumber or broaden the later interaction pass.
 
 ## Phase 4.5 Prowler
 
@@ -50,6 +50,7 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - While Akedra holds the spear, the Prowler stays in a cautious stalking band with restrained lateral movement and uses a short defensive pass-through pounce only when Akedra crowds its personal space.
 - While the spear is `FLYING` or `LANDED`, it gives one longer red-eye alert and then switches into a faster direct hunt until the spear is legitimately recovered.
 - Each unarmed cycle grants exactly one committed hunting pounce attempt; a valid hit knocks Akedra back through the existing player authority, while a dodge or invulnerability rejection leads to a brief punishable skid/stun window.
+- The approved presentation now uses the selected `Bonejaw Prowler` visual direction on a roomier `20x18` frame with a `4x6` live sheet, a hooked pale jaw silhouette, and separate hostile-alert, defensive-launch, and hunting-impact Prowler audio responsibilities.
 - Prowler dies to one valid thrown-spear hit for `2` points, uses ordinary contact damage, has a dedicated active cap of `1`, and has no authored-wave membership in this phase.
 - Its first organic appearance reuses the existing randomized intro-target plus persistent overdue-guarantee system rather than adding a new spawn framework.
 - Phase 4.5 deliberately excludes landed-spear theft, ranged behavior, squad logic, and all broader interaction work reserved for Phase 4.6.

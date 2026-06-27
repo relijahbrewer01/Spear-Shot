@@ -113,6 +113,7 @@ def main() -> int:
         "outer_shockwave_radius",
         "landed_spear_shockwave_displacement",
         "unarmed_alert_delay",
+        "alert_voice_delay",
         "stalk_speed_scale",
         "hunt_speed_scale",
         "stalk_distance_min",
@@ -178,7 +179,7 @@ def main() -> int:
         "`hunt_prowler_recoil_distance/duration` | `26.0px / 0.16s`",
         "`hunt_hit_stop_duration` | `0.06s`",
         "`miss_stun_duration` | `0.42s`",
-        "Live animation sheet layout | `4x5` frames on `64x80px`",
+        "Live animation sheet layout | `4x6` frames on `80x108px`",
         "`heart_runner_unlock_time` | `20.0s`",
         "`heart_runner_roll_interval_min/max` | `8.0-12.0s`",
         "`heart_runner_health_3_spawn_chance` | `0.01`",
@@ -206,9 +207,12 @@ def main() -> int:
     require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
     require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)
     require("## Phase 4 Interlude 1 — Input & Audio Polish" in roadmap, "ROADMAP documents the bounded input/audio interlude", failures)
-    require("Phase 4.5" in roadmap and "does not replace" in roadmap, "ROADMAP keeps Phase 4.5 reserved for enemy development", failures)
+    require("Phase 4.5" in roadmap and "does not renumber" in roadmap, "ROADMAP keeps the interlude bounded without redefining Phase 4.5", failures)
     require("quiet_hunter_loop_02.wav" in readme and "dedicated `audio_rng`" in tuning, "README and TUNING document the new local audio behavior", failures)
     require("spear_recover.wav" in readme and "legitimate landed-spear recovery" in roadmap.lower(), "Input/audio docs include the recovery-only spear cue", failures)
+    require("Bonejaw Prowler" in readme and "Bonejaw Prowler" in tuning and "Bonejaw Prowler" in roadmap and "Marsh Hound" not in readme and "Marsh Hound" not in tuning and "Marsh Hound" not in roadmap, "Docs reflect the approved Bonejaw Prowler direction and drop the superseded Marsh Hound wording", failures)
+    require("audio/prowler_defensive_attack.wav" in readme and "audio/prowler_defensive_attack.wav" in tuning, "README and TUNING document the defensive Prowler launch cue", failures)
+    require("audio/dev/prowler_candidates" in readme, "README documents the kept Prowler audio candidate directory for the review pass", failures)
 
     if failures:
         print(f"\nTuning audit failed with {len(failures)} issue(s).")

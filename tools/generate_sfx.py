@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import random
 import wave
@@ -7,6 +8,7 @@ from pathlib import Path
 
 SAMPLE_RATE = 44100
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "audio"
+PROWLER_AUDIO_DEV_DIR = OUTPUT_DIR / "dev" / "prowler_candidates"
 TARGET_PEAK = 0.92
 
 
@@ -547,54 +549,231 @@ def generate_heart_runner_alarm() -> list[float]:
     return samples
 
 
-def generate_prowler_alert() -> list[float]:
-    length = int(SAMPLE_RATE * 0.34)
+def _generate_prowler_alert_variant(
+    seed: int,
+    duration: float,
+    growl_start: float,
+    growl_end: float,
+    throat_start: float,
+    throat_end: float,
+    jaw_pitch: float,
+    rasp_mix: float,
+    rattle_mix: float,
+) -> list[float]:
+    rng = random.Random(seed)
+    length = int(SAMPLE_RATE * duration)
     samples: list[float] = []
-    body_noise = 0.0
+    chest_noise = 0.0
+    previous_raw_noise = 0.0
     for index in range(length):
         progress = index / max(length - 1, 1)
-        raw_noise = random.random() * 2.0 - 1.0
-        body_noise = body_noise * 0.90 + raw_noise * 0.10
-        low_growl = math.sin(2.0 * math.pi * (132.0 - progress * 24.0) * index / SAMPLE_RATE)
-        throat_resonance = math.sin(2.0 * math.pi * (214.0 + progress * 32.0) * index / SAMPLE_RATE)
-        hiss_noise = (raw_noise - body_noise) * 0.22
-        pulse = math.exp(-((progress - 0.58) / 0.20) ** 2)
+        raw_noise = rng.random() * 2.0 - 1.0
+        chest_noise = chest_noise * 0.91 + raw_noise * 0.09
+        rasp_noise = raw_noise - chest_noise
+        spit_noise = raw_noise - previous_raw_noise
+        previous_raw_noise = raw_noise
+
+        instability = math.sin(progress * math.pi * 2.4) * 10.0
+        growl_frequency = growl_start + (growl_end - growl_start) * progress + instability
+        throat_frequency = throat_start + (throat_end - throat_start) * progress + instability * 0.48
+        undertone_frequency = growl_start * 0.62 - progress * 8.0
+        jaw_frequency = jaw_pitch - progress * 160.0
+        growl = math.sin(2.0 * math.pi * growl_frequency * index / SAMPLE_RATE)
+        throat = math.sin(2.0 * math.pi * throat_frequency * index / SAMPLE_RATE)
+        undertone = math.sin(2.0 * math.pi * undertone_frequency * index / SAMPLE_RATE)
+        jaw_clack = math.sin(2.0 * math.pi * jaw_frequency * index / SAMPLE_RATE)
+        body_curve = math.exp(-((progress - 0.38) / 0.20) ** 2)
+        rasp_curve = math.exp(-((progress - 0.56) / 0.15) ** 2)
+        jaw_curve = math.exp(-((progress - 0.18) / 0.05) ** 2) + math.exp(-((progress - 0.33) / 0.06) ** 2)
         samples.append(
             (
-                low_growl * 0.34
-                + throat_resonance * 0.18 * (0.35 + pulse)
-                + body_noise * 0.24 * (0.45 + pulse)
-                + hiss_noise
+                growl * 0.42
+                + throat * 0.22 * (0.45 + body_curve)
+                + undertone * 0.18 * (1.0 - progress * 0.30)
+                + chest_noise * 0.22 * (0.50 + body_curve)
+                + rasp_noise * rasp_mix * (0.30 + rasp_curve)
+                + jaw_clack * rattle_mix * jaw_curve
+                + spit_noise * 0.10 * jaw_curve
             )
-            * envelope(progress, 0.03, 0.20)
+            * envelope(progress, 0.02, 0.20)
         )
     return samples
 
 
-def generate_prowler_pounce_hit() -> list[float]:
-    length = int(SAMPLE_RATE * 0.13)
+def _generate_prowler_defensive_variant(
+    seed: int,
+    duration: float,
+    reed_start: float,
+    reed_end: float,
+    jaw_pitch: float,
+    hiss_mix: float,
+    click_mix: float,
+) -> list[float]:
+    rng = random.Random(seed)
+    length = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    body_noise = 0.0
+    previous_raw_noise = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = rng.random() * 2.0 - 1.0
+        body_noise = body_noise * 0.84 + raw_noise * 0.16
+        airy_hiss = raw_noise - body_noise
+        click_noise = raw_noise - previous_raw_noise
+        previous_raw_noise = raw_noise
+
+        reed_frequency = reed_start + (reed_end - reed_start) * progress
+        jaw_frequency = jaw_pitch - progress * 180.0
+        undertone_frequency = 152.0 + progress * 24.0
+        reed_whip = math.sin(2.0 * math.pi * reed_frequency * index / SAMPLE_RATE)
+        jaw_snap = math.sin(2.0 * math.pi * jaw_frequency * index / SAMPLE_RATE)
+        undertone = math.sin(2.0 * math.pi * undertone_frequency * index / SAMPLE_RATE)
+        windup_curve = math.exp(-((progress - 0.20) / 0.12) ** 2)
+        release_curve = math.exp(-((progress - 0.54) / 0.14) ** 2)
+        samples.append(
+            (
+                reed_whip * 0.28 * (0.55 + windup_curve)
+                + jaw_snap * click_mix * release_curve
+                + undertone * 0.18
+                + body_noise * 0.16 * (0.35 + windup_curve)
+                + airy_hiss * hiss_mix * (0.25 + release_curve)
+                + click_noise * 0.12 * release_curve
+            )
+            * envelope(progress, 0.01, 0.26)
+        )
+    return samples
+
+
+def _generate_prowler_impact_variant(
+    seed: int,
+    duration: float,
+    thud_pitch: float,
+    crack_pitch: float,
+    jaw_mix: float,
+    body_mix: float,
+) -> list[float]:
+    rng = random.Random(seed)
+    length = int(SAMPLE_RATE * duration)
     samples: list[float] = []
     body_resonance = 0.0
     previous_noise = 0.0
     for index in range(length):
         progress = index / max(length - 1, 1)
-        raw_noise = random.random() * 2.0 - 1.0
+        raw_noise = rng.random() * 2.0 - 1.0
         snap_noise = raw_noise - previous_noise
         previous_noise = raw_noise
-        body_resonance = body_resonance * 0.84 + raw_noise * 0.16
-        bite_click = math.sin(2.0 * math.pi * (520.0 - progress * 160.0) * index / SAMPLE_RATE)
-        body_thump = math.sin(2.0 * math.pi * (148.0 - progress * 20.0) * index / SAMPLE_RATE)
-        hit_curve = math.exp(-progress * 9.0)
+        body_resonance = body_resonance * 0.82 + raw_noise * 0.18
+        bite_click = math.sin(2.0 * math.pi * (crack_pitch - progress * 180.0) * index / SAMPLE_RATE)
+        body_thump = math.sin(2.0 * math.pi * (thud_pitch - progress * 24.0) * index / SAMPLE_RATE)
+        rebound = math.sin(2.0 * math.pi * 228.0 * index / SAMPLE_RATE)
+        impact_curve = math.exp(-progress * 8.5)
+        crack_curve = math.exp(-((progress - 0.10) / 0.08) ** 2)
         samples.append(
             (
-                bite_click * 0.26 * hit_curve
-                + body_thump * 0.40 * hit_curve
-                + body_resonance * 0.24 * hit_curve
-                + snap_noise * 0.22 * hit_curve
+                bite_click * jaw_mix * crack_curve
+                + body_thump * body_mix * impact_curve
+                + rebound * 0.16 * impact_curve
+                + body_resonance * 0.22 * impact_curve
+                + snap_noise * 0.18 * crack_curve
             )
-            * envelope(progress, 0.006, 0.60)
+            * envelope(progress, 0.006, 0.56)
         )
     return samples
+
+
+def build_prowler_audio_candidate_specs() -> dict[str, list[dict[str, object]]]:
+    return {
+        "alert": [
+            {
+                "key": "1",
+                "title": "Jaw-Rattle Bark",
+                "file_name": "prowler_alert_candidate_1.wav",
+                "selected": False,
+                "description": "Short territorial bark with a clear bone-jaw chatter on the front edge.",
+                "samples": _generate_prowler_alert_variant(4511, 0.33, 154.0, 118.0, 294.0, 238.0, 780.0, 0.16, 0.14),
+            },
+            {
+                "key": "2",
+                "title": "Bone-Throat Snarl",
+                "file_name": "prowler_alert_candidate_2.wav",
+                "selected": True,
+                "description": "Deeper chesty snarl with a stronger rattling jaw accent; selected for the live Bonejaw identity.",
+                "samples": _generate_prowler_alert_variant(4512, 0.37, 146.0, 110.0, 276.0, 220.0, 720.0, 0.20, 0.18),
+            },
+            {
+                "key": "3",
+                "title": "Hollow Warning Yip",
+                "file_name": "prowler_alert_candidate_3.wav",
+                "selected": False,
+                "description": "Sharper nasal warning call with less weight and a slightly more feral yip-like top end.",
+                "samples": _generate_prowler_alert_variant(4513, 0.31, 168.0, 132.0, 314.0, 252.0, 860.0, 0.18, 0.12),
+            },
+        ],
+        "defensive": [
+            {
+                "key": "1",
+                "title": "Bone-Click Burst",
+                "file_name": "prowler_defensive_candidate_1.wav",
+                "selected": True,
+                "description": "Fast reed-swipe launch with a compact jaw click; selected for the live defensive pounce.",
+                "samples": _generate_prowler_defensive_variant(4521, 0.17, 286.0, 214.0, 760.0, 0.20, 0.24),
+            },
+            {
+                "key": "2",
+                "title": "Reed Lash Lunge",
+                "file_name": "prowler_defensive_candidate_2.wav",
+                "selected": False,
+                "description": "Airier lash-forward cue with more hiss and less bony snap.",
+                "samples": _generate_prowler_defensive_variant(4522, 0.18, 314.0, 238.0, 708.0, 0.26, 0.18),
+            },
+            {
+                "key": "3",
+                "title": "Jaw-Rasp Feint",
+                "file_name": "prowler_defensive_candidate_3.wav",
+                "selected": False,
+                "description": "More abrasive jaw-rasp burst that reads mean but slightly noisier than the chosen live cue.",
+                "samples": _generate_prowler_defensive_variant(4523, 0.16, 274.0, 202.0, 816.0, 0.22, 0.26),
+            },
+        ],
+        "impact": [
+            {
+                "key": "1",
+                "title": "Bone Plate Thud",
+                "file_name": "prowler_impact_candidate_1.wav",
+                "selected": True,
+                "description": "Physical jaw-and-shoulder body hit with a concise bone click; selected for the live hunting impact.",
+                "samples": _generate_prowler_impact_variant(4531, 0.12, 146.0, 540.0, 0.24, 0.42),
+            },
+            {
+                "key": "2",
+                "title": "Jaw Crack Snap",
+                "file_name": "prowler_impact_candidate_2.wav",
+                "selected": False,
+                "description": "Sharper contact crack with less body weight and more top-end snap.",
+                "samples": _generate_prowler_impact_variant(4532, 0.11, 154.0, 618.0, 0.30, 0.34),
+            },
+            {
+                "key": "3",
+                "title": "Shoulder Slam",
+                "file_name": "prowler_impact_candidate_3.wav",
+                "selected": False,
+                "description": "Heavier bodily slam with less bone articulation and a duller landing read.",
+                "samples": _generate_prowler_impact_variant(4533, 0.14, 132.0, 486.0, 0.18, 0.48),
+            },
+        ],
+    }
+
+
+def generate_prowler_alert() -> list[float]:
+    return list(build_prowler_audio_candidate_specs()["alert"][1]["samples"])
+
+
+def generate_prowler_defensive_attack() -> list[float]:
+    return list(build_prowler_audio_candidate_specs()["defensive"][0]["samples"])
+
+
+def generate_prowler_pounce_hit() -> list[float]:
+    return list(build_prowler_audio_candidate_specs()["impact"][0]["samples"])
 
 
 def generate_heart_pickup_spawn() -> list[float]:
@@ -637,6 +816,7 @@ def generate_heart_pickup_expire() -> list[float]:
 
 def main() -> None:
     random.seed(42)
+    prowler_audio_candidates = build_prowler_audio_candidate_specs()
     sounds = {
         "throw.wav": generate_throw(),
         "enemy_hit.wav": generate_hit(),
@@ -655,6 +835,7 @@ def main() -> None:
         "boomer_fuse.wav": generate_boomer_fuse(),
         "boomer_explosion.wav": generate_boomer_explosion(),
         "prowler_alert.wav": generate_prowler_alert(),
+        "prowler_defensive_attack.wav": generate_prowler_defensive_attack(),
         "prowler_pounce_hit.wav": generate_prowler_pounce_hit(),
         "heart_runner_appear.wav": generate_heart_runner_appear(),
         "heart_pickup_spawn.wav": generate_heart_pickup_spawn(),
@@ -675,6 +856,35 @@ def main() -> None:
     )
     for filename, samples in sounds.items():
         write_wav(OUTPUT_DIR / filename, samples)
+
+    prowler_audio_manifest: dict[str, object] = {
+        "directory": str(PROWLER_AUDIO_DEV_DIR),
+        "selected": {},
+        "candidates": {},
+    }
+    for category, entries in prowler_audio_candidates.items():
+        manifest_entries: list[dict[str, object]] = []
+        for entry in entries:
+            file_name = str(entry["file_name"])
+            samples = list(entry["samples"])
+            write_wav(PROWLER_AUDIO_DEV_DIR / file_name, samples)
+            manifest_entry = {
+                "key": entry["key"],
+                "title": entry["title"],
+                "file_name": file_name,
+                "selected": bool(entry["selected"]),
+                "description": entry["description"],
+                "duration_seconds": round(len(samples) / SAMPLE_RATE, 3),
+            }
+            manifest_entries.append(manifest_entry)
+            if bool(entry["selected"]):
+                prowler_audio_manifest["selected"][category] = manifest_entry
+        prowler_audio_manifest["candidates"][category] = manifest_entries
+
+    (PROWLER_AUDIO_DEV_DIR / "prowler_audio_manifest.json").write_text(
+        json.dumps(prowler_audio_manifest, indent=2),
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":

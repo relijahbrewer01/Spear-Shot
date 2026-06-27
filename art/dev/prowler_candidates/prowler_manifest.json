@@ -3,113 +3,156 @@
   "behavior_board_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_behavior_board.png",
   "active_reference_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\prowler_enemy.png",
   "active_sheet_path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\sprites\\prowler_enemy_sheet.png",
-  "selected_concept": "Moss Lynx",
+  "selected_concept": "Bonejaw Prowler",
+  "signature_motif": "Hooked pale jaw plate under a low shoulder wedge, with a dry mane ridge that stays readable in both stalking and hunting poses.",
+  "selected_reasons": [
+    "keeps the prowler visually small while giving it a sharper, more authored identity than the generic marsh-hound pass",
+    "the hooked jaw reads instantly at native scale and stays distinct from Charger, Boomer, Heart Runner, and Akedra's spear",
+    "its low cautious crouch and forward hunting lean separate clearly without needing UI help or oversized effects",
+    "the compact body still supports the approved defensive and hunting pounce frames without looking boss-sized"
+  ],
+  "rejected_weaknesses": {
+    "Bristlemane Prowler": "Strong neck silhouette, but the heavier mane risks muddying the face read and makes the body feel more generic from a distance.",
+    "Hollow Hound": "Memorable skull-mask head, but it leans too eerie and airy compared with the grounded physical combat roster."
+  },
+  "frame_size": [
+    20,
+    18
+  ],
+  "sheet_layout": [
+    4,
+    6
+  ],
   "candidates": [
     {
       "key": "1",
-      "title": "Hookjaw",
+      "title": "Bonejaw Prowler",
       "file_name": "prowler_variant_1.png",
-      "palette_summary": "dry peat body, pale hooked muzzle, muted sage tail accent",
-      "silhouette_summary": "A low reptile-jackal shape with a hooked snout, narrow forequarters, and a long tail drag.",
+      "palette_summary": "peat-black hide, dry reed mane, pale hooked jaw plate, hot ember eye",
+      "silhouette_summary": "Low shoulder wedge, heavy pale jaw hook, and the clearest stylized predator read without growing beyond the approved gameplay footprint.",
+      "signature_motif": "Oversized hooked lower jaw plate that hangs below the snout like scavenged bone armor.",
+      "weakness_summary": "Most readable overall, but it gives up some of Variant B's mane flair to keep the body mass compact and gameplay-legible.",
       "body_color": [
-        92,
-        82,
-        60,
+        43,
+        40,
+        35,
         255
       ],
-      "accent_color": [
-        138,
-        151,
+      "midtone_color": [
+        108,
         101,
+        76,
+        255
+      ],
+      "bone_color": [
+        214,
+        201,
+        164,
         255
       ],
       "eye_color": [
-        226,
-        212,
-        166,
+        246,
+        70,
+        58,
         255
       ],
       "shadow_color": [
-        44,
-        39,
-        30,
+        21,
+        20,
+        18,
         255
       ],
-      "canvas_width": 16,
-      "canvas_height": 16,
-      "apparent_body_width": 14,
-      "apparent_body_height": 10,
+      "canvas_width": 20,
+      "canvas_height": 18,
+      "apparent_body_width": 19,
+      "apparent_body_height": 13,
       "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_variant_1.png"
     },
     {
       "key": "2",
-      "title": "Moss Lynx",
+      "title": "Bristlemane Prowler",
       "file_name": "prowler_variant_2.png",
-      "palette_summary": "moss-dark back, pale bone muzzle, charcoal legs, muted ochre eye",
-      "silhouette_summary": "A compact low cat-jackal stalker with a shoulder hump, clear head separation, and a narrow trailing tail.",
+      "palette_summary": "charred bark hide, thorn-bristle mane, muted bone muzzle, blood-red hostile eye",
+      "silhouette_summary": "A reed-backed skirmisher with the strongest mane profile and the roughest wild-dog outline of the three candidates.",
+      "signature_motif": "Tall bristled mane ridge that makes the cautious crouch and aggressive lean easy to separate.",
+      "weakness_summary": "The mane reads well, but the head becomes slightly more generic from a distance and the body risks blending into dark ground tiles.",
       "body_color": [
-        78,
-        89,
-        64,
+        45,
+        39,
+        34,
         255
       ],
-      "accent_color": [
-        194,
-        180,
-        136,
+      "midtone_color": [
+        124,
+        111,
+        73,
+        255
+      ],
+      "bone_color": [
+        192,
+        182,
+        146,
         255
       ],
       "eye_color": [
-        235,
-        214,
-        150,
+        240,
+        68,
+        56,
         255
       ],
       "shadow_color": [
-        37,
-        34,
-        29,
+        23,
+        19,
+        18,
         255
       ],
-      "canvas_width": 16,
-      "canvas_height": 16,
-      "apparent_body_width": 14,
-      "apparent_body_height": 10,
+      "canvas_width": 20,
+      "canvas_height": 18,
+      "apparent_body_width": 18,
+      "apparent_body_height": 14,
       "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_variant_2.png"
     },
     {
       "key": "3",
-      "title": "Spineback",
+      "title": "Hollow Hound",
       "file_name": "prowler_variant_3.png",
-      "palette_summary": "dark bark body, dusty olive back-spines, pale eye stripe",
-      "silhouette_summary": "A flatter feral runner with a sharp back ridge, longer body, and a distinctly rear-weighted sprint shape.",
+      "palette_summary": "cold charcoal hide, hollow bone mask, dusty sage back plane, ember socket eye",
+      "silhouette_summary": "A gaunter skull-faced tracker with the eeriest head read and the narrowest ribcage of the three.",
+      "signature_motif": "Bone mask head with a hollow socket cut and tucked, almost carrion-bird neck posture.",
+      "weakness_summary": "Memorable face silhouette, but it drifts a little too spectral compared with the grounded physicality of the selected live direction.",
       "body_color": [
-        83,
-        72,
-        54,
+        49,
+        44,
+        40,
         255
       ],
-      "accent_color": [
-        124,
-        136,
+      "midtone_color": [
+        89,
         92,
+        74,
+        255
+      ],
+      "bone_color": [
+        206,
+        193,
+        160,
         255
       ],
       "eye_color": [
-        216,
-        205,
-        162,
+        236,
+        74,
+        60,
         255
       ],
       "shadow_color": [
-        33,
-        29,
-        24,
+        20,
+        18,
+        19,
         255
       ],
-      "canvas_width": 16,
-      "canvas_height": 16,
-      "apparent_body_width": 13,
+      "canvas_width": 20,
+      "canvas_height": 18,
+      "apparent_body_width": 18,
       "apparent_body_height": 12,
       "path": "C:\\Users\\Elijah\\Documents\\Spear Shot\\art\\dev\\prowler_candidates\\prowler_variant_3.png"
     }

@@ -30,6 +30,7 @@ const AUDIO_PATHS := [
 	"res://audio/boomer_fuse.wav",
 	"res://audio/boomer_explosion.wav",
 	"res://audio/prowler_alert.wav",
+	"res://audio/prowler_defensive_attack.wav",
 	"res://audio/prowler_pounce_hit.wav",
 	"res://audio/heart_runner_appear.wav",
 	"res://audio/heart_runner_alarm.wav",
@@ -122,8 +123,8 @@ func _audit_scene_sprite(scene_path: String, sprite_path: String, report_lines: 
 			instance.queue_free()
 			return 1
 	if scene_path == "res://ProwlerEnemy.tscn":
-		if sprite.hframes != 4 or sprite.vframes != 5:
-			push_error("AUDIT: Prowler sprite sheet is not configured for a 4x5 live animation layout")
+		if sprite.hframes != 4 or sprite.vframes != 6:
+			push_error("AUDIT: Prowler sprite sheet is not configured for a 4x6 live animation layout")
 			report_lines.append("FAILED Prowler sprite sheet layout")
 			instance.queue_free()
 			return 1
@@ -187,6 +188,7 @@ func _audit_main_scene_audio(report_lines: Array[String]) -> int:
 		"AudioPlayers/BoomerFusePlayer",
 		"AudioPlayers/BoomerExplosionPlayer",
 		"AudioPlayers/ProwlerAlertPlayer",
+		"AudioPlayers/ProwlerDefensiveAttackPlayer",
 		"AudioPlayers/ProwlerPounceHitPlayer",
 		"AudioPlayers/HeartRunnerAppearPlayer",
 		"AudioPlayers/HeartRunnerAlarmPlayer",

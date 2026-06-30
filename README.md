@@ -392,6 +392,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `shielded_hostile_cap`
   - `shooter_hostile_cap`
   - `boomer_hostile_cap`
+  - `prowler_hostile_cap`
   - `first_minute_charger_cap`
   - `spawn_retry_interval`
 - `scripts/shooter_enemy.gd`

@@ -17,6 +17,11 @@ const DEBUG_SHOOTER_SPAWN_ENABLED := true
 const DEBUG_BOOMER_SPAWN_ENABLED := true
 const DEBUG_PROWLER_SPAWN_ENABLED := true
 const DEBUG_HEART_RUNNER_SPAWN_ENABLED := true
+const FORMATION_BIAS_SEQUENCE: Array[int] = [
+	Enemy.FormationBias.DIRECT,
+	Enemy.FormationBias.LEFT_FLANK,
+	Enemy.FormationBias.RIGHT_FLANK,
+]
 const PLAYER_ACTION_THROW := &"throw"
 const PLAYER_ACTION_DODGE := &"dodge"
 const PLAYER_ACTION_HURT := &"hurt"
@@ -155,6 +160,8 @@ var debug_heart_runner_interval_sequence: Array = []
 var heart_runner_next_eligible_time := 0.0
 var heart_runner_one_health_active_time := 0.0
 var heart_runner_one_health_grace_due := false
+var formation_bias_assignment_index := 0
+var debug_formation_bias_assignment_index := 0
 var active_heart_runner: HeartRunner
 var active_heart_pickup: HeartPickup
 
@@ -266,6 +273,8 @@ func _reset_runtime_state() -> void:
 	_clear_buffered_spear_throw()
 	_cancel_hit_stop()
 	debug_reset_prowler_audio_metrics()
+	formation_bias_assignment_index = 0
+	debug_formation_bias_assignment_index = 0
 
 	for child in enemy_container.get_children():
 		child.queue_free()
@@ -431,6 +440,7 @@ func _try_spawn_enemy(
 		return false
 
 	enemy.setup(player, arena.get_play_rect(), _get_current_enemy_speed())
+	_assign_enemy_formation_bias(enemy, enemy_kind, spawn_source)
 	if enemy.has_method("set_tracked_spear"):
 		enemy.call("set_tracked_spear", spear)
 	enemy.global_position = spawn_position
@@ -757,6 +767,35 @@ func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 	if enemy_kind == EncounterDirector.EnemyKind.PROWLER:
 		return ProwlerScene
 	return EnemyScene
+
+
+func _assign_enemy_formation_bias(enemy: Enemy, enemy_kind: int, spawn_source: int) -> void:
+	if enemy == null:
+		return
+
+	var assigned_bias := Enemy.FormationBias.DIRECT
+	if _enemy_kind_uses_formation_bias(enemy_kind):
+		assigned_bias = _get_next_formation_bias(spawn_source == SpawnSource.DEBUG)
+
+	enemy.set_formation_bias(assigned_bias)
+
+
+func _enemy_kind_uses_formation_bias(enemy_kind: int) -> bool:
+	return (
+		enemy_kind == EncounterDirector.EnemyKind.NORMAL
+		or enemy_kind == EncounterDirector.EnemyKind.SHIELDED
+	)
+
+
+func _get_next_formation_bias(use_debug_sequence: bool = false) -> int:
+	var sequence_index := formation_bias_assignment_index
+	if use_debug_sequence:
+		sequence_index = debug_formation_bias_assignment_index
+		debug_formation_bias_assignment_index += 1
+	else:
+		formation_bias_assignment_index += 1
+
+	return FORMATION_BIAS_SEQUENCE[sequence_index % FORMATION_BIAS_SEQUENCE.size()]
 
 
 func _get_current_enemy_speed() -> float:

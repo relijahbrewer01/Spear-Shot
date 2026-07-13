@@ -10,6 +10,8 @@ radius = 8.0
 collision_layer = 2
 collision_mask = 12
 script = ExtResource("1")
+uses_formation_bias = true
+accepts_authored_hostile_displacement = true
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture_filter = 1

@@ -72,6 +72,8 @@ func _physics_process(delta: float) -> void:
 			_process_stagger(delta)
 		elif _process_explosion_knockback(delta):
 			pass
+		elif _process_authored_hostile_displacement(delta):
+			pass
 		else:
 			_process_alive_behavior(delta)
 
@@ -96,6 +98,7 @@ func _break_shield(
 		knockback_direction = Vector2.RIGHT
 
 	velocity = Vector2.ZERO
+	cancel_authored_hostile_displacement()
 	shield_broken.emit(hit_position)
 	queue_redraw()
 
@@ -131,6 +134,13 @@ func apply_explosion_knockback(direction: Vector2, distance: float, duration: fl
 		return
 
 	super.apply_explosion_knockback(direction, distance, duration)
+
+
+func can_accept_authored_hostile_displacement() -> bool:
+	if is_staggering() or knockback_time_left > 0.0:
+		return false
+
+	return super.can_accept_authored_hostile_displacement()
 
 
 func _try_contact_damage() -> void:

@@ -134,6 +134,9 @@
 | Collision radius | `8.0px` | `Enemy.tscn` | Physics shape size. |
 | `separation_distance` | `18.0px` | `scripts/enemy.gd` | Lightweight crowd spacing radius. |
 | `separation_strength` | `48.0` | `scripts/enemy.gd` | Lightweight crowd spacing force. |
+| `formation_bias_angle_degrees` | `18.0` | `scripts/enemy.gd` | Mild lifetime-stable left/right crowd-flow bias applied during ordinary Normal locomotion. |
+| `formation_direct_pressure_distance` | `28.0px` | `scripts/enemy.gd` | Close-range fallback where biased approach collapses back to direct pressure. |
+| `formation_wall_fallback_padding` | `8.0px` | `scripts/enemy.gd` | Arena-edge padding that disables the flank angle before it turns into sticky wall sliding. |
 
 ## Charger
 
@@ -165,6 +168,9 @@
 | Collision radius | `9.0px` | `ShieldedEnemy.tscn` | Physics shape size. |
 | `separation_distance` | `19.0px` | `ShieldedEnemy.tscn` | Shielded spacing radius. |
 | `separation_strength` | `56.0` | `ShieldedEnemy.tscn` | Shielded spacing force. |
+| `formation_bias_angle_degrees` | `18.0` | `scripts/enemy.gd`, `ShieldedEnemy.tscn` | Shared crowd-flow flank angle used only while Shielded is in ordinary locomotion. |
+| `formation_direct_pressure_distance` | `28.0px` | `scripts/enemy.gd`, `ShieldedEnemy.tscn` | Shared close-range fallback to direct pressure before the broad body reaches Akedra. |
+| `formation_wall_fallback_padding` | `8.0px` | `scripts/enemy.gd`, `ShieldedEnemy.tscn` | Shared wall-safety padding that suppresses flank bias near arena edges. |
 | `stopped_hit_landing_clearance` | `4.0px` | `scripts/spear.gd` | Spear lands on incoming side after shield stop. |
 | `shielded_hostile_cap` | `1` | `scripts/encounter_director.gd` | Dedicated active Shielded cap. |
 

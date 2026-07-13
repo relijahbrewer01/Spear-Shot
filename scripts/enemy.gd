@@ -13,11 +13,22 @@ enum HitResponse {
 	STOPPED,
 }
 
+enum FormationBias {
+	DIRECT,
+	LEFT_FLANK,
+	RIGHT_FLANK,
+}
+
 @export var move_speed := 42.0
 @export var score_value := 1
 @export var body_radius := 8.0
 @export var separation_distance := 18.0
 @export var separation_strength := 48.0
+@export var uses_formation_bias := false
+@export var formation_bias_angle_degrees := 18.0
+@export var formation_direct_pressure_distance := 28.0
+@export var formation_wall_fallback_padding := 8.0
+@export var accepts_authored_hostile_displacement := false
 @export var body_color := Color8(176, 92, 92)
 @export var hit_flash_color := Color8(255, 216, 216)
 @export var death_particle_color := Color8(255, 228, 182)
@@ -34,6 +45,12 @@ var explosion_knockback_direction := Vector2.ZERO
 var explosion_knockback_distance := 0.0
 var explosion_knockback_duration := 0.0
 var explosion_knockback_time_left := 0.0
+var formation_bias: FormationBias = FormationBias.DIRECT
+var authored_hostile_displacement_source: StringName = &""
+var authored_hostile_displacement_direction := Vector2.ZERO
+var authored_hostile_displacement_distance := 0.0
+var authored_hostile_displacement_duration := 0.0
+var authored_hostile_displacement_time_left := 0.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -57,6 +74,7 @@ func set_active(is_active: bool) -> void:
 	active = is_active
 	if not active:
 		_clear_explosion_knockback()
+		_clear_authored_hostile_displacement()
 		velocity = Vector2.ZERO
 
 
@@ -67,6 +85,8 @@ func take_spear_hit() -> void:
 	is_dying = true
 	hit_flash_left = 0.08
 	death_left = 0.2
+	_clear_explosion_knockback()
+	_clear_authored_hostile_displacement()
 	velocity = Vector2.ZERO
 	collision_layer = 0
 	collision_mask = 0
@@ -97,7 +117,8 @@ func _physics_process(delta: float) -> void:
 
 	if _can_run_behavior():
 		if not _process_explosion_knockback(delta):
-			_process_alive_behavior(delta)
+			if not _process_authored_hostile_displacement(delta):
+				_process_alive_behavior(delta)
 
 	_update_sprite_visuals()
 	queue_redraw()
@@ -127,7 +148,10 @@ func _process_alive_behavior(_delta: float) -> void:
 
 
 func _get_chase_velocity() -> Vector2:
-	var desired_velocity := _get_direction_to_player() * move_speed + _get_separation_push()
+	var chase_direction := _get_direction_to_player()
+	if uses_formation_bias:
+		chase_direction = _get_formation_biased_direction(chase_direction)
+	var desired_velocity := chase_direction * move_speed + _get_separation_push()
 	var speed_limit := move_speed * 1.2
 	if desired_velocity.length() > speed_limit:
 		desired_velocity = desired_velocity.normalized() * speed_limit
@@ -151,6 +175,62 @@ func _move_with_velocity(desired_velocity: Vector2) -> void:
 	_clamp_inside_arena()
 
 
+func set_formation_bias(new_formation_bias: int) -> void:
+	if new_formation_bias < FormationBias.DIRECT or new_formation_bias > FormationBias.RIGHT_FLANK:
+		formation_bias = FormationBias.DIRECT
+		return
+
+	formation_bias = new_formation_bias
+
+
+func get_formation_bias() -> int:
+	return formation_bias
+
+
+func get_formation_bias_name() -> String:
+	match formation_bias:
+		FormationBias.LEFT_FLANK:
+			return "LEFT_FLANK"
+		FormationBias.RIGHT_FLANK:
+			return "RIGHT_FLANK"
+	return "DIRECT"
+
+
+func _get_formation_biased_direction(direct_direction: Vector2) -> Vector2:
+	if direct_direction == Vector2.ZERO or formation_bias == FormationBias.DIRECT:
+		return direct_direction
+	if player == null:
+		return direct_direction
+
+	var distance_to_player := global_position.distance_to(player.global_position)
+	if distance_to_player <= formation_direct_pressure_distance:
+		return direct_direction
+
+	var bias_angle_radians := deg_to_rad(formation_bias_angle_degrees)
+	var rotation_sign := 1.0
+	if formation_bias == FormationBias.LEFT_FLANK:
+		rotation_sign = -1.0
+
+	var biased_direction := direct_direction.rotated(bias_angle_radians * rotation_sign).normalized()
+	if _would_biased_direction_risk_arena_clamp(biased_direction):
+		return direct_direction
+
+	return biased_direction
+
+
+func _would_biased_direction_risk_arena_clamp(direction: Vector2) -> bool:
+	if arena_rect.size == Vector2.ZERO or direction.length_squared() <= 0.001:
+		return false
+
+	var preview_rect := arena_rect.grow(-(body_radius + formation_wall_fallback_padding))
+	if preview_rect.size.x <= 0.0 or preview_rect.size.y <= 0.0:
+		return false
+
+	var preview_distance := maxf(body_radius + formation_wall_fallback_padding, move_speed * 0.2)
+	var preview_position := global_position + direction.normalized() * preview_distance
+	return not preview_rect.has_point(preview_position)
+
+
 func apply_explosion_knockback(direction: Vector2, distance: float, duration: float) -> void:
 	if is_dying or not active:
 		return
@@ -159,6 +239,7 @@ func apply_explosion_knockback(direction: Vector2, distance: float, duration: fl
 	if distance <= 0.0 or duration <= 0.0:
 		return
 
+	_clear_authored_hostile_displacement()
 	explosion_knockback_direction = direction.normalized()
 	explosion_knockback_distance = distance
 	explosion_knockback_duration = duration
@@ -198,6 +279,83 @@ func _clear_explosion_knockback() -> void:
 	explosion_knockback_distance = 0.0
 	explosion_knockback_duration = 0.0
 	explosion_knockback_time_left = 0.0
+
+
+func can_accept_authored_hostile_displacement() -> bool:
+	return (
+		accepts_authored_hostile_displacement
+		and active
+		and not is_dying
+		and player != null
+		and player.is_alive()
+		and not is_in_explosion_knockback()
+		and not is_in_authored_hostile_displacement()
+	)
+
+
+func try_start_authored_hostile_displacement(
+	source: StringName,
+	direction: Vector2,
+	distance: float,
+	duration: float
+) -> bool:
+	if not can_accept_authored_hostile_displacement():
+		return false
+	if direction.length_squared() <= 0.001:
+		return false
+	if distance <= 0.0 or duration <= 0.0:
+		return false
+
+	authored_hostile_displacement_source = source
+	authored_hostile_displacement_direction = direction.normalized()
+	authored_hostile_displacement_distance = distance
+	authored_hostile_displacement_duration = duration
+	authored_hostile_displacement_time_left = duration
+	velocity = authored_hostile_displacement_direction * (distance / duration)
+	return true
+
+
+func is_in_authored_hostile_displacement() -> bool:
+	return authored_hostile_displacement_time_left > 0.0
+
+
+func cancel_authored_hostile_displacement() -> void:
+	_clear_authored_hostile_displacement()
+
+
+func _process_authored_hostile_displacement(delta: float) -> bool:
+	if not is_in_authored_hostile_displacement():
+		return false
+	if authored_hostile_displacement_duration <= 0.0:
+		_clear_authored_hostile_displacement()
+		return false
+
+	var motion_delta := minf(delta, authored_hostile_displacement_time_left)
+	var step_distance := authored_hostile_displacement_distance * (
+		motion_delta / authored_hostile_displacement_duration
+	)
+	global_position += authored_hostile_displacement_direction * step_distance
+	_clamp_inside_arena()
+	if delta > 0.0:
+		velocity = authored_hostile_displacement_direction * step_distance / delta
+	else:
+		velocity = Vector2.ZERO
+
+	authored_hostile_displacement_time_left = maxf(
+		authored_hostile_displacement_time_left - delta,
+		0.0
+	)
+	if authored_hostile_displacement_time_left == 0.0:
+		_clear_authored_hostile_displacement()
+	return true
+
+
+func _clear_authored_hostile_displacement() -> void:
+	authored_hostile_displacement_source = &""
+	authored_hostile_displacement_direction = Vector2.ZERO
+	authored_hostile_displacement_distance = 0.0
+	authored_hostile_displacement_duration = 0.0
+	authored_hostile_displacement_time_left = 0.0
 
 
 func _try_contact_damage() -> void:

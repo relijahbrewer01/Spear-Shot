@@ -23,6 +23,8 @@ def main() -> int:
 
     enemy = read_text("scripts/enemy.gd")
     shielded = read_text("scripts/shielded_enemy.gd")
+    shooter = read_text("scripts/shooter_enemy.gd")
+    dart = read_text("scripts/dart_projectile.gd")
     main_script = read_text("scripts/main.gd")
     enemy_scene = read_text("Enemy.tscn")
     shielded_scene = read_text("ShieldedEnemy.tscn")
@@ -130,8 +132,56 @@ def main() -> int:
         failures,
     )
     require(
+        "func is_valid_shooter_anchor() -> bool:" in shielded
+        and "shield_intact" in shielded
+        and "not is_in_authored_hostile_displacement()" in shielded,
+        "Shielded exposes one narrow intact-anchor suitability helper for Shooter cover behavior",
+        failures,
+    )
+    require(
         "cancel_authored_hostile_displacement()" in shielded,
         "Shield break clears any authored hostile displacement before stagger begins",
+        failures,
+    )
+    require(
+        "PROJECTILE_KIND_DART" not in shielded and "body_entered" not in shielded,
+        "Shielded cooperation does not depend on projectile interception hooks",
+        failures,
+    )
+
+    require(
+        "COVER_HOLD" in shooter
+        and "COVER_PEEK" in shooter
+        and "anchor_shielded" in shooter
+        and "preferred_cover_side" in shooter
+        and "current_peek_side" in shooter,
+        "Shooter defines local cover and peek states plus narrow anchor-tracking data",
+        failures,
+    )
+    require(
+        "shield_anchor_max_distance := 72.0" in shooter
+        and "cover_hold_offset := 14.0" in shooter
+        and "anchor_refresh_interval := 0.18" in shooter
+        and "peek_lateral_offset := 18.0" in shooter
+        and "peek_forward_offset := 4.0" in shooter
+        and "lane_clearance_margin := 3.0" in shooter
+        and "peek_timeout := 0.55" in shooter,
+        "Shooter exports the approved narrow Shielded-cover tuning values",
+        failures,
+    )
+    require(
+        "func _find_best_shield_anchor()" in shooter
+        and "func _anchor_is_valid" in shooter
+        and "func _abandon_anchor()" in shooter
+        and "func _get_cover_hold_position" in shooter
+        and "func _get_peek_position" in shooter
+        and "func _has_clear_anchor_lane" in shooter,
+        "Shooter keeps anchor acquisition, abandonment, cover holding, peeking, and lane checks local to its own script",
+        failures,
+    )
+    require(
+        "ShieldedEnemy" not in dart and "receive_combat_hit" not in dart,
+        "Darts still do not implement Shielded interception or hostile damage in this checkpoint",
         failures,
     )
 
@@ -165,6 +215,15 @@ def main() -> int:
         "formation_bias_angle_degrees",
         "formation_direct_pressure_distance",
         "formation_wall_fallback_padding",
+        "shield_anchor_max_distance",
+        "cover_hold_offset",
+        "cover_position_tolerance",
+        "anchor_refresh_interval",
+        "peek_lateral_offset",
+        "peek_forward_offset",
+        "peek_position_tolerance",
+        "lane_clearance_margin",
+        "peek_timeout",
         "`formation_bias_angle_degrees` | `18.0`",
         "`formation_direct_pressure_distance` | `28.0px`",
         "`formation_wall_fallback_padding` | `8.0px`",

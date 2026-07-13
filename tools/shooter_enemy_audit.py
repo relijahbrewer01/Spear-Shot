@@ -103,6 +103,8 @@ def main() -> int:
     require("wall_fallback_commit_duration := 0.45" in shooter, "Shooter has a committed wall fallback", failures)
     require(
         "enum ShooterState" in shooter
+        and "COVER_HOLD" in shooter
+        and "COVER_PEEK" in shooter
         and "LOCKED" in shooter
         and "ARC_REPOSITION" in shooter
         and "POST_SHOVE_REPOSITION" in shooter
@@ -110,6 +112,30 @@ def main() -> int:
         and "SHOVE_ACTIVE" in shooter
         and "SHOVE_RECOVER" in shooter,
         "Shooter uses explicit attack, reposition, follow-up, and shove states without the retired AIM-cancel state",
+        failures,
+    )
+    require(
+        "shield_anchor_max_distance := 72.0" in shooter
+        and "cover_hold_offset := 14.0" in shooter
+        and "cover_position_tolerance := 4.0" in shooter
+        and "anchor_refresh_interval := 0.18" in shooter
+        and "peek_lateral_offset := 18.0" in shooter
+        and "peek_forward_offset := 4.0" in shooter
+        and "peek_position_tolerance := 4.0" in shooter
+        and "lane_clearance_margin := 3.0" in shooter
+        and "peek_timeout := 0.55" in shooter,
+        "Shooter exports the approved Shielded-cover cooperation tuning values",
+        failures,
+    )
+    require(
+        "anchor_shielded" in shooter
+        and "preferred_cover_side" in shooter
+        and "current_peek_side" in shooter
+        and "_find_best_shield_anchor" in shooter
+        and "_get_cover_hold_position" in shooter
+        and "_get_peek_position" in shooter
+        and "_has_clear_anchor_lane" in shooter,
+        "Shooter keeps narrow local anchor, cover, and peek helpers for Shielded cooperation",
         failures,
     )
     require("aim_duration := 0.48" in shooter and "locked_duration := 0.24" in shooter, "Shooter refined telegraph timing is explicit", failures)

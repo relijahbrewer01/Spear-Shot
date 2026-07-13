@@ -138,7 +138,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
-- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, range maintenance, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
+- `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, Shielded-aware cover hold and side-peek behavior, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
 - `ProwlerEnemy.tscn` and `scripts/prowler_enemy.gd`: ambient-only weapon-state predator with armed stalking, a defensive personal-space pounce, red-eye unarmed alert, one committed hunting pounce per unarmed window, and miss/recovery handling
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
@@ -194,14 +194,14 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
 - Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
-- Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, visibly aims before locking one dart direction, fires a two-dart straight player-only burst, then performs a longer tangential relocation around Akedra, and dies to one spear hit for `2` points
+- Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, can use a nearby intact Shielded as temporary cover, peeks to a readable side lane before aiming, fires a two-dart straight player-only burst, then performs a longer tangential relocation around Akedra, and dies to one spear hit for `2` points
 - The two darts use the same locked direction with a deterministic `0.17` second burst interval, so one successful sidestep can avoid the whole committed volley
 - Once a Shooter begins `AIM`, that wind-up is committed through the ordinary `AIM -> LOCKED -> FIRE -> RECOVER` sequence unless the Shooter dies or is cleaned up
 - Shooter body overlap no longer deals ordinary enemy contact damage
 - At very close range, the Shooter can use a short non-damaging shove that knocks Akedra back through the existing movement authority, grants shove-only temporary damage protection while that authored displacement resolves, and then quickly repositions into a normal readable follow-up shot
 - Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by active dodge or dodge exit grace
 - A narrow burst context lets two distinct darts from the same Shooter volley each deal one damage, while duplicate callbacks from either individual dart and unrelated damage sources still respect normal invulnerability
-- Darts currently do not collide with the spear, enemies, or Shielded enemies; Phase 4.6 cooperation is planned around positioning-based Shielded/Shooter screening rather than projectile blocking
+- Darts currently do not collide with the spear, enemies, or Shielded enemies; the live Shielded/Shooter cooperation now comes from positioning-based cover and side peeks rather than projectile blocking
 - Boomer: ambient-only late-run hopping hazard with no ordinary contact damage, one active cap, safe pre-fuse spear kill for `2`, and a committed three-pulse fuse that starts immediately when it lands inside range
 - The Boomer only translates during its hop; hop prep, landing recovery, and fuse stay positionally stationary apart from visual-only squash, settle, and pulse cues
 - An armed Boomer detonates into a damaging core blast plus a non-damaging outer shockwave, can be triggered early by a valid thrown-spear hit during fuse, and awards no direct score for self-destruction
@@ -405,6 +405,15 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
   - `retreat_distance`
   - `resume_after_retreat_distance`
   - `attack_range_max`
+  - `shield_anchor_max_distance`
+  - `cover_hold_offset`
+  - `cover_position_tolerance`
+  - `anchor_refresh_interval`
+  - `peek_lateral_offset`
+  - `peek_forward_offset`
+  - `peek_position_tolerance`
+  - `lane_clearance_margin`
+  - `peek_timeout`
   - `aim_duration`
   - `locked_duration`
   - `burst_interval`
@@ -516,7 +525,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 ## Features intentionally left for later
 
 - More enemy types
-- Phase 4.6 enemy interaction work focused on positioning-based Shielded/Shooter cooperation and Shooter-dart/Boomer interactions
+- Further Phase 4.6 enemy interaction work focused on Shooter-dart/Boomer interactions, later Charger bulldozing, and broader formation follow-through beyond the live Shielded/Shooter cover behavior
 - Ring encounter formations
 - Wave reward selection driven by encounter completion signals
 - Upgrades or progression systems

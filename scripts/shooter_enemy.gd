@@ -7,6 +7,8 @@ signal shove_used
 
 enum ShooterState {
 	REPOSITION,
+	COVER_HOLD,
+	COVER_PEEK,
 	AIM,
 	LOCKED,
 	FIRE,
@@ -57,6 +59,15 @@ enum ShooterState {
 @export var post_shove_side_sample_distance := 48.0
 @export var post_shove_radial_correction_strength := 0.36
 @export var post_shove_follow_up_delay := 0.12
+@export var shield_anchor_max_distance := 72.0
+@export var cover_hold_offset := 14.0
+@export var cover_position_tolerance := 4.0
+@export var anchor_refresh_interval := 0.18
+@export var peek_lateral_offset := 18.0
+@export var peek_forward_offset := 4.0
+@export var peek_position_tolerance := 4.0
+@export var lane_clearance_margin := 3.0
+@export var peek_timeout := 0.55
 @export var blowgun_length := 14.0
 @export var blowgun_shaft_width := 1.0
 @export var blowgun_tip_width := 1.0
@@ -80,6 +91,11 @@ var arc_reposition_left := 0.0
 var arc_reposition_side := 1
 var arc_reposition_reversed_for_wall := false
 var last_blocked_arc_side := 0
+var anchor_shielded: ShieldedEnemy
+var preferred_cover_side := 0
+var current_peek_side := 0
+var anchor_refresh_left := 0.0
+var peek_timeout_left := 0.0
 var post_shove_reposition_side := 1
 var post_shove_reposition_reversed_for_wall := false
 var last_blocked_post_shove_side := 0
@@ -104,6 +120,10 @@ func _ready() -> void:
 	_enter_reposition_state(false)
 
 
+func _exit_tree() -> void:
+	_abandon_anchor()
+
+
 func setup(player_ref: Player, new_arena_rect: Rect2, starting_speed: float) -> void:
 	super.setup(player_ref, new_arena_rect, starting_speed * movement_speed_scale)
 
@@ -117,6 +137,7 @@ func set_active(is_active: bool) -> void:
 func _physics_process(delta: float) -> void:
 	visual_time += delta
 	_update_shooter_timers(delta)
+	_discard_invalid_anchor_reference()
 
 	if _update_effect_timers(delta):
 		_update_sprite_visuals()
@@ -127,6 +148,10 @@ func _physics_process(delta: float) -> void:
 			match shooter_state:
 				ShooterState.REPOSITION:
 					_process_reposition_state(delta)
+				ShooterState.COVER_HOLD:
+					_process_cover_hold_state(delta)
+				ShooterState.COVER_PEEK:
+					_process_cover_peek_state(delta)
 				ShooterState.AIM:
 					_process_aim_state(delta)
 				ShooterState.LOCKED:
@@ -163,19 +188,91 @@ func _update_shooter_timers(delta: float) -> void:
 	direction_change_left = maxf(direction_change_left - delta, 0.0)
 	wall_fallback_left = maxf(wall_fallback_left - delta, 0.0)
 	arc_reposition_left = maxf(arc_reposition_left - delta, 0.0)
+	anchor_refresh_left = maxf(anchor_refresh_left - delta, 0.0)
+	peek_timeout_left = maxf(peek_timeout_left - delta, 0.0)
 	post_shove_follow_up_left = maxf(post_shove_follow_up_left - delta, 0.0)
 
 
 func _process_reposition_state(delta: float) -> void:
 	var distance_to_player := _get_distance_to_player()
+	_refresh_anchor_if_needed()
 	if _should_start_shove(distance_to_player):
+		_abandon_anchor()
 		_enter_shove_windup_state()
+		return
+	if _should_use_anchor_cover(distance_to_player):
+		_enter_cover_hold_state()
+		_process_cover_hold_state(delta)
 		return
 	if _can_begin_attack(distance_to_player):
 		_enter_aim_state()
 		return
 
 	_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
+
+
+func _process_cover_hold_state(delta: float) -> void:
+	var distance_to_player := _get_distance_to_player()
+	_refresh_anchor_if_needed()
+	if anchor_shielded == null:
+		_enter_reposition_state(false)
+		_process_reposition_state(delta)
+		return
+	if _should_start_shove(distance_to_player):
+		_abandon_anchor()
+		_enter_shove_windup_state()
+		return
+	if _should_fallback_to_direct_safety(distance_to_player):
+		_abandon_anchor()
+		_enter_reposition_state(false)
+		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
+		return
+	if _can_begin_attack(distance_to_player):
+		_enter_cover_peek_state()
+		return
+
+	_move_with_velocity(_get_cover_hold_velocity())
+
+
+func _process_cover_peek_state(delta: float) -> void:
+	var distance_to_player := _get_distance_to_player()
+	var current_direction := _get_direction_to_player()
+	if current_direction != Vector2.ZERO:
+		aim_direction = current_direction
+		_update_facing_from_direction(aim_direction)
+	_refresh_anchor_if_needed()
+	if anchor_shielded == null:
+		_enter_reposition_state(false)
+		_process_reposition_state(delta)
+		return
+	if _should_start_shove(distance_to_player):
+		_abandon_anchor()
+		_enter_shove_windup_state()
+		return
+	if _should_fallback_to_direct_safety(distance_to_player):
+		_abandon_anchor()
+		_enter_reposition_state(false)
+		_move_with_velocity(_get_reposition_velocity(delta, distance_to_player))
+		return
+	if not _can_begin_attack(distance_to_player):
+		_enter_cover_hold_state()
+		return
+
+	var peek_position := _get_peek_position()
+	var lane_is_clear := _has_clear_anchor_lane(global_position)
+	if lane_is_clear and global_position.distance_to(peek_position) <= peek_position_tolerance:
+		_enter_aim_state()
+		return
+
+	_move_with_velocity(_get_cover_peek_velocity())
+	if peek_timeout_left > 0.0:
+		return
+	if _has_clear_anchor_lane(global_position):
+		_enter_aim_state()
+		return
+
+	_abandon_anchor()
+	_enter_reposition_state(false)
 
 
 func _process_aim_state(delta: float) -> void:
@@ -321,6 +418,35 @@ func _get_reposition_velocity(delta: float, distance_to_player: float) -> Vector
 	return desired_velocity
 
 
+func _get_cover_hold_velocity() -> Vector2:
+	return _get_positioning_velocity(_get_cover_hold_position(), approach_speed_scale, 0.45)
+
+
+func _get_cover_peek_velocity() -> Vector2:
+	return _get_positioning_velocity(_get_peek_position(), approach_speed_scale, 0.25)
+
+
+func _get_positioning_velocity(
+	target_position: Vector2,
+	speed_scale: float,
+	separation_weight: float
+) -> Vector2:
+	var to_target := target_position - global_position
+	var desired_velocity := Vector2.ZERO
+	if to_target.length_squared() > 0.25:
+		desired_velocity = to_target.normalized() * move_speed * speed_scale
+
+	desired_velocity += _get_separation_push() * separation_weight
+	var speed_limit := move_speed * maxf(maxf(approach_speed_scale, retreat_speed_scale), speed_scale)
+	if desired_velocity.length() > speed_limit:
+		desired_velocity = desired_velocity.normalized() * speed_limit
+
+	if desired_velocity.length_squared() > 0.01:
+		_update_facing_from_direction(desired_velocity.normalized())
+
+	return desired_velocity
+
+
 func _get_arc_reposition_velocity(delta: float, distance_to_player: float) -> Vector2:
 	if player == null:
 		return Vector2.ZERO
@@ -395,6 +521,254 @@ func _get_post_shove_reposition_velocity(delta: float, distance_to_player: float
 		_update_facing_from_direction(desired_velocity.normalized())
 
 	return desired_velocity
+
+
+func _refresh_anchor_if_needed() -> void:
+	if anchor_shielded != null:
+		if not _anchor_is_valid(anchor_shielded):
+			_abandon_anchor()
+		return
+	if anchor_refresh_left > 0.0:
+		return
+
+	anchor_refresh_left = anchor_refresh_interval
+	var candidate_anchor := _find_best_shield_anchor()
+	if candidate_anchor == null:
+		return
+
+	anchor_shielded = candidate_anchor
+	preferred_cover_side = _choose_cover_side(candidate_anchor)
+	current_peek_side = 0
+
+
+func _discard_invalid_anchor_reference() -> void:
+	if anchor_shielded != null and not _anchor_is_valid(anchor_shielded):
+		_abandon_anchor()
+
+
+func _anchor_is_valid(candidate_anchor: ShieldedEnemy) -> bool:
+	if candidate_anchor == null or not is_instance_valid(candidate_anchor):
+		return false
+	if not candidate_anchor.is_inside_tree():
+		return false
+	if not active or is_dying or player == null or not player.is_alive():
+		return false
+	if global_position.distance_to(candidate_anchor.global_position) > shield_anchor_max_distance:
+		return false
+
+	return candidate_anchor.is_valid_shooter_anchor()
+
+
+func _find_best_shield_anchor() -> ShieldedEnemy:
+	var best_anchor: ShieldedEnemy
+	var best_distance := INF
+	for enemy_node in get_tree().get_nodes_in_group("enemy"):
+		var shielded := enemy_node as ShieldedEnemy
+		if shielded == null:
+			continue
+		if not _anchor_is_valid(shielded):
+			continue
+
+		var distance_to_anchor := global_position.distance_to(shielded.global_position)
+		if distance_to_anchor < best_distance:
+			best_distance = distance_to_anchor
+			best_anchor = shielded
+
+	return best_anchor
+
+
+func _abandon_anchor() -> void:
+	anchor_shielded = null
+	preferred_cover_side = 0
+	current_peek_side = 0
+	anchor_refresh_left = 0.0
+	peek_timeout_left = 0.0
+
+
+func _should_use_anchor_cover(distance_to_player: float) -> bool:
+	if _should_fallback_to_direct_safety(distance_to_player):
+		return false
+	if not _can_use_cover_behavior():
+		return false
+	return _anchor_is_valid(anchor_shielded)
+
+
+func _should_fallback_to_direct_safety(distance_to_player: float) -> bool:
+	return (
+		distance_to_player <= retreat_distance
+		or distance_to_player < preferred_distance_min - distance_dead_zone
+	)
+
+
+func _can_use_cover_behavior() -> bool:
+	return (
+		active
+		and not is_dying
+		and player != null
+		and player.is_alive()
+		and not is_in_explosion_knockback()
+	)
+
+
+func _enter_cover_hold_state() -> void:
+	shooter_state = ShooterState.COVER_HOLD
+	state_time_left = 0.0
+	peek_timeout_left = 0.0
+	current_peek_side = 0
+	velocity = Vector2.ZERO
+
+
+func _enter_cover_peek_state() -> void:
+	shooter_state = ShooterState.COVER_PEEK
+	state_time_left = 0.0
+	peek_timeout_left = peek_timeout
+	current_peek_side = _choose_peek_side()
+	if current_peek_side == 0:
+		current_peek_side = preferred_cover_side
+	if current_peek_side == 0:
+		current_peek_side = 1
+	aim_direction = _get_direction_to_player()
+	if aim_direction == Vector2.ZERO:
+		aim_direction = Vector2(float(facing_direction), 0.0)
+	_update_facing_from_direction(aim_direction)
+	velocity = Vector2.ZERO
+
+
+func _choose_cover_side(candidate_anchor: ShieldedEnemy) -> int:
+	var shared_side := _get_other_shooter_side(candidate_anchor)
+	if shared_side != 0:
+		return -shared_side
+
+	var current_side := _infer_side_from_position(candidate_anchor, global_position)
+	if current_side != 0:
+		return current_side
+
+	var left_score := _score_anchor_side(candidate_anchor, -1)
+	var right_score := _score_anchor_side(candidate_anchor, 1)
+	if right_score > left_score + 1.0:
+		return 1
+	if left_score > right_score + 1.0:
+		return -1
+	return -1 if int(get_instance_id()) % 2 == 0 else 1
+
+
+func _choose_peek_side() -> int:
+	if preferred_cover_side != 0:
+		return preferred_cover_side
+	if anchor_shielded == null:
+		return 0
+	return _choose_cover_side(anchor_shielded)
+
+
+func _get_other_shooter_side(candidate_anchor: ShieldedEnemy) -> int:
+	for enemy_node in get_tree().get_nodes_in_group("enemy"):
+		var other_shooter := enemy_node as ShooterEnemy
+		if other_shooter == null or other_shooter == self or other_shooter.is_dying:
+			continue
+		if other_shooter.anchor_shielded != candidate_anchor:
+			continue
+		if other_shooter.current_peek_side != 0:
+			return other_shooter.current_peek_side
+		if other_shooter.preferred_cover_side != 0:
+			return other_shooter.preferred_cover_side
+	return 0
+
+
+func _infer_side_from_position(candidate_anchor: ShieldedEnemy, world_position: Vector2) -> int:
+	var tangent := _get_anchor_tangent_direction(candidate_anchor, 1)
+	var side_dot := (world_position - candidate_anchor.global_position).dot(tangent)
+	if side_dot > 1.0:
+		return 1
+	if side_dot < -1.0:
+		return -1
+	return 0
+
+
+func _score_anchor_side(candidate_anchor: ShieldedEnemy, side: int) -> float:
+	var peek_position := _get_peek_position_for_anchor(candidate_anchor, side)
+	var clamped_peek := _clamp_position_to_arena(peek_position)
+	var clamp_penalty := peek_position.distance_to(clamped_peek) * 4.0
+	var travel_penalty := global_position.distance_to(clamped_peek) * 0.05
+	var lane_bonus := 0.0
+	if _has_clear_anchor_lane(clamped_peek, candidate_anchor):
+		lane_bonus = 6.0
+
+	return lane_bonus - clamp_penalty - travel_penalty
+
+
+func _get_cover_hold_position() -> Vector2:
+	if anchor_shielded == null:
+		return global_position
+	return _get_cover_hold_position_for_anchor(anchor_shielded, preferred_cover_side)
+
+
+func _get_cover_hold_position_for_anchor(candidate_anchor: ShieldedEnemy, side: int) -> Vector2:
+	var away_from_player := _get_anchor_away_direction(candidate_anchor)
+	var hold_distance := candidate_anchor.body_radius + cover_hold_offset
+	var target_position := candidate_anchor.global_position + away_from_player * hold_distance
+	if side != 0:
+		target_position += _get_anchor_tangent_direction(candidate_anchor, side) * cover_position_tolerance
+	return _clamp_position_to_arena(target_position)
+
+
+func _get_peek_position() -> Vector2:
+	if anchor_shielded == null:
+		return global_position
+	return _get_peek_position_for_anchor(anchor_shielded, current_peek_side)
+
+
+func _get_peek_position_for_anchor(candidate_anchor: ShieldedEnemy, side: int) -> Vector2:
+	var resolved_side := side if side != 0 else 1
+	var away_from_player := _get_anchor_away_direction(candidate_anchor)
+	var tangent := _get_anchor_tangent_direction(candidate_anchor, resolved_side)
+	var hold_distance := candidate_anchor.body_radius + maxf(cover_hold_offset - peek_forward_offset, 1.0)
+	var target_position := candidate_anchor.global_position + away_from_player * hold_distance
+	target_position += tangent * peek_lateral_offset
+	return _clamp_position_to_arena(target_position)
+
+
+func _get_anchor_away_direction(candidate_anchor: ShieldedEnemy) -> Vector2:
+	if player == null:
+		return Vector2.RIGHT
+
+	var away_from_player := candidate_anchor.global_position - player.global_position
+	if away_from_player.length_squared() <= 0.001:
+		away_from_player = candidate_anchor.global_position - global_position
+	if away_from_player.length_squared() <= 0.001:
+		away_from_player = Vector2.RIGHT
+	return away_from_player.normalized()
+
+
+func _get_anchor_tangent_direction(candidate_anchor: ShieldedEnemy, side: int) -> Vector2:
+	var away_from_player := _get_anchor_away_direction(candidate_anchor)
+	var tangent := Vector2(-away_from_player.y, away_from_player.x).normalized()
+	return tangent * float(side)
+
+
+func _has_clear_anchor_lane(
+	from_position: Vector2,
+	candidate_anchor: ShieldedEnemy = anchor_shielded
+) -> bool:
+	if candidate_anchor == null or player == null:
+		return true
+
+	var lane_radius := candidate_anchor.body_radius + lane_clearance_margin
+	return _distance_point_to_segment(
+		candidate_anchor.global_position,
+		from_position,
+		player.global_position
+	) > lane_radius
+
+
+func _distance_point_to_segment(point: Vector2, segment_start: Vector2, segment_end: Vector2) -> float:
+	var segment := segment_end - segment_start
+	var length_squared := segment.length_squared()
+	if length_squared <= 0.001:
+		return point.distance_to(segment_start)
+
+	var projection := clampf((point - segment_start).dot(segment) / length_squared, 0.0, 1.0)
+	var closest_point := segment_start + segment * projection
+	return point.distance_to(closest_point)
 
 
 func _get_radial_correction(distance_to_player: float, radial_direction: Vector2, correction_strength: float) -> Vector2:
@@ -477,6 +851,7 @@ func _enter_reposition_state(start_cooldown: bool) -> void:
 	burst_shots_fired = 0
 	shove_has_attempted_hit = false
 	shove_connected = false
+	peek_timeout_left = 0.0
 	post_shove_follow_up_left = 0.0
 	if start_cooldown:
 		attack_cooldown_left = attack_cooldown
@@ -546,6 +921,7 @@ func _enter_shove_windup_state() -> void:
 	aim_retry_left = maxf(aim_retry_left, aim_retry_delay)
 	shove_has_attempted_hit = false
 	shove_connected = false
+	peek_timeout_left = 0.0
 	shove_direction = _get_direction_to_player()
 	if shove_direction == Vector2.ZERO:
 		shove_direction = Vector2(float(facing_direction), 0.0)
@@ -657,6 +1033,7 @@ func _score_post_shove_side(side: int) -> float:
 
 
 func _clear_attack_state() -> void:
+	_abandon_anchor()
 	shooter_state = ShooterState.REPOSITION
 	state_time_left = 0.0
 	attack_cooldown_left = 0.0
@@ -685,6 +1062,7 @@ func apply_explosion_knockback(direction: Vector2, distance: float, duration: fl
 
 
 func _interrupt_for_explosion_knockback() -> void:
+	_abandon_anchor()
 	shooter_state = ShooterState.REPOSITION
 	state_time_left = 0.0
 	arc_reposition_left = 0.0
@@ -774,6 +1152,8 @@ func _draw_attack_cue() -> void:
 
 
 func _get_visual_aim_direction() -> Vector2:
+	if shooter_state == ShooterState.COVER_PEEK:
+		return aim_direction.normalized()
 	if shooter_state == ShooterState.AIM:
 		return aim_direction.normalized()
 	if shooter_state == ShooterState.LOCKED or shooter_state == ShooterState.FIRE:
@@ -789,6 +1169,10 @@ func _get_visual_offset() -> Vector2:
 	var visual_direction := _get_visual_aim_direction()
 
 	match shooter_state:
+		ShooterState.COVER_HOLD:
+			base_offset -= visual_direction * 0.6
+		ShooterState.COVER_PEEK:
+			base_offset -= visual_direction * 0.8
 		ShooterState.AIM:
 			base_offset -= visual_direction * 1.0
 		ShooterState.LOCKED:
@@ -810,6 +1194,8 @@ func _get_visual_offset() -> Vector2:
 
 func _get_visual_scale() -> Vector2:
 	match shooter_state:
+		ShooterState.COVER_PEEK:
+			return Vector2(1.04, 0.96)
 		ShooterState.AIM:
 			return Vector2(1.08, 0.92)
 		ShooterState.FIRE:

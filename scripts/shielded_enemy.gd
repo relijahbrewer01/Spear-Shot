@@ -40,6 +40,18 @@ func is_staggering() -> bool:
 	return stagger_time_left > 0.0
 
 
+func is_valid_shooter_anchor() -> bool:
+	return (
+		active
+		and shield_intact
+		and not is_dying
+		and not is_staggering()
+		and knockback_time_left <= 0.0
+		and not is_in_explosion_knockback()
+		and not is_in_authored_hostile_displacement()
+	)
+
+
 func receive_combat_hit(
 	hit_source: StringName,
 	hit_position: Vector2,

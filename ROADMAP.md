@@ -57,9 +57,9 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 
 ## Phase 4.6 Enemy Interaction And Formation Pass
 
-- Shielded and Shooter cooperation should come from positioning rather than a projectile-blocking behavior.
-- The simplest stable model should be chosen during that pass: either Shielded screens between Akedra and Shooter, or Shooter tries to remain behind Shielded relative to Akedra.
-- Shooters should later gain firing-lane repositioning around Shielded allies rather than blindly stacking behind them.
+- Phase 4.6.1 adds the shared enemy foundations: deterministic crowd-flow bias for ordinary Normal/Shielded locomotion plus an opt-in authored hostile-displacement seam for later Charger bulldozing.
+- Phase 4.6.2 adds the first live cooperation behavior: a Shooter can use a nearby intact Shielded as temporary positional cover, hold behind it, and peek to a side lane before beginning the existing committed attack sequence.
+- This cooperation remains positioning-based rather than projectile-blocking: Shielded armor still does not intercept darts or spear throws, and the Shooter still abandons cover whenever the anchor becomes unsuitable.
 - Shooter darts should later stop when they hit a Boomer; the first dart to hit an unarmed Boomer should begin its normal fuse, while darts hitting an already fusing Boomer should stop without restarting, shortening, cancelling, or duplicating that fuse.
 - Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
 - Final interaction and population tuning should happen after those behaviors exist, not before.

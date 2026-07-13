@@ -96,6 +96,15 @@ def main() -> int:
         "formation_wall_fallback_padding",
         "stagger_duration",
         "knockback_distance",
+        "shield_anchor_max_distance",
+        "cover_hold_offset",
+        "cover_position_tolerance",
+        "anchor_refresh_interval",
+        "peek_lateral_offset",
+        "peek_forward_offset",
+        "peek_position_tolerance",
+        "lane_clearance_margin",
+        "peek_timeout",
         "aim_duration",
         "locked_duration",
         "burst_interval",
@@ -156,6 +165,15 @@ def main() -> int:
         "`locked_duration` | `0.24s`",
         "`burst_interval` | `0.17s`",
         "`attack_cooldown` | `0.95s`",
+        "`shield_anchor_max_distance` | `72.0px`",
+        "`cover_hold_offset` | `14.0px`",
+        "`cover_position_tolerance` | `4.0px`",
+        "`anchor_refresh_interval` | `0.18s`",
+        "`peek_lateral_offset` | `18.0px`",
+        "`peek_forward_offset` | `4.0px`",
+        "`peek_position_tolerance` | `4.0px`",
+        "`lane_clearance_margin` | `3.0px`",
+        "`peek_timeout` | `0.55s`",
         "`arc_reposition_duration` | `1.10s`",
         "`arc_reposition_speed_scale` | `1.35`",
         "`arc_reposition_side_sample_distance` | `60.0px`",
@@ -211,6 +229,7 @@ def main() -> int:
     require("Heart Runner" in readme and "Heart Runner" in roadmap, "Docs mention the implemented Heart Runner opportunity", failures)
     require("Prowler" in readme and "Prowler" in roadmap, "Docs mention the implemented Prowler phase", failures)
     require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
+    require("Shielded-aware cover hold and side-peek behavior" in readme and "temporary positional cover" in roadmap, "README and ROADMAP describe the live Shielded/Shooter cooperation checkpoint", failures)
     require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)
     require("## Phase 4 Interlude 1 — Input & Audio Polish" in roadmap, "ROADMAP documents the bounded input/audio interlude", failures)
     require("Phase 4.5" in roadmap and "does not renumber" in roadmap, "ROADMAP keeps the interlude bounded without redefining Phase 4.5", failures)

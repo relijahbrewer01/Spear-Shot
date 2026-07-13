@@ -207,7 +207,17 @@
 | `recover_duration` | `0.16s` | `scripts/shooter_enemy.gd` | Tiny stationary recoil before movement. |
 | `attack_cooldown` | `0.95s` | `scripts/shooter_enemy.gd` | Post-burst cooldown, starts when the burst finishes. |
 | `minimum_dart_interval` | `2.4s` | `scripts/shooter_enemy.gd` | Hard minimum between burst starts. |
+| `shield_anchor_max_distance` | `72.0px` | `scripts/shooter_enemy.gd` | Max distance for an intact nearby Shielded enemy to qualify as a temporary cover anchor. |
+| `cover_hold_offset` | `14.0px` | `scripts/shooter_enemy.gd` | Extra distance the Shooter tries to hold behind the Shielded's body while anchored. |
+| `cover_position_tolerance` | `4.0px` | `scripts/shooter_enemy.gd` | Small behind-cover tolerance and side-split offset used to keep anchored Shooters readable. |
+| `anchor_refresh_interval` | `0.18s` | `scripts/shooter_enemy.gd` | How often ordinary Shooter movement rechecks for a valid intact Shielded anchor. |
+| `peek_lateral_offset` | `18.0px` | `scripts/shooter_enemy.gd` | Side-step distance used when the Shooter peeks out from anchored cover before aiming. |
+| `peek_forward_offset` | `4.0px` | `scripts/shooter_enemy.gd` | Small forward step from the held cover depth when the Shooter peeks for a firing lane. |
+| `peek_position_tolerance` | `4.0px` | `scripts/shooter_enemy.gd` | Arrival tolerance before an anchored Shooter begins its committed attack sequence. |
+| `lane_clearance_margin` | `3.0px` | `scripts/shooter_enemy.gd` | Extra Shielded-body clearance required before an anchored Shooter may fire. |
+| `peek_timeout` | `0.55s` | `scripts/shooter_enemy.gd` | Short limit on cover peeking before the Shooter abandons the anchor and returns to normal behavior. |
 | Ordinary body contact damage | disabled | `scripts/shooter_enemy.gd` | Shooter body overlap no longer damages Akedra. |
+| Shielded cover rule | intact Shielded only, positioning-based only | `scripts/shooter_enemy.gd`, `scripts/shielded_enemy.gd` | Anchored Shooters hold behind Shielded cover, peek to a side lane before aiming, and never rely on projectile interception. |
 | Committed aim rule | once `AIM` begins, finish `AIM -> LOCKED -> FIRE -> RECOVER` unless cleaned up | `scripts/shooter_enemy.gd` | Player distance changes no longer cancel the live wind-up once it has started. |
 | `aim_retry_delay` | `0.18s` | `scripts/shooter_enemy.gd` | Small safeguard after non-burst interruptions such as the close-range shove path. |
 | `arc_reposition_duration` | `1.10s` | `scripts/shooter_enemy.gd` | Longer post-burst relocation time. |

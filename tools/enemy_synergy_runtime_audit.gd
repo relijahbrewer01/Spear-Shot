@@ -26,6 +26,7 @@ func _run_audit() -> void:
 	await _audit_formation_bias_movement()
 	await _audit_authored_displacement_contract()
 	await _audit_shielded_opt_in_and_pause()
+	await _audit_shielded_shooter_cooperation()
 
 	for failure in failures:
 		push_error("ENEMY SYNERGY AUDIT: %s" % failure)
@@ -315,6 +316,168 @@ func _audit_shielded_opt_in_and_pause() -> void:
 	await get_tree().process_frame
 
 
+func _audit_shielded_shooter_cooperation() -> void:
+	var root := Node2D.new()
+	add_child(root)
+	var player := _spawn_player(root, Vector2(86.0, 108.0))
+	var shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(152.0, 108.0)) as ShieldedEnemy
+	var shooter := _spawn_enemy(root, ShooterScene, player, Vector2(208.0, 108.0)) as ShooterEnemy
+	shooter.first_attack_delay_left = 99.0
+	shooter.attack_cooldown_left = 0.0
+	shooter.minimum_dart_interval_left = 0.0
+	shooter.shove_cooldown_left = 99.0
+
+	var dart_count := 0
+	shooter.dart_requested.connect(func(_spawn_position: Vector2, _fire_direction: Vector2, _burst_id: int, _dart_index: int) -> void:
+		dart_count += 1
+	)
+
+	var anchored := await _advance_until(func() -> bool:
+		return shooter.anchor_shielded == shielded
+	, 0.50)
+	_require(anchored, "Shooter acquires a valid intact Shielded anchor.")
+	_require(shooter.shooter_state == ShooterEnemy.ShooterState.COVER_HOLD, "Anchored Shooter enters cover hold during ordinary movement.")
+
+	var behind_alignment := (shooter.global_position - shielded.global_position).normalized().dot(
+		(shielded.global_position - player.global_position).normalized()
+	)
+	_require(behind_alignment > 0.75, "Anchored Shooter moves behind Shielded relative to Akedra.")
+	shooter.first_attack_delay_left = 0.0
+
+	var saw_cover_hold := false
+	var saw_cover_peek := false
+	var aim_started_with_clear_lane := false
+	for _index in 90:
+		if shooter.shooter_state == ShooterEnemy.ShooterState.COVER_HOLD:
+			saw_cover_hold = true
+		if shooter.shooter_state == ShooterEnemy.ShooterState.COVER_PEEK:
+			saw_cover_peek = true
+		if shooter.shooter_state == ShooterEnemy.ShooterState.AIM:
+			var tangent := Vector2(
+				-(shielded.global_position - player.global_position).normalized().y,
+				(shielded.global_position - player.global_position).normalized().x
+			)
+			var side_distance := absf((shooter.global_position - shielded.global_position).dot(tangent))
+			aim_started_with_clear_lane = side_distance >= 8.0 and bool(
+				shooter.call("_has_clear_anchor_lane", shooter.global_position, shielded)
+			)
+			break
+		await get_tree().physics_frame
+
+	_require(saw_cover_hold, "Anchored Shooter uses a dedicated cover-hold phase during ordinary movement.")
+	_require(saw_cover_peek, "Anchored Shooter peeks to a side before beginning its committed attack.")
+	_require(aim_started_with_clear_lane, "Shooter does not begin AIM from directly behind Shielded without a clear lane.")
+
+	var finished_burst := await _advance_until(func() -> bool:
+		return dart_count == 2
+	, 1.50)
+	_require(finished_burst and dart_count == 2, "Once anchored AIM begins, the existing committed two-dart attack still finishes normally.")
+
+	shielded.receive_combat_hit(
+		Enemy.HIT_SOURCE_SPEAR,
+		shielded.global_position - Vector2.RIGHT * shielded.body_radius,
+		Vector2.RIGHT
+	)
+	await _advance_physics(0.05)
+	_require(shooter.anchor_shielded == null, "Shooter abandons the anchor immediately when Shielded loses its shield.")
+
+	player.global_position = Vector2(110.0, 108.0)
+	shooter.global_position = Vector2(162.0, 108.0)
+	shooter.first_attack_delay_left = 99.0
+	await _advance_physics(0.18)
+	_require(
+		shooter.shooter_state == ShooterEnemy.ShooterState.REPOSITION,
+		"Shooter returns to ordinary behavior when no valid Shielded anchor exists."
+	)
+
+	root.queue_free()
+	await get_tree().process_frame
+
+	var death_root := Node2D.new()
+	add_child(death_root)
+	var death_player := _spawn_player(death_root, Vector2(86.0, 108.0))
+	var death_shielded := _spawn_enemy(death_root, ShieldedScene, death_player, Vector2(152.0, 108.0)) as ShieldedEnemy
+	var death_shooter := _spawn_enemy(death_root, ShooterScene, death_player, Vector2(208.0, 108.0)) as ShooterEnemy
+	death_shooter.first_attack_delay_left = 99.0
+	var death_anchor_ready := await _advance_until(func() -> bool:
+		return death_shooter.anchor_shielded == death_shielded
+	, 0.50)
+	_require(death_anchor_ready, "Shooter can acquire a second intact Shielded anchor for cleanup coverage.")
+	death_shielded.take_spear_hit()
+	await _advance_physics(0.05)
+	_require(death_shooter.anchor_shielded == null, "Shooter abandons the anchor when Shielded dies or leaves the live contract.")
+	death_root.queue_free()
+	await get_tree().process_frame
+
+	var two_root := Node2D.new()
+	add_child(two_root)
+	var two_player := _spawn_player(two_root, Vector2(86.0, 108.0))
+	var shared_shielded := _spawn_enemy(two_root, ShieldedScene, two_player, Vector2(152.0, 108.0)) as ShieldedEnemy
+	var primary_shooter := _spawn_enemy(two_root, ShooterScene, two_player, Vector2(208.0, 98.0)) as ShooterEnemy
+	primary_shooter.first_attack_delay_left = 99.0
+	var primary_anchor_ready := await _advance_until(func() -> bool:
+		return primary_shooter.anchor_shielded == shared_shielded and primary_shooter.preferred_cover_side != 0
+	, 0.50)
+	_require(primary_anchor_ready, "Primary Shooter anchors before the shared-anchor side-preference check.")
+	var support_shooter := _spawn_enemy(two_root, ShooterScene, two_player, Vector2(212.0, 118.0)) as ShooterEnemy
+	support_shooter.first_attack_delay_left = 99.0
+	var support_anchor_ready := await _advance_until(func() -> bool:
+		return support_shooter.anchor_shielded == shared_shielded and support_shooter.preferred_cover_side != 0
+	, 0.60)
+	_require(support_anchor_ready, "Second Shooter also acquires the shared Shielded anchor.")
+	_require(
+		support_anchor_ready and primary_anchor_ready and primary_shooter.preferred_cover_side == -support_shooter.preferred_cover_side,
+		"Two Shooters sharing one Shielded prefer opposite cover or peek sides when possible."
+	)
+	var initial_primary_side := primary_shooter.preferred_cover_side
+	var initial_support_side := support_shooter.preferred_cover_side
+	await _advance_physics(0.55)
+	_require(
+		primary_shooter.preferred_cover_side == initial_primary_side and support_shooter.preferred_cover_side == initial_support_side,
+		"Shared-anchor Shooter side choices stay stable instead of endlessly swapping."
+	)
+	_require(
+		primary_shooter.global_position.distance_to(support_shooter.global_position) > 10.0,
+		"Two Shooters sharing one Shielded do not permanently overlap while holding cover."
+	)
+	two_root.queue_free()
+	await get_tree().process_frame
+
+	var shove_root := Node2D.new()
+	add_child(shove_root)
+	var shove_player := _spawn_player(shove_root, Vector2(86.0, 108.0))
+	var shove_shielded := _spawn_enemy(shove_root, ShieldedScene, shove_player, Vector2(152.0, 108.0)) as ShieldedEnemy
+	var shove_shooter := _spawn_enemy(shove_root, ShooterScene, shove_player, Vector2(208.0, 108.0)) as ShooterEnemy
+	shove_shooter.first_attack_delay_left = 99.0
+	var shove_anchor_ready := await _advance_until(func() -> bool:
+		return shove_shooter.anchor_shielded == shove_shielded
+	, 0.50)
+	_require(shove_anchor_ready, "Anchored Shooter setup succeeds before close-range shove coverage.")
+	shove_player.global_position = Vector2(166.0, 108.0)
+	var shove_started := await _advance_until(func() -> bool:
+		return shove_shooter.shooter_state == ShooterEnemy.ShooterState.SHOVE_WINDUP
+	, 0.25)
+	_require(shove_started, "Close-range shove still takes priority over anchored cover behavior.")
+	_require(shove_shooter.anchor_shielded == null, "Shove path abandons the anchor instead of keeping stale cover state.")
+	shove_root.queue_free()
+	await get_tree().process_frame
+
+	var cleanup_root := Node2D.new()
+	add_child(cleanup_root)
+	var cleanup_player := _spawn_player(cleanup_root, Vector2(86.0, 108.0))
+	var cleanup_shielded := _spawn_enemy(cleanup_root, ShieldedScene, cleanup_player, Vector2(152.0, 108.0)) as ShieldedEnemy
+	var cleanup_shooter := _spawn_enemy(cleanup_root, ShooterScene, cleanup_player, Vector2(208.0, 108.0)) as ShooterEnemy
+	cleanup_shooter.first_attack_delay_left = 99.0
+	var cleanup_anchor_ready := await _advance_until(func() -> bool:
+		return cleanup_shooter.anchor_shielded == cleanup_shielded
+	, 0.50)
+	_require(cleanup_anchor_ready, "Cleanup coverage acquires an anchor before deactivation.")
+	cleanup_shooter.set_active(false)
+	_require(cleanup_shooter.anchor_shielded == null, "Deactivate or restart-style cleanup clears stale Shooter anchor references.")
+	cleanup_root.queue_free()
+	await get_tree().process_frame
+
+
 func _spawn_player(root: Node, start_position: Vector2) -> Player:
 	var player := PlayerScene.instantiate() as Player
 	root.add_child(player)
@@ -335,6 +498,16 @@ func _advance_physics(duration: float) -> void:
 	while elapsed < duration:
 		await get_tree().physics_frame
 		elapsed += 1.0 / 60.0
+
+
+func _advance_until(condition: Callable, timeout: float) -> bool:
+	var elapsed := 0.0
+	while elapsed < timeout:
+		if bool(condition.call()):
+			return true
+		await get_tree().physics_frame
+		elapsed += 1.0 / 60.0
+	return bool(condition.call())
 
 
 func _stop_main_runtime(main: Node) -> void:

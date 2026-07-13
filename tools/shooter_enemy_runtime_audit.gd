@@ -958,6 +958,10 @@ func _get_shooter_state_name(state: int) -> String:
 	match state:
 		ShooterEnemy.ShooterState.REPOSITION:
 			return "REPOSITION"
+		ShooterEnemy.ShooterState.COVER_HOLD:
+			return "COVER_HOLD"
+		ShooterEnemy.ShooterState.COVER_PEEK:
+			return "COVER_PEEK"
 		ShooterEnemy.ShooterState.AIM:
 			return "AIM"
 		ShooterEnemy.ShooterState.LOCKED:

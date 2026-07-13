@@ -150,6 +150,11 @@
 | `dash_speed` | `220.0px/s` | `scripts/charger.gd` | Committed dash speed. |
 | `dash_max_distance` | `92.0px` | `scripts/charger.gd` | Max committed dash travel. |
 | `recover_duration` | `0.55s` | `scripts/charger.gd` | Post-dash recovery. |
+| `bulldoze_probe_radius` | `12.0px` | `scripts/charger.gd` | Dash-only proximity probe used to find eligible hostiles in the Charger lane. |
+| `bulldoze_distance` | `14.0px` | `scripts/charger.gd` | Authored hostile displacement distance applied by one successful bulldoze. |
+| `bulldoze_duration` | `0.12s` | `scripts/charger.gd` | Authored hostile displacement duration for a bulldozed target. |
+| Bulldoze target rule | opt-in authored displacement only, once per target per dash | `scripts/charger.gd`, `scripts/enemy.gd`, `scripts/shielded_enemy.gd` | Limits bulldozing to eligible ordinary hostiles, keeps special enemies excluded unless they explicitly opt in, and prevents repeated shoves every physics frame. |
+| Bulldoze damage/score rule | none | `scripts/charger.gd` | Charger lane-clearing shoves do not deal damage, emit kills, or award score. |
 | `telegraph_line_length` | `38.0px` | `scripts/charger.gd` | Dash-line readability. |
 | `telegraph_shake_strength` | `1.4px` | `scripts/charger.gd` | Telegraph motion emphasis. |
 | `visible_entry_damage_sync_distance` | `10.0px` | `scripts/charger.gd` | Safety sync between visual body and damage. |

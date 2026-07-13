@@ -136,7 +136,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Spear.tscn` and `scripts/spear.gd`: the single spear state loop (`HELD`, `FLYING`, `LANDED`)
 - `scripts/spear_trail.gd`: non-rotating deterministic spear trail renderer
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
-- `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, recovery, and distinct visuals
+- `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, dash-only bulldozing of eligible hostiles, recovery, and distinct visuals
 - `ShieldedEnemy.tscn` and `scripts/shielded_enemy.gd`: two-hit Shielded enemy, shield-break stagger, and exposed death through the shared score path
 - `ShooterEnemy.tscn` and `scripts/shooter_enemy.gd`: ranged Blowgun Shooter, Shielded-aware cover hold and side-peek behavior, committed aim/lock/two-dart burst, non-damaging shove, successful-shove follow-up reposition, longer post-burst relocation, and dart request signal
 - `BoomerEnemy.tscn` and `scripts/boomer_enemy.gd`: ambient-only hopping Boomer, immediate landing-time fuse decision, two-radius detonation, and enemy-owned explosion resolution
@@ -191,7 +191,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 ## Enemy behavior
 
 - Normal enemy: slow direct pursuit, worth `1` point
-- Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, then recovers, worth `3` points
+- Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, can shove eligible ordinary hostiles out of that lane during the dash without damaging them, then recovers, worth `3` points
 - Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
 - Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, can use a nearby intact Shielded as temporary cover, peeks to a readable side lane before aiming, fires a two-dart straight player-only burst, then performs a longer tangential relocation around Akedra, and dies to one spear hit for `2` points
@@ -204,9 +204,11 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - Shooter darts can now trigger an unfused Boomer's normal fuse, and darts consumed by an already-fusing Boomer leave that fuse unchanged
 - This remains a narrow authored interaction, not universal friendly fire: darts still do not damage ordinary enemies, collide with the spear, or add Shielded projectile blocking
 - The live Shielded/Shooter cooperation still comes from positioning-based cover and side peeks rather than projectile blocking
+- Charger dash can now shove eligible ordinary hostiles out of its path through the existing authored displacement seam, preserving lane readability and breaking up enemy piles; bulldozing deals no damage, score, or enemy death
 - Boomer: ambient-only late-run hopping hazard with no ordinary contact damage, one active cap, safe pre-fuse spear kill for `2`, and a committed three-pulse fuse that starts immediately when it lands inside range
 - The Boomer only translates during its hop; hop prep, landing recovery, and fuse stay positionally stationary apart from visual-only squash, settle, and pulse cues
 - An armed Boomer detonates into a damaging core blast plus a non-damaging outer shockwave, can be triggered early by a valid thrown-spear hit during fuse, and awards no direct score for self-destruction
+- Charger body contact does not trigger Boomer fuse; the live Charger/Boomer interaction is still exclusionary rather than damage- or fuse-based
 - If Akedra is currently in shove-protected forced movement from a successful Shooter shove, the Boomer core blast deals no health damage and does not replace that authored movement with a second knockback impulse
 - A Boomer outer shockwave can lightly nudge an already landed spear by `20` pixels, keeping it in `LANDED`/`FETCH`, clamping it inside the arena, and preserving normal retrieval behavior
 - Prowler: ambient-only weapon-state predator that stalks while Akedra is armed, uses a short defensive personal-space pounce when crowded, then turns red-eyed and aggressive after a `0.28s` unarmed alert whenever the spear is not held
@@ -527,7 +529,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 ## Features intentionally left for later
 
 - More enemy types
-- Further Phase 4.6 enemy interaction work focused on later Charger bulldozing and broader formation follow-through beyond the live Shielded/Shooter cover behavior and Boomer lane-trap interaction
+- Further Phase 4.6 enemy interaction work focused on broader formation follow-through beyond the live Shielded/Shooter cover behavior, Boomer lane-trap interaction, and Charger bulldozing
 - Ring encounter formations
 - Wave reward selection driven by encounter completion signals
 - Upgrades or progression systems

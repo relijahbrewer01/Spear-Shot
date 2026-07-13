@@ -23,6 +23,7 @@ def main() -> int:
 
     enemy = read_text("scripts/enemy.gd")
     shielded = read_text("scripts/shielded_enemy.gd")
+    charger = read_text("scripts/charger.gd")
     shooter = read_text("scripts/shooter_enemy.gd")
     boomer = read_text("scripts/boomer_enemy.gd")
     dart = read_text("scripts/dart_projectile.gd")
@@ -152,6 +153,44 @@ def main() -> int:
         "Shielded cooperation does not depend on projectile interception hooks",
         failures,
     )
+    require(
+        "bulldoze_probe_radius := 12.0" in charger
+        and "bulldoze_distance := 14.0" in charger
+        and "bulldoze_duration := 0.12" in charger
+        and "_bulldozed_targets_this_dash" in charger,
+        "Charger exports the approved dash-only bulldoze tuning values and per-dash target guard",
+        failures,
+    )
+    require(
+        "_try_bulldoze_hostiles(start_position, global_position)" in charger
+        and "if state != State.DASH:" in charger
+        and "target.try_start_authored_hostile_displacement(" in charger,
+        "Charger layers bulldozing onto the committed dash by reusing the authored hostile-displacement seam instead of damage",
+        failures,
+    )
+    require(
+        "killed.emit" not in charger and "receive_combat_hit(" not in charger,
+        "Charger bulldozing does not introduce an enemy-damage or scoring path",
+        failures,
+    )
+    require(
+        "target is Charger or target is BoomerEnemy or target is ShooterEnemy or target is ProwlerEnemy" in charger
+        and "target.can_accept_authored_hostile_displacement()" in charger,
+        "Charger keeps bulldoze eligibility explicit and opt-in rather than treating all Enemy subclasses as valid targets",
+        failures,
+    )
+    require(
+        "Bulwark" not in charger and "multikill" not in charger and "friendly fire" not in charger.lower(),
+        "Charger script does not broaden this checkpoint into Bulwark, multikill, or universal friendly-fire work",
+        failures,
+    )
+    require(
+        "func _clear_bulldoze_targets()" in charger
+        and "_clear_bulldoze_targets()" in charger.split("func _enter_dash_state", 1)[1]
+        and "_clear_bulldoze_targets()" in charger.split("func _enter_recover_state", 1)[1],
+        "Charger clears bulldoze tracking when a dash starts and when it ends",
+        failures,
+    )
 
     require(
         "COVER_HOLD" in shooter
@@ -204,6 +243,16 @@ def main() -> int:
         "README and ROADMAP describe the live Boomer-only dart/fuse interaction without broadening it into universal friendly fire",
         failures,
     )
+    require(
+        "Phase 4.6.4" in roadmap
+        and "bulldozing deals no damage" in readme
+        and "body contact does not trigger Boomer fuse" in readme
+        and "bulldoze_probe_radius" in tuning
+        and "bulldoze_distance" in tuning
+        and "bulldoze_duration" in tuning,
+        "README, ROADMAP, and TUNING describe the narrow live Charger bulldozing checkpoint accurately",
+        failures,
+    )
 
     require(
         "FORMATION_BIAS_SEQUENCE" in main_script
@@ -235,6 +284,9 @@ def main() -> int:
         "formation_bias_angle_degrees",
         "formation_direct_pressure_distance",
         "formation_wall_fallback_padding",
+        "bulldoze_probe_radius",
+        "bulldoze_distance",
+        "bulldoze_duration",
         "shield_anchor_max_distance",
         "cover_hold_offset",
         "cover_position_tolerance",

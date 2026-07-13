@@ -1,6 +1,8 @@
 extends Enemy
 class_name Charger
 
+const BULLDOZE_DISPLACEMENT_SOURCE := &"charger_bulldoze"
+
 enum State {
 	CHASE,
 	TELEGRAPH,
@@ -14,6 +16,9 @@ enum State {
 @export var dash_speed := 220.0
 @export var dash_max_distance := 92.0
 @export var recover_duration := 0.55
+@export var bulldoze_probe_radius := 12.0
+@export var bulldoze_distance := 14.0
+@export var bulldoze_duration := 0.12
 @export var telegraph_color := Color8(247, 222, 158)
 @export var dash_color := Color8(232, 176, 102)
 @export var telegraph_line_color := Color8(255, 247, 214)
@@ -27,6 +32,7 @@ var dash_direction := Vector2.RIGHT
 var telegraph_direction := Vector2.RIGHT
 var dash_distance_travelled := 0.0
 var has_visible_arena_entry := false
+var _bulldozed_targets_this_dash: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 
 
@@ -39,6 +45,7 @@ func _ready() -> void:
 	super._ready()
 	rng.randomize()
 	has_visible_arena_entry = false
+	_clear_bulldoze_targets()
 	_enter_chase_state()
 
 
@@ -94,6 +101,7 @@ func _process_dash_state(_delta: float) -> void:
 	move_and_slide()
 	var hit_wall := is_on_wall()
 	_clamp_inside_arena()
+	_try_bulldoze_hostiles(start_position, global_position)
 
 	var moved_distance := start_position.distance_to(global_position)
 	dash_distance_travelled += moved_distance
@@ -111,6 +119,7 @@ func _process_recover_state(delta: float) -> void:
 func _enter_chase_state() -> void:
 	state = State.CHASE
 	state_time_left = rng.randf_range(chase_duration_min, chase_duration_max)
+	_clear_bulldoze_targets()
 
 
 func _enter_telegraph_state() -> void:
@@ -127,17 +136,102 @@ func _enter_dash_state() -> void:
 	dash_direction = telegraph_direction
 	if dash_direction == Vector2.ZERO:
 		dash_direction = Vector2.RIGHT
+	_clear_bulldoze_targets()
 
 
 func _enter_recover_state() -> void:
 	state = State.RECOVER
 	state_time_left = recover_duration
 	velocity = Vector2.ZERO
+	_clear_bulldoze_targets()
 
 
 func apply_explosion_knockback(direction: Vector2, distance: float, duration: float) -> void:
 	_enter_recover_state()
 	super.apply_explosion_knockback(direction, distance, duration)
+
+
+func set_active(is_active: bool) -> void:
+	super.set_active(is_active)
+	if not is_active:
+		_clear_bulldoze_targets()
+
+
+func take_spear_hit() -> void:
+	_clear_bulldoze_targets()
+	super.take_spear_hit()
+
+
+func _exit_tree() -> void:
+	_clear_bulldoze_targets()
+
+
+func _clear_bulldoze_targets() -> void:
+	_bulldozed_targets_this_dash.clear()
+
+
+func _try_bulldoze_hostiles(segment_start: Vector2, segment_end: Vector2) -> void:
+	if state != State.DASH:
+		return
+	if segment_start == segment_end:
+		return
+
+	for enemy_node in get_tree().get_nodes_in_group("enemy"):
+		var target := enemy_node as Enemy
+		if not _is_valid_bulldoze_target(target):
+			continue
+
+		var target_id := target.get_instance_id()
+		if _bulldozed_targets_this_dash.has(target_id):
+			continue
+
+		var closest_point := _get_closest_point_on_segment(target.global_position, segment_start, segment_end)
+		var hit_radius := bulldoze_probe_radius + target.body_radius
+		if closest_point.distance_to(target.global_position) > hit_radius:
+			continue
+
+		var bulldoze_direction := _get_bulldoze_direction_for(target, segment_start, segment_end)
+		if bulldoze_direction == Vector2.ZERO:
+			continue
+
+		if target.try_start_authored_hostile_displacement(
+			BULLDOZE_DISPLACEMENT_SOURCE,
+			bulldoze_direction,
+			bulldoze_distance,
+			bulldoze_duration
+		):
+			_bulldozed_targets_this_dash[target_id] = true
+
+
+func _is_valid_bulldoze_target(target: Enemy) -> bool:
+	if target == null or target == self or target.is_dying:
+		return false
+	if target is Charger or target is BoomerEnemy or target is ShooterEnemy or target is ProwlerEnemy:
+		return false
+	return target.can_accept_authored_hostile_displacement()
+
+
+func _get_bulldoze_direction_for(target: Enemy, segment_start: Vector2, segment_end: Vector2) -> Vector2:
+	var closest_point := _get_closest_point_on_segment(target.global_position, segment_start, segment_end)
+	var away_from_path := target.global_position - closest_point
+	if away_from_path.length_squared() > 0.001:
+		return away_from_path.normalized()
+
+	var away_from_charger := target.global_position - global_position
+	if away_from_charger.length_squared() > 0.001:
+		return away_from_charger.normalized()
+
+	return dash_direction.orthogonal().normalized()
+
+
+func _get_closest_point_on_segment(point: Vector2, segment_start: Vector2, segment_end: Vector2) -> Vector2:
+	var segment := segment_end - segment_start
+	var segment_length_squared := segment.length_squared()
+	if segment_length_squared <= 0.001:
+		return segment_start
+
+	var projection := (point - segment_start).dot(segment) / segment_length_squared
+	return segment_start + segment * clampf(projection, 0.0, 1.0)
 
 
 func _get_current_fill_color() -> Color:

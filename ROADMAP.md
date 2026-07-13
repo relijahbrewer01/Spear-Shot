@@ -62,6 +62,8 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - This cooperation remains positioning-based rather than projectile-blocking: Shielded armor still does not intercept darts or spear throws, and the Shooter still abandons cover whenever the anchor becomes unsuitable.
 - Phase 4.6.3 adds one narrow authored projectile interaction: Shooter darts now stop when they hit a Boomer, start an unfused Boomer's existing normal fuse, and are still consumed harmlessly by an already-fusing Boomer without restarting, shortening, cancelling, or duplicating that fuse.
 - This remains intentionally narrow rather than universal friendly fire: Shooters still aim at Akedra, darts still ignore other ordinary enemies, and Shielded projectile blocking remains deferred.
+- Phase 4.6.4 adds dash-only Charger bulldozing: during the committed dash, a Charger can shove eligible ordinary hostiles out of its lane through the existing authored displacement seam.
+- Bulldozing deals no damage, awards no score, does not clear enemy ownership, and does not trigger Boomer fuse by body contact; it exists purely to preserve the dash lane and break up piles.
 - Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
 - Final interaction and population tuning should happen after those behaviors exist, not before.
 

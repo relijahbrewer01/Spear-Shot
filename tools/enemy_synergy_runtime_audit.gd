@@ -7,6 +7,9 @@ const ChargerScene := preload("res://Charger.tscn")
 const ShooterScene := preload("res://ShooterEnemy.tscn")
 const BoomerScene := preload("res://BoomerEnemy.tscn")
 const ProwlerScene := preload("res://ProwlerEnemy.tscn")
+const HeartRunnerScene := preload("res://HeartRunner.tscn")
+const HeartPickupScene := preload("res://HeartPickup.tscn")
+const SpearScene := preload("res://Spear.tscn")
 const DartProjectileScene := preload("res://DartProjectile.tscn")
 const MainScene := preload("res://Main.tscn")
 const TEST_ARENA := Rect2(Vector2(16.0, 16.0), Vector2(352.0, 184.0))
@@ -27,6 +30,7 @@ func _run_audit() -> void:
 	await _audit_formation_bias_movement()
 	await _audit_authored_displacement_contract()
 	await _audit_shielded_opt_in_and_pause()
+	await _audit_charger_bulldoze()
 	await _audit_shielded_shooter_cooperation()
 	await _audit_shooter_dart_boomer_interaction()
 
@@ -314,6 +318,217 @@ func _audit_shielded_opt_in_and_pause() -> void:
 	await _advance_physics(0.12)
 	_require(pause_enemy.global_position.x > paused_position.x, "Authored hostile displacement resumes after pause.")
 
+	root.queue_free()
+	await get_tree().process_frame
+
+
+func _audit_charger_bulldoze() -> void:
+	var root := Node2D.new()
+	add_child(root)
+	var player := _spawn_player(root, Vector2(320.0, 40.0))
+	var charger := _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	var normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
+	var normal_start := normal.global_position
+	var normal_kill_count := 0
+	normal.killed.connect(func(_position: Vector2, _score: int) -> void:
+		normal_kill_count += 1
+	)
+
+	_start_charger_dash(charger, Vector2.RIGHT)
+	var bulldozed_normal := await _advance_until(func() -> bool:
+		return normal.is_in_authored_hostile_displacement()
+	, 0.20)
+	_require(bulldozed_normal, "Charger dashing through a Normal starts authored hostile displacement.")
+	_require(charger._bulldozed_targets_this_dash.size() == 1, "Charger records one successful bulldozed target during the active dash.")
+	await _advance_physics(0.22)
+	var normal_displacement := normal.global_position.distance_to(normal_start)
+	_require(normal_displacement >= 12.5 and normal_displacement <= 16.5, "Repeated overlap during one dash does not repeatedly shove the same Normal.")
+	_require(not normal.is_dying and normal_kill_count == 0, "Bulldozed Normals take no damage, emit no kill signal, and award no score.")
+	var reached_recover := await _advance_until(func() -> bool:
+		return charger.state == Charger.State.RECOVER
+	, 0.40)
+	_require(reached_recover, "Charger dash still transitions into recovery after its normal committed travel.")
+	_require(charger.dash_distance_travelled <= charger.dash_max_distance + 0.5, "Charger bulldozing does not extend the committed dash distance.")
+	_require(charger._bulldozed_targets_this_dash.size() == 0, "Charger clears its per-dash bulldoze guard when the dash ends.")
+
+	normal.global_position = normal_start
+	normal.cancel_authored_hostile_displacement()
+	charger.global_position = Vector2(96.0, 108.0)
+	charger.velocity = Vector2.ZERO
+	_start_charger_dash(charger, Vector2.RIGHT)
+	var bulldozed_again := await _advance_until(func() -> bool:
+		return normal.is_in_authored_hostile_displacement()
+	, 0.20)
+	_require(bulldozed_again, "A later Charger dash can bulldoze the same Normal again after the prior dash ends.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 180.0)) as Charger
+	var edge_normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 190.0))
+	var edge_start := edge_normal.global_position
+	_start_charger_dash(charger, Vector2.RIGHT)
+	await _advance_until(func() -> bool:
+		return edge_normal.is_in_authored_hostile_displacement()
+	, 0.20)
+	await _advance_physics(0.16)
+	_require(edge_normal.global_position.y <= TEST_ARENA.end.y - edge_normal.body_radius + 0.01, "Bulldozed Normals remain clamped inside the arena.")
+	_require(edge_normal.global_position.distance_to(edge_start) < charger.bulldoze_distance, "Arena clamping can safely shorten a bulldoze shove.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	var shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 116.0)) as ShieldedEnemy
+	_start_charger_dash(charger, Vector2.RIGHT)
+	var bulldozed_shielded := await _advance_until(func() -> bool:
+		return shielded.is_in_authored_hostile_displacement()
+	, 0.20)
+	_require(bulldozed_shielded, "Charger can bulldoze Shielded enemies during safe ordinary movement.")
+	_require(shielded.is_shield_intact() and not shielded.is_dying, "Bulldozing Shielded enemies does not break the shield or deal damage.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	var staggered_shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 116.0)) as ShieldedEnemy
+	staggered_shielded.receive_combat_hit(
+		Enemy.HIT_SOURCE_SPEAR,
+		staggered_shielded.global_position - Vector2.RIGHT * staggered_shielded.body_radius,
+		Vector2.RIGHT
+	)
+	await _advance_physics(0.14)
+	var staggered_position := staggered_shielded.global_position
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	_start_charger_dash(charger, Vector2.RIGHT)
+	await _advance_physics(0.22)
+	_require(not staggered_shielded.is_in_authored_hostile_displacement(), "Shielded rejects Charger bulldoze during shield-break stagger.")
+	_require(staggered_shielded.global_position == staggered_position, "Charger bulldozing does not add extra movement to a staggering Shielded enemy.")
+
+	var dead_shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 136.0)) as ShieldedEnemy
+	dead_shielded.take_spear_hit()
+	var dead_position := dead_shielded.global_position
+	var death_charger := _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 128.0)) as Charger
+	_start_charger_dash(death_charger, Vector2.RIGHT)
+	await _advance_physics(0.12)
+	_require(dead_shielded.global_position == dead_position, "Dying Shielded enemies reject Charger bulldoze.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	var other_charger := _spawn_enemy(root, ChargerScene, player, Vector2(122.0, 116.0)) as Charger
+	other_charger.state = Charger.State.RECOVER
+	other_charger.state_time_left = 99.0
+	other_charger.velocity = Vector2.ZERO
+	var other_charger_start := other_charger.global_position
+	_start_charger_dash(charger, Vector2.RIGHT)
+	await _advance_physics(0.22)
+	_require(other_charger.global_position == other_charger_start, "Chargers do not bulldoze other Chargers.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	var boomer := _spawn_enemy(root, BoomerScene, player, Vector2(122.0, 116.0)) as BoomerEnemy
+	boomer.boomer_state = BoomerEnemy.BoomerState.HOP_PREP
+	boomer.state_time_left = 99.0
+	var boomer_start := boomer.global_position
+	_start_charger_dash(charger, Vector2.RIGHT)
+	await _advance_physics(0.22)
+	_require(boomer.global_position == boomer_start, "Chargers do not bulldoze unfused Boomers.")
+	_require(boomer.boomer_state == BoomerEnemy.BoomerState.HOP_PREP, "Charger body contact does not start Boomer fuse.")
+
+	var fusing_boomer := _spawn_enemy(root, BoomerScene, player, Vector2(122.0, 136.0)) as BoomerEnemy
+	fusing_boomer.call("_enter_fuse_state")
+	var fusing_position := fusing_boomer.global_position
+	var fuse_time_before_charge := fusing_boomer.state_time_left
+	var fuse_charger := _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 128.0)) as Charger
+	_start_charger_dash(fuse_charger, Vector2.RIGHT)
+	await _advance_physics(0.12)
+	_require(fusing_boomer.global_position == fusing_position, "Chargers do not bulldoze already-fusing Boomers.")
+	_require(fusing_boomer.boomer_state == BoomerEnemy.BoomerState.FUSE and fusing_boomer.state_time_left < fuse_time_before_charge, "Charger body contact does not restart or alter an existing Boomer fuse.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	var shooter := _spawn_enemy(root, ShooterScene, player, Vector2(122.0, 116.0)) as ShooterEnemy
+	shooter.shooter_state = ShooterEnemy.ShooterState.RECOVER
+	shooter.state_time_left = 99.0
+	shooter.velocity = Vector2.ZERO
+	var shooter_start := shooter.global_position
+	var prowler := _spawn_enemy(root, ProwlerScene, player, Vector2(122.0, 136.0)) as ProwlerEnemy
+	prowler.prowler_state = ProwlerEnemy.ProwlerState.MISS_STUN
+	prowler.state_time_left = 99.0
+	prowler.velocity = Vector2.ZERO
+	var prowler_start := prowler.global_position
+	var spear := _spawn_spear(root, player)
+	_force_landed_spear(spear, Vector2(122.0, 156.0), Vector2.RIGHT)
+	var spear_start := spear.global_position
+	var dart := _spawn_dart(root, player, Vector2(122.0, 176.0), Vector2.RIGHT)
+	var heart_runner := _spawn_heart_runner(root, player, spear, Vector2(122.0, 96.0))
+	heart_runner.set_active(false)
+	var heart_runner_start := heart_runner.global_position
+	var heart_pickup := _spawn_heart_pickup(root, player, Vector2(122.0, 188.0))
+	heart_pickup.set_deferred("monitoring", false)
+	var heart_pickup_start := heart_pickup.global_position
+	_start_charger_dash(charger, Vector2.RIGHT)
+	await _advance_physics(0.22)
+	_require(shooter.global_position == shooter_start, "Chargers do not bulldoze Shooters.")
+	_require(prowler.global_position == prowler_start, "Chargers do not bulldoze Prowlers.")
+	_require(heart_runner.global_position == heart_runner_start, "Chargers do not bulldoze Heart Runner opportunities.")
+	_require(heart_pickup.global_position == heart_pickup_start, "Chargers do not bulldoze Heart Pickup opportunities.")
+	_require(spear.global_position == spear_start and spear.is_landed(), "Chargers do not bulldoze or disturb the spear.")
+	_require(is_instance_valid(dart) and not dart.has_resolved_hit, "Chargers do not bulldoze or consume Shooter darts.")
+	if is_instance_valid(dart):
+		dart.destroy_projectile()
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(126.0, 108.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	_start_charger_dash(charger, Vector2.RIGHT)
+	var damaged_player := await _advance_until(func() -> bool:
+		return player.health == player.max_health - 1
+	, 0.30)
+	_require(damaged_player, "Charger dash still damages Akedra through the existing player contact rules.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 40.0))
+	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
+	normal = _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
+	_start_charger_dash(charger, Vector2.RIGHT)
+	await _advance_until(func() -> bool:
+		return charger._bulldozed_targets_this_dash.size() == 1
+	, 0.20)
+	charger.set_active(false)
+	_require(charger._bulldozed_targets_this_dash.is_empty(), "Deactivate or restart-style cleanup clears Charger bulldoze tracking.")
+
+	var death_cleanup_charger := _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 136.0)) as Charger
+	var death_cleanup_normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 144.0))
+	_start_charger_dash(death_cleanup_charger, Vector2.RIGHT)
+	await _advance_until(func() -> bool:
+		return death_cleanup_charger._bulldozed_targets_this_dash.size() == 1
+	, 0.20)
+	death_cleanup_charger.take_spear_hit()
+	_require(death_cleanup_charger._bulldozed_targets_this_dash.is_empty(), "Death cleanup clears Charger bulldoze tracking.")
 	root.queue_free()
 	await get_tree().process_frame
 
@@ -606,12 +821,57 @@ func _spawn_enemy(root: Node, scene: PackedScene, player: Player, start_position
 	return enemy
 
 
+func _spawn_spear(root: Node, player: Player) -> Spear:
+	var spear := SpearScene.instantiate() as Spear
+	root.add_child(spear)
+	spear.setup(player, TEST_ARENA)
+	spear.reset_for_new_run(player, TEST_ARENA)
+	return spear
+
+
+func _force_landed_spear(spear: Spear, position: Vector2, direction: Vector2) -> void:
+	spear.throw_direction = direction.normalized()
+	if spear.throw_direction == Vector2.ZERO:
+		spear.throw_direction = Vector2.RIGHT
+	spear.call("_enter_landed_state", position)
+
+
 func _spawn_dart(root: Node, player: Player, start_position: Vector2, fire_direction: Vector2) -> DartProjectile:
 	var dart := DartProjectileScene.instantiate() as DartProjectile
 	root.add_child(dart)
 	dart.global_position = start_position
 	dart.setup(player, TEST_ARENA, fire_direction)
 	return dart
+
+
+func _spawn_heart_runner(root: Node, player: Player, spear: Spear, start_position: Vector2) -> HeartRunner:
+	var heart_runner := HeartRunnerScene.instantiate() as HeartRunner
+	root.add_child(heart_runner)
+	heart_runner.setup(
+		TEST_ARENA,
+		start_position,
+		Arena.SpawnEdge.LEFT,
+		140.0,
+		player,
+		spear,
+		false,
+		1
+	)
+	return heart_runner
+
+
+func _spawn_heart_pickup(root: Node, player: Player, start_position: Vector2) -> HeartPickup:
+	var heart_pickup := HeartPickupScene.instantiate() as HeartPickup
+	root.add_child(heart_pickup)
+	heart_pickup.setup(player, TEST_ARENA, start_position)
+	return heart_pickup
+
+
+func _start_charger_dash(charger: Charger, direction: Vector2) -> void:
+	charger.telegraph_direction = direction.normalized()
+	if charger.telegraph_direction == Vector2.ZERO:
+		charger.telegraph_direction = Vector2.RIGHT
+	charger.call("_enter_dash_state")
 
 
 func _advance_physics(duration: float) -> void:

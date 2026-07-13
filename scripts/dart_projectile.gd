@@ -2,7 +2,9 @@ extends Area2D
 class_name DartProjectile
 
 const PROJECTILE_KIND_DART := &"dart"
+const BOOMER_DART_TARGET_GROUP := &"boomer_dart_target"
 const DESTROY_REASON_PLAYER := &"player"
+const DESTROY_REASON_BOOMER := &"boomer"
 const DESTROY_REASON_LIFETIME := &"lifetime"
 const DESTROY_REASON_BOUNDS := &"bounds"
 const DESTROY_REASON_CLEARED := &"cleared"
@@ -29,6 +31,7 @@ var projectile_token := Player.INVALID_PROJECTILE_TOKEN
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	body_entered.connect(_on_body_entered)
+	area_entered.connect(_on_area_entered)
 	lifetime_left = max_lifetime
 	rotation = direction.angle()
 	queue_redraw()
@@ -107,6 +110,20 @@ func _on_body_entered(body: Node) -> void:
 		)
 
 	destroy_projectile(DESTROY_REASON_PLAYER)
+
+
+func _on_area_entered(area: Area2D) -> void:
+	if has_resolved_hit or area == null:
+		return
+	if not area.is_in_group(BOOMER_DART_TARGET_GROUP):
+		return
+
+	var boomer := area.get_parent() as BoomerEnemy
+	if boomer == null:
+		return
+
+	if boomer.trigger_fuse_from_dart(PROJECTILE_KIND_DART, global_position, direction):
+		destroy_projectile(DESTROY_REASON_BOOMER)
 
 
 func _draw() -> void:

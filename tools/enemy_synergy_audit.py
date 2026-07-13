@@ -24,8 +24,11 @@ def main() -> int:
     enemy = read_text("scripts/enemy.gd")
     shielded = read_text("scripts/shielded_enemy.gd")
     shooter = read_text("scripts/shooter_enemy.gd")
+    boomer = read_text("scripts/boomer_enemy.gd")
     dart = read_text("scripts/dart_projectile.gd")
     main_script = read_text("scripts/main.gd")
+    readme = read_text("README.md")
+    roadmap = read_text("ROADMAP.md")
     enemy_scene = read_text("Enemy.tscn")
     shielded_scene = read_text("ShieldedEnemy.tscn")
     charger_scene = read_text("Charger.tscn")
@@ -33,6 +36,7 @@ def main() -> int:
     boomer_scene = read_text("BoomerEnemy.tscn")
     prowler_scene = read_text("ProwlerEnemy.tscn")
     director = read_text("scripts/encounter_director.gd")
+    project = read_text("project.godot")
     tuning = read_text("TUNING.md")
 
     require((ROOT / "tools" / "EnemySynergyRuntimeAudit.tscn").exists(), "Enemy synergy runtime audit scene exists", failures)
@@ -180,8 +184,24 @@ def main() -> int:
         failures,
     )
     require(
+        "area_entered.connect(_on_area_entered)" in dart
+        and "BOOMER_DART_TARGET_GROUP" in dart
+        and "func trigger_fuse_from_dart(" in boomer
+        and "DartFuseTarget" in boomer_scene
+        and "BoomerDartTarget" in project,
+        "Phase 4.6.3 keeps the new non-player dart path narrow: only the dedicated Boomer dart target can consume a dart",
+        failures,
+    )
+    require(
         "ShieldedEnemy" not in dart and "receive_combat_hit" not in dart,
-        "Darts still do not implement Shielded interception or hostile damage in this checkpoint",
+        "Darts still do not implement Shielded interception or broad hostile damage in this checkpoint",
+        failures,
+    )
+    require(
+        "Shooter darts can now trigger an unfused Boomer's normal fuse" in readme
+        and "Phase 4.6.3" in roadmap
+        and "narrow authored interaction" in readme,
+        "README and ROADMAP describe the live Boomer-only dart/fuse interaction without broadening it into universal friendly fire",
         failures,
     )
 

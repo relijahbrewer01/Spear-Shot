@@ -1,6 +1,8 @@
 extends Enemy
 class_name BoomerEnemy
 
+const DART_FUSE_TARGET_GROUP := &"boomer_dart_target"
+
 signal hop_prepared
 signal hop_landed
 signal fuse_started
@@ -54,14 +56,21 @@ var fuse_flash_left := 0.0
 var emitted_fuse_pulse_count := 0
 var has_detonated := false
 
+@onready var dart_fuse_target: Area2D = $DartFuseTarget
+@onready var dart_fuse_target_shape: CollisionShape2D = $DartFuseTarget/CollisionShape2D
+
 
 func _ready() -> void:
 	super._ready()
+	if dart_fuse_target != null:
+		dart_fuse_target.add_to_group(DART_FUSE_TARGET_GROUP)
+	_set_dart_fuse_target_enabled(true)
 	_enter_hop_prep_state()
 
 
 func set_active(is_active: bool) -> void:
 	super.set_active(is_active)
+	_set_dart_fuse_target_enabled(is_active and not is_dying and not has_detonated)
 	if not is_active:
 		state_time_left = 0.0
 		fuse_flash_left = 0.0
@@ -81,10 +90,28 @@ func receive_combat_hit(
 		return HitResponse.IGNORED
 
 	if boomer_state == BoomerState.FUSE:
+		_set_dart_fuse_target_enabled(false)
 		_start_detonation(hit_position, hit_direction)
 		return HitResponse.DAMAGED
 
+	_set_dart_fuse_target_enabled(false)
 	return super.receive_combat_hit(hit_source, hit_position, hit_direction)
+
+
+func trigger_fuse_from_dart(
+	projectile_kind: StringName,
+	_hit_position: Vector2,
+	_hit_direction: Vector2
+) -> bool:
+	if projectile_kind != DartProjectile.PROJECTILE_KIND_DART:
+		return false
+	if is_dying or has_detonated or not active or is_queued_for_deletion():
+		return false
+	if boomer_state == BoomerState.FUSE:
+		return true
+
+	_enter_fuse_state()
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -216,6 +243,7 @@ func _start_detonation(_hit_position: Vector2, hit_direction: Vector2) -> void:
 
 	has_detonated = true
 	active = false
+	_set_dart_fuse_target_enabled(false)
 	velocity = Vector2.ZERO
 	collision_layer = 0
 	collision_mask = 0
@@ -378,6 +406,16 @@ func _clamp_position_to_arena(target_position: Vector2) -> Vector2:
 		clamp(target_position.x, arena_rect.position.x + body_radius, arena_rect.end.x - body_radius),
 		clamp(target_position.y, arena_rect.position.y + body_radius, arena_rect.end.y - body_radius)
 	)
+
+
+func _set_dart_fuse_target_enabled(is_enabled: bool) -> void:
+	if dart_fuse_target == null:
+		return
+
+	dart_fuse_target.monitoring = false
+	dart_fuse_target.set_deferred("monitorable", is_enabled)
+	if dart_fuse_target_shape != null:
+		dart_fuse_target_shape.set_deferred("disabled", not is_enabled)
 
 
 func _try_contact_damage() -> void:

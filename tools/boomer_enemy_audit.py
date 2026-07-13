@@ -56,6 +56,7 @@ def main() -> int:
     player = read_text("scripts/player.gd")
     main_script = read_text("scripts/main.gd")
     director = read_text("scripts/encounter_director.gd")
+    project = read_text("project.godot")
     main_scene = read_text("Main.tscn")
     boomer_scene = read_text("BoomerEnemy.tscn")
     blast_effect_scene = read_text("BoomerBlastEffect.tscn")
@@ -106,6 +107,13 @@ def main() -> int:
     require("_is_player_in_fuse_range()" in boomer and "_enter_fuse_state()" in boomer and "_enter_land_recovery_state()" in boomer, "Boomer checks fuse range immediately on landing", failures)
     require("_apply_landing_correction" in boomer and "_process_hop_prep" in boomer and "_process_land_recovery" in boomer, "Boomer keeps prep and recovery discrete while using only a one-time landing correction", failures)
     require("has_detonated" in boomer and "_resolve_explosion" in boomer and "queue_free()" in boomer, "Boomer guards detonation to one explosion and self-cleans without scoring", failures)
+    require(
+        "func trigger_fuse_from_dart(" in boomer
+        and "projectile_kind != DartProjectile.PROJECTILE_KIND_DART" in boomer
+        and "boomer_state == BoomerState.FUSE" in boomer,
+        "Boomer exposes one narrow dart-trigger seam that reuses the live fuse state instead of creating a parallel projectile path",
+        failures,
+    )
     require("Player.DAMAGE_SOURCE_EXPLOSION" in boomer and "player.try_start_forced_movement" in boomer, "Boomer routes player damage and knockback through the existing player authority", failures)
     require("landed_spear_shockwave_displacement := 20.0" in boomer, "Boomer exports the approved landed-spear shockwave displacement", failures)
     require("if player.has_shove_damage_protection():\n\t\treturn" in boomer, "Boomer core blast skips damage and replacement knockback during shove-protected forced movement", failures)
@@ -116,8 +124,10 @@ def main() -> int:
     require("score_value = 2" in boomer_scene, "Boomer safe kill score is 2", failures)
     require("body_radius = 8.0" in boomer_scene and "radius = 8.0" in boomer_scene, "Boomer body and collision radii start at 8", failures)
     require("separation_distance = 26.0" in boomer_scene and "separation_strength = 48.0" in boomer_scene, "Boomer has its own spacing tuning", failures)
+    require("DartFuseTarget" in boomer_scene and "collision_layer = 64" in boomer_scene, "Boomer scene exposes a dedicated Boomer-only dart trigger target", failures)
     require("script = ExtResource(\"1\")" in blast_effect_scene, "Boomer blast effect scene is script-backed", failures)
 
+    require("BoomerDartTarget" in project, "Project defines the dedicated Boomer dart-target physics layer", failures)
     require("DAMAGE_SOURCE_EXPLOSION := &\"explosion\"" in player, "Player defines a narrow explosion damage source", failures)
     require("has_shove_damage_protection() and damage_source != DAMAGE_SOURCE_EXPLOSION" in player, "Player still keeps explosion damage generally valid while shove protection blocks other sources", failures)
 

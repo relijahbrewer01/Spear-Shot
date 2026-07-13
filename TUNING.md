@@ -264,6 +264,7 @@
 | `outer_shockwave_radius` | `54.0px` | `scripts/boomer_enemy.gd` | Non-damaging crowd-rearrangement radius. |
 | `player_knockback_distance/duration` | `28.0px / 0.20s` | `scripts/boomer_enemy.gd` | Authored player knockback when the core blast damage lands. |
 | `landed_spear_shockwave_displacement` | `20.0px` | `scripts/boomer_enemy.gd` | One-time outward nudge applied to a spear that is already landed inside the Boomer outer shockwave. |
+| Dart fuse interaction | consume dart, start fuse only if unfused | `scripts/boomer_enemy.gd`, `scripts/dart_projectile.gd`, `BoomerEnemy.tscn` | Dedicated Boomer-only projectile target that starts the ordinary Boomer fuse without dealing projectile damage or score. |
 | `enemy_shockwave_knockback_distance/duration` | `18.0px / 0.16s` | `scripts/boomer_enemy.gd` | Default outer-ring enemy knockback. |
 | `shooter_shockwave_knockback_distance/duration` | `22.0px / 0.18s` | `scripts/boomer_enemy.gd` | Slightly stronger outer-ring Shooter knockback. |
 | `charger_core_knockback_distance/duration` | `30.0px / 0.20s` | `scripts/boomer_enemy.gd` | Core-blast Charger interruption and recovery setup. |
@@ -355,8 +356,10 @@
 | `max_lifetime` | `1.8s` | `scripts/dart_projectile.gd` | Projectile lifetime cleanup. |
 | `bounds_padding` | `8.0px` | `scripts/dart_projectile.gd` | Arena cleanup padding. |
 | `PROJECTILE_KIND_DART` | `&"dart"` | `scripts/dart_projectile.gd` | Projectile identity for future narrow interactions. |
+| Collision mask | Player + `BoomerDartTarget` (`65`) | `DartProjectile.tscn`, `project.godot` | Darts can still hit Akedra and now detect only the dedicated Boomer fuse target, not general enemy bodies. |
+| Boomer consumption rule | consume on unfused or already-fusing Boomer only | `scripts/dart_projectile.gd`, `scripts/boomer_enemy.gd` | Boomer is the only non-player target in this checkpoint; other enemies still ignore darts. |
 | Burst damage rule | Two distinct dart indices from one `burst_id` may both damage | `scripts/player.gd` | Dart two can pierce dart one's hurt window without weakening normal invulnerability. |
-| Collision targets | Player layer only | `DartProjectile.tscn` | Darts do not hit spear, enemies, or Shielded yet. |
+| Collision targets | Player plus dedicated Boomer fuse target only | `DartProjectile.tscn`, `BoomerEnemy.tscn` | Darts still do not hit the spear or ordinary enemies; only Akedra and the Boomer's narrow fuse target can consume them. |
 
 ## HUD And Feedback
 

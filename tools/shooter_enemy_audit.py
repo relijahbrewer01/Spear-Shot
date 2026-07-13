@@ -167,18 +167,25 @@ def main() -> int:
     require("speed := 145.0" in dart, "Dart speed starts at 145", failures)
     require("max_lifetime := 1.8" in dart, "Dart lifetime starts at 1.8", failures)
     require("collision_layer = 32" in dart_scene, "Dart uses the EnemyProjectile layer", failures)
-    require("collision_mask = 1" in dart_scene, "Dart only masks the Player layer", failures)
+    require("collision_mask = 65" in dart_scene, "Dart masks the Player and Boomer-only dart-target layers", failures)
     require("radius = 3.0" in dart_scene, "Dart collision radius is 3", failures)
     require("take_damage" in dart and "Player.DAMAGE_SOURCE_DART" in dart, "Dart uses the player damage authority with dart context", failures)
     require("burst_id" in dart and "dart_index" in dart and "projectile_token" in dart, "Dart carries burst id, dart index, and projectile token", failures)
+    require(
+        "area_entered.connect(_on_area_entered)" in dart
+        and "BOOMER_DART_TARGET_GROUP" in dart
+        and "trigger_fuse_from_dart" in dart,
+        "Dart keeps one narrow Boomer-only non-player interaction path without becoming a general hostile projectile system",
+        failures,
+    )
     require("DAMAGE_SOURCE_DART := &\"dart\"" in player, "Player defines a narrow dart damage source", failures)
     require("damaged_dart_indices_by_burst" in player, "Player tracks accepted dart indices by burst", failures)
     require("accepted_dart_projectile_tokens" in player, "Player blocks duplicate dart projectile tokens", failures)
     require("FORCED_MOVEMENT" in player and "try_start_forced_movement" in player, "Player exposes the narrow forced-movement state used by shove", failures)
     require("FORCED_MOVEMENT_PROTECTION_SHOVE" in player and "has_shove_damage_protection" in player, "Player exposes shove-specific damage protection without turning it into dodge invulnerability", failures)
-    require("ShieldedEnemy" not in dart and "receive_combat_hit" not in dart, "Dart does not implement Shielded interception yet", failures)
+    require("ShieldedEnemy" not in dart and "receive_combat_hit" not in dart, "Dart still does not implement Shielded interception or broad hostile damage", failures)
 
-    require("EnemyProjectile" in project, "Project names the EnemyProjectile physics layer", failures)
+    require("EnemyProjectile" in project and "BoomerDartTarget" in project, "Project names the narrow EnemyProjectile and BoomerDartTarget physics layers", failures)
     require("const ShooterScene := preload(\"res://ShooterEnemy.tscn\")" in main_script, "Main preloads Shooter", failures)
     require("const DartProjectileScene := preload(\"res://DartProjectile.tscn\")" in main_script, "Main preloads DartProjectile", failures)
     require("ProjectileContainer" in main_scene, "Main scene has a projectile container", failures)

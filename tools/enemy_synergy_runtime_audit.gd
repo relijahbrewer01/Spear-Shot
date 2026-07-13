@@ -7,6 +7,7 @@ const ChargerScene := preload("res://Charger.tscn")
 const ShooterScene := preload("res://ShooterEnemy.tscn")
 const BoomerScene := preload("res://BoomerEnemy.tscn")
 const ProwlerScene := preload("res://ProwlerEnemy.tscn")
+const DartProjectileScene := preload("res://DartProjectile.tscn")
 const MainScene := preload("res://Main.tscn")
 const TEST_ARENA := Rect2(Vector2(16.0, 16.0), Vector2(352.0, 184.0))
 const TEST_WAVE_ID := 77
@@ -27,6 +28,7 @@ func _run_audit() -> void:
 	await _audit_authored_displacement_contract()
 	await _audit_shielded_opt_in_and_pause()
 	await _audit_shielded_shooter_cooperation()
+	await _audit_shooter_dart_boomer_interaction()
 
 	for failure in failures:
 		push_error("ENEMY SYNERGY AUDIT: %s" % failure)
@@ -478,6 +480,117 @@ func _audit_shielded_shooter_cooperation() -> void:
 	await get_tree().process_frame
 
 
+func _audit_shooter_dart_boomer_interaction() -> void:
+	var root := Node2D.new()
+	add_child(root)
+	var player := _spawn_player(root, Vector2(320.0, 160.0))
+	var boomer := _spawn_enemy(root, BoomerScene, player, Vector2(160.0, 108.0)) as BoomerEnemy
+	var first_dart := _spawn_dart(root, player, Vector2(145.0, 108.0), Vector2.RIGHT)
+	var first_hit := await _advance_until(func() -> bool:
+		return boomer.boomer_state == BoomerEnemy.BoomerState.FUSE and not is_instance_valid(first_dart)
+	, 0.20)
+	_require(first_hit, "A Shooter dart consumed by an unfused Boomer starts the existing normal fuse.")
+	_require(boomer.emitted_fuse_pulse_count == 1, "Boomer keeps its normal fuse pulse sequence when triggered by a dart.")
+	var detonated_count := 0
+	boomer.detonated.connect(func(
+		_position: Vector2,
+		_core_radius: float,
+		_outer_radius: float,
+		_landed_spear_shockwave_displacement: float
+	) -> void:
+		detonated_count += 1
+	)
+
+	await _advance_physics(0.12)
+	var fuse_time_before_second_dart := boomer.state_time_left
+	var second_dart := _spawn_dart(root, player, Vector2(145.0, 108.0), Vector2.RIGHT)
+	var second_hit := await _advance_until(func() -> bool:
+		return not is_instance_valid(second_dart)
+	, 0.20)
+	_require(second_hit, "A second Shooter dart is still consumed by an already-fusing Boomer.")
+	_require(boomer.boomer_state == BoomerEnemy.BoomerState.FUSE, "An already-fusing Boomer stays on its existing fuse path after another dart.")
+	_require(boomer.state_time_left < fuse_time_before_second_dart, "A second Shooter dart does not restart, extend, or otherwise refresh the fuse timer.")
+
+	var single_detonation := await _advance_until(func() -> bool:
+		return detonated_count == 1
+	, boomer.fuse_duration + 0.20)
+	_require(single_detonation and detonated_count == 1, "Repeated Shooter darts do not schedule duplicate Boomer detonations.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 160.0))
+	boomer = _spawn_enemy(root, BoomerScene, player, Vector2(160.0, 108.0)) as BoomerEnemy
+	var paused_dart := _spawn_dart(root, player, Vector2(145.0, 108.0), Vector2.RIGHT)
+	get_tree().paused = true
+	await get_tree().create_timer(0.12, true, false, true).timeout
+	_require(boomer.boomer_state == BoomerEnemy.BoomerState.HOP_PREP, "Pause freezes the Boomer before an in-flight dart can trigger its fuse.")
+	_require(is_instance_valid(paused_dart), "Pause also freezes the in-flight Shooter dart instead of resolving the Boomer interaction early.")
+	get_tree().paused = false
+	var resumed_hit := await _advance_until(func() -> bool:
+		return boomer.boomer_state == BoomerEnemy.BoomerState.FUSE and not is_instance_valid(paused_dart)
+	, 0.20)
+	_require(resumed_hit, "The same in-flight Shooter dart resumes into the normal Boomer fuse after pause ends.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 160.0))
+	boomer = _spawn_enemy(root, BoomerScene, player, Vector2(160.0, 108.0)) as BoomerEnemy
+	boomer.set_active(false)
+	var inactive_dart := _spawn_dart(root, player, Vector2(145.0, 108.0), Vector2.RIGHT)
+	var passed_inactive_boomer := await _advance_until(func() -> bool:
+		return inactive_dart.global_position.x >= boomer.global_position.x + boomer.body_radius + 12.0 or not is_instance_valid(inactive_dart)
+	, 0.25)
+	_require(passed_inactive_boomer and boomer.boomer_state == BoomerEnemy.BoomerState.HOP_PREP, "Cleanup-style Boomer deactivation disables the dart trigger instead of leaving a stale fuse target.")
+	_require(is_instance_valid(inactive_dart), "An inactive Boomer does not consume later Shooter darts.")
+	if is_instance_valid(inactive_dart):
+		inactive_dart.destroy_projectile()
+	await get_tree().process_frame
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(176.0, 108.0))
+	var player_dart := _spawn_dart(root, player, Vector2(152.0, 108.0), Vector2.RIGHT)
+	var player_hit := await _advance_until(func() -> bool:
+		return not is_instance_valid(player_dart)
+	, 0.20)
+	_require(player_hit and player.health == player.max_health - 1, "Shooter darts still damage Akedra through the existing player authority when no Boomer absorbs them.")
+	root.queue_free()
+	await get_tree().process_frame
+
+	root = Node2D.new()
+	add_child(root)
+	player = _spawn_player(root, Vector2(320.0, 160.0))
+	var normal := _spawn_enemy(root, EnemyScene, player, Vector2(160.0, 72.0))
+	var shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(160.0, 96.0)) as ShieldedEnemy
+	var shooter := _spawn_enemy(root, ShooterScene, player, Vector2(160.0, 120.0)) as ShooterEnemy
+	shooter.first_attack_delay_left = 99.0
+	var prowler := _spawn_enemy(root, ProwlerScene, player, Vector2(160.0, 144.0)) as ProwlerEnemy
+	for test_case in [
+		{"enemy": normal, "start": Vector2(145.0, 72.0), "label": "Normal"},
+		{"enemy": shielded, "start": Vector2(145.0, 96.0), "label": "Shielded"},
+		{"enemy": shooter, "start": Vector2(145.0, 120.0), "label": "Shooter"},
+		{"enemy": prowler, "start": Vector2(145.0, 144.0), "label": "Prowler"},
+	]:
+		var enemy := test_case["enemy"] as Enemy
+		var test_dart := _spawn_dart(root, player, test_case["start"], Vector2.RIGHT)
+		var cleared_enemy_body := await _advance_until(func() -> bool:
+			return test_dart.global_position.x >= enemy.global_position.x + enemy.body_radius + 12.0 or not is_instance_valid(test_dart)
+		, 0.25)
+		_require(cleared_enemy_body and not enemy.is_dying, "Shooter darts do not damage or kill %s enemies." % String(test_case["label"]))
+		_require(is_instance_valid(test_dart), "%s enemies do not consume Shooter darts in this checkpoint." % String(test_case["label"]))
+		if is_instance_valid(test_dart):
+			test_dart.destroy_projectile()
+		await get_tree().process_frame
+	root.queue_free()
+	await get_tree().process_frame
+
+
 func _spawn_player(root: Node, start_position: Vector2) -> Player:
 	var player := PlayerScene.instantiate() as Player
 	root.add_child(player)
@@ -491,6 +604,14 @@ func _spawn_enemy(root: Node, scene: PackedScene, player: Player, start_position
 	enemy.setup(player, TEST_ARENA, 42.0)
 	enemy.global_position = start_position
 	return enemy
+
+
+func _spawn_dart(root: Node, player: Player, start_position: Vector2, fire_direction: Vector2) -> DartProjectile:
+	var dart := DartProjectileScene.instantiate() as DartProjectile
+	root.add_child(dart)
+	dart.global_position = start_position
+	dart.setup(player, TEST_ARENA, fire_direction)
+	return dart
 
 
 func _advance_physics(duration: float) -> void:

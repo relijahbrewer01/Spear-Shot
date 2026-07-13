@@ -144,7 +144,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `BoomerBlastEffect.tscn` and `scripts/boomer_blast_effect.gd`: short-lived visual-only Boomer blast effect
 - `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile opportunity runner with visible calm entry, limited wandering, proximity-triggered panic, locked casual-or-panic exit routing, explicit spear-hit handling, authored displacement support, and currently locked route exit-plane cleanup
 - `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
-- `DartProjectile.tscn` and `scripts/dart_projectile.gd`: player-only dart projectile with straight-line travel, burst-aware player damage context, invulnerability-safe contact, and cleanup
+- `DartProjectile.tscn` and `scripts/dart_projectile.gd`: straight-line dart projectile with burst-aware player damage context, a dedicated Boomer-only fuse-trigger target, invulnerability-safe contact, and cleanup
 - `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
 - `scripts/destination_marker.gd`: brief right-click destination feedback marker
@@ -201,7 +201,9 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - At very close range, the Shooter can use a short non-damaging shove that knocks Akedra back through the existing movement authority, grants shove-only temporary damage protection while that authored displacement resolves, and then quickly repositions into a normal readable follow-up shot
 - Darts travel at `145` pixels per second for up to `1.8` seconds, damage Akedra only through the existing player damage authority, and are consumed harmlessly by active dodge or dodge exit grace
 - A narrow burst context lets two distinct darts from the same Shooter volley each deal one damage, while duplicate callbacks from either individual dart and unrelated damage sources still respect normal invulnerability
-- Darts currently do not collide with the spear, enemies, or Shielded enemies; the live Shielded/Shooter cooperation now comes from positioning-based cover and side peeks rather than projectile blocking
+- Shooter darts can now trigger an unfused Boomer's normal fuse, and darts consumed by an already-fusing Boomer leave that fuse unchanged
+- This remains a narrow authored interaction, not universal friendly fire: darts still do not damage ordinary enemies, collide with the spear, or add Shielded projectile blocking
+- The live Shielded/Shooter cooperation still comes from positioning-based cover and side peeks rather than projectile blocking
 - Boomer: ambient-only late-run hopping hazard with no ordinary contact damage, one active cap, safe pre-fuse spear kill for `2`, and a committed three-pulse fuse that starts immediately when it lands inside range
 - The Boomer only translates during its hop; hop prep, landing recovery, and fuse stay positionally stationary apart from visual-only squash, settle, and pulse cues
 - An armed Boomer detonates into a damaging core blast plus a non-damaging outer shockwave, can be triggered early by a valid thrown-spear hit during fuse, and awards no direct score for self-destruction
@@ -525,7 +527,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 ## Features intentionally left for later
 
 - More enemy types
-- Further Phase 4.6 enemy interaction work focused on Shooter-dart/Boomer interactions, later Charger bulldozing, and broader formation follow-through beyond the live Shielded/Shooter cover behavior
+- Further Phase 4.6 enemy interaction work focused on later Charger bulldozing and broader formation follow-through beyond the live Shielded/Shooter cover behavior and Boomer lane-trap interaction
 - Ring encounter formations
 - Wave reward selection driven by encounter completion signals
 - Upgrades or progression systems

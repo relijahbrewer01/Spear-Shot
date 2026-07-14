@@ -95,13 +95,30 @@ func _process_telegraph_state(delta: float) -> void:
 		_enter_dash_state()
 
 
-func _process_dash_state(_delta: float) -> void:
+func _process_dash_state(delta: float) -> void:
 	var start_position := global_position
+	var planned_distance := minf(
+		dash_speed * delta,
+		maxf(dash_max_distance - dash_distance_travelled, 0.0)
+	)
+	var intended_end := start_position + dash_direction * planned_distance
+	if arena_rect.size != Vector2.ZERO:
+		intended_end.x = clamp(
+			intended_end.x,
+			arena_rect.position.x + body_radius,
+			arena_rect.end.x - body_radius
+		)
+		intended_end.y = clamp(
+			intended_end.y,
+			arena_rect.position.y + body_radius,
+			arena_rect.end.y - body_radius
+		)
+
+	_try_bulldoze_hostiles(start_position, intended_end)
 	velocity = dash_direction * dash_speed
 	move_and_slide()
 	var hit_wall := is_on_wall()
 	_clamp_inside_arena()
-	_try_bulldoze_hostiles(start_position, global_position)
 
 	var moved_distance := start_position.distance_to(global_position)
 	dash_distance_travelled += moved_distance

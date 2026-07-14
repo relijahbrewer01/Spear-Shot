@@ -162,10 +162,11 @@ def main() -> int:
         failures,
     )
     require(
-        "_try_bulldoze_hostiles(start_position, global_position)" in charger
+        "var intended_end := start_position + dash_direction * planned_distance" in charger
+        and "_try_bulldoze_hostiles(start_position, intended_end)" in charger
         and "if state != State.DASH:" in charger
         and "target.try_start_authored_hostile_displacement(" in charger,
-        "Charger layers bulldozing onto the committed dash by reusing the authored hostile-displacement seam instead of damage",
+        "Charger layers bulldozing onto the committed dash by probing the intended dash segment and reusing the authored hostile-displacement seam instead of damage",
         failures,
     )
     require(
@@ -177,6 +178,11 @@ def main() -> int:
         "target is Charger or target is BoomerEnemy or target is ShooterEnemy or target is ProwlerEnemy" in charger
         and "target.can_accept_authored_hostile_displacement()" in charger,
         "Charger keeps bulldoze eligibility explicit and opt-in rather than treating all Enemy subclasses as valid targets",
+        failures,
+    )
+    require(
+        "has_bulldozed_this_dash" not in charger,
+        "Charger does not use a global one-bulldoze-per-dash flag that would block later eligible targets",
         failures,
     )
     require(

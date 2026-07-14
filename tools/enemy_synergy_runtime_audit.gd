@@ -327,23 +327,41 @@ func _audit_charger_bulldoze() -> void:
 	add_child(root)
 	var player := _spawn_player(root, Vector2(320.0, 40.0))
 	var charger := _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
-	var normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
-	var normal_start := normal.global_position
-	var normal_kill_count := 0
-	normal.killed.connect(func(_position: Vector2, _score: int) -> void:
-		normal_kill_count += 1
-	)
+	var normals: Array[Enemy] = []
+	var normal_starts: Array[Vector2] = []
+	var normal_kill_counts := [0, 0, 0]
+	for normal_index in 3:
+		var normal := _spawn_enemy(
+			root,
+			EnemyScene,
+			player,
+			Vector2(122.0 + float(normal_index) * 18.0, 116.0)
+		)
+		var captured_index := normal_index
+		normal.killed.connect(func(_position: Vector2, _score: int) -> void:
+			normal_kill_counts[captured_index] += 1
+		)
+		normals.append(normal)
+		normal_starts.append(normal.global_position)
 
 	_start_charger_dash(charger, Vector2.RIGHT)
-	var bulldozed_normal := await _advance_until(func() -> bool:
-		return normal.is_in_authored_hostile_displacement()
-	, 0.20)
-	_require(bulldozed_normal, "Charger dashing through a Normal starts authored hostile displacement.")
-	_require(charger._bulldozed_targets_this_dash.size() == 1, "Charger records one successful bulldozed target during the active dash.")
+	var bulldozed_normals := await _advance_until(func() -> bool:
+		return charger._bulldozed_targets_this_dash.size() == 3
+	, 0.60)
+	_require(bulldozed_normals, "One committed Charger dash can bulldoze every eligible Normal it reaches instead of stopping after the first target.")
+	_require(charger._bulldozed_targets_this_dash.size() == 3, "Charger records each successfully bulldozed target separately during the active dash.")
 	await _advance_physics(0.22)
-	var normal_displacement := normal.global_position.distance_to(normal_start)
-	_require(normal_displacement >= 12.5 and normal_displacement <= 16.5, "Repeated overlap during one dash does not repeatedly shove the same Normal.")
-	_require(not normal.is_dying and normal_kill_count == 0, "Bulldozed Normals take no damage, emit no kill signal, and award no score.")
+	for normal_index in normals.size():
+		var normal := normals[normal_index]
+		var normal_displacement := normal.global_position.distance_to(normal_starts[normal_index])
+		_require(
+			normal_displacement >= 12.5 and normal_displacement <= 16.5,
+			"Repeated overlap during one dash does not repeatedly shove the same Normal."
+		)
+		_require(
+			not normal.is_dying and normal_kill_counts[normal_index] == 0,
+			"Bulldozed Normals take no damage, emit no kill signal, and award no score."
+		)
 	var reached_recover := await _advance_until(func() -> bool:
 		return charger.state == Charger.State.RECOVER
 	, 0.40)
@@ -351,15 +369,17 @@ func _audit_charger_bulldoze() -> void:
 	_require(charger.dash_distance_travelled <= charger.dash_max_distance + 0.5, "Charger bulldozing does not extend the committed dash distance.")
 	_require(charger._bulldozed_targets_this_dash.size() == 0, "Charger clears its per-dash bulldoze guard when the dash ends.")
 
-	normal.global_position = normal_start
-	normal.cancel_authored_hostile_displacement()
+	for normal_index in normals.size():
+		var reset_normal := normals[normal_index]
+		reset_normal.global_position = normal_starts[normal_index]
+		reset_normal.cancel_authored_hostile_displacement()
 	charger.global_position = Vector2(96.0, 108.0)
 	charger.velocity = Vector2.ZERO
 	_start_charger_dash(charger, Vector2.RIGHT)
 	var bulldozed_again := await _advance_until(func() -> bool:
-		return normal.is_in_authored_hostile_displacement()
-	, 0.20)
-	_require(bulldozed_again, "A later Charger dash can bulldoze the same Normal again after the prior dash ends.")
+		return charger._bulldozed_targets_this_dash.size() == 3
+	, 0.60)
+	_require(bulldozed_again, "A later Charger dash can bulldoze those same eligible Normals again after the prior dash ends.")
 	root.queue_free()
 	await get_tree().process_frame
 
@@ -383,12 +403,14 @@ func _audit_charger_bulldoze() -> void:
 	add_child(root)
 	player = _spawn_player(root, Vector2(320.0, 40.0))
 	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
-	var shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 116.0)) as ShieldedEnemy
+	var mixed_normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
+	var shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 100.0)) as ShieldedEnemy
 	_start_charger_dash(charger, Vector2.RIGHT)
-	var bulldozed_shielded := await _advance_until(func() -> bool:
-		return shielded.is_in_authored_hostile_displacement()
-	, 0.20)
-	_require(bulldozed_shielded, "Charger can bulldoze Shielded enemies during safe ordinary movement.")
+	var bulldozed_mixed_targets := await _advance_until(func() -> bool:
+		return mixed_normal.is_in_authored_hostile_displacement() and shielded.is_in_authored_hostile_displacement()
+	, 0.30)
+	_require(bulldozed_mixed_targets, "Charger can bulldoze an eligible Shielded and a Normal during the same dash.")
+	_require(charger._bulldozed_targets_this_dash.size() == 2, "Per-dash bulldoze tracking records multiple eligible targets independently in one dash.")
 	_require(shielded.is_shield_intact() and not shielded.is_dying, "Bulldozing Shielded enemies does not break the shield or deal damage.")
 	root.queue_free()
 	await get_tree().process_frame
@@ -396,7 +418,8 @@ func _audit_charger_bulldoze() -> void:
 	root = Node2D.new()
 	add_child(root)
 	player = _spawn_player(root, Vector2(320.0, 40.0))
-	var staggered_shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 116.0)) as ShieldedEnemy
+	var staggered_normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
+	var staggered_shielded := _spawn_enemy(root, ShieldedScene, player, Vector2(122.0, 100.0)) as ShieldedEnemy
 	staggered_shielded.receive_combat_hit(
 		Enemy.HIT_SOURCE_SPEAR,
 		staggered_shielded.global_position - Vector2.RIGHT * staggered_shielded.body_radius,
@@ -406,7 +429,11 @@ func _audit_charger_bulldoze() -> void:
 	var staggered_position := staggered_shielded.global_position
 	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
 	_start_charger_dash(charger, Vector2.RIGHT)
-	await _advance_physics(0.22)
+	var bulldozed_staggered_normal := await _advance_until(func() -> bool:
+		return staggered_normal.is_in_authored_hostile_displacement()
+	, 0.30)
+	_require(bulldozed_staggered_normal, "An ineligible staggering Shielded does not stop other eligible targets in the same dash from being bulldozed.")
+	await _advance_physics(0.10)
 	_require(not staggered_shielded.is_in_authored_hostile_displacement(), "Shielded rejects Charger bulldoze during shield-break stagger.")
 	_require(staggered_shielded.global_position == staggered_position, "Charger bulldozing does not add extra movement to a staggering Shielded enemy.")
 
@@ -513,7 +540,7 @@ func _audit_charger_bulldoze() -> void:
 	add_child(root)
 	player = _spawn_player(root, Vector2(320.0, 40.0))
 	charger = _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 108.0)) as Charger
-	normal = _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
+	_spawn_enemy(root, EnemyScene, player, Vector2(122.0, 116.0))
 	_start_charger_dash(charger, Vector2.RIGHT)
 	await _advance_until(func() -> bool:
 		return charger._bulldozed_targets_this_dash.size() == 1
@@ -522,7 +549,7 @@ func _audit_charger_bulldoze() -> void:
 	_require(charger._bulldozed_targets_this_dash.is_empty(), "Deactivate or restart-style cleanup clears Charger bulldoze tracking.")
 
 	var death_cleanup_charger := _spawn_enemy(root, ChargerScene, player, Vector2(96.0, 136.0)) as Charger
-	var death_cleanup_normal := _spawn_enemy(root, EnemyScene, player, Vector2(122.0, 144.0))
+	_spawn_enemy(root, EnemyScene, player, Vector2(122.0, 144.0))
 	_start_charger_dash(death_cleanup_charger, Vector2.RIGHT)
 	await _advance_until(func() -> bool:
 		return death_cleanup_charger._bulldozed_targets_this_dash.size() == 1

@@ -42,6 +42,12 @@ const RECOVERY_FRAME_DURATION := 0.12
 const ALERT_TWITCH_DURATION := 0.10
 const MISS_SKID_SPEED_SCALE := 0.34
 const RETREAT_END_DISTANCE := 10.0
+const POUNCE_INDICATOR_START_OFFSET := 6.0
+const DEFENSIVE_INDICATOR_LENGTH := 20.0
+const HUNT_INDICATOR_LENGTH := 23.0
+const POUNCE_INDICATOR_WIDTH := 1.0
+const POUNCE_INDICATOR_TIP_LENGTH := 4.0
+const POUNCE_INDICATOR_TIP_SPAN := 1.5
 
 @export var stalk_speed_scale := 0.82
 @export var hunt_speed_scale := 1.48
@@ -175,6 +181,16 @@ func debug_has_hunt_pounce_available() -> bool:
 
 func debug_get_locked_pounce_direction() -> Vector2:
 	return pounce_locked_direction
+
+
+func debug_is_pounce_indicator_active() -> bool:
+	return _should_draw_pounce_indicator()
+
+
+func debug_get_pounce_indicator_direction() -> Vector2:
+	if not _should_draw_pounce_indicator():
+		return Vector2.ZERO
+	return _get_pounce_indicator_direction()
 
 
 func _exit_tree() -> void:
@@ -913,6 +929,8 @@ func _try_contact_damage() -> void:
 
 func _draw_alive_body(fill_color: Color) -> void:
 	super._draw_alive_body(fill_color)
+	if _should_draw_pounce_indicator():
+		_draw_pounce_indicator(_get_visual_offset())
 	if _has_red_eyes():
 		var eye_offset_x := -1.0 if facing_left else 1.0
 		draw_circle(_get_visual_offset() + Vector2(eye_offset_x, -2.0), 0.8, Color8(255, 82, 82))
@@ -927,6 +945,56 @@ func _has_red_eyes() -> bool:
 		or (prowler_state == ProwlerState.POUNCE and pounce_mode == PounceMode.HUNT)
 		or prowler_state == ProwlerState.IMPACT_RECOIL
 	)
+
+
+func _should_draw_pounce_indicator() -> bool:
+	return (
+		not is_dying
+		and (
+			prowler_state == ProwlerState.DEFENSIVE_WINDUP
+			or prowler_state == ProwlerState.POUNCE_WINDUP
+		)
+	)
+
+
+func _draw_pounce_indicator(draw_offset: Vector2) -> void:
+	var indicator_direction := _get_pounce_indicator_direction()
+	if indicator_direction == Vector2.ZERO:
+		return
+
+	var start_point := (draw_offset + indicator_direction * POUNCE_INDICATOR_START_OFFSET).round()
+	var end_point := (start_point + indicator_direction * _get_pounce_indicator_length()).round()
+	var indicator_color := _get_pounce_indicator_color()
+	var tip_base := end_point - indicator_direction * POUNCE_INDICATOR_TIP_LENGTH
+	var tip_side := indicator_direction.orthogonal() * POUNCE_INDICATOR_TIP_SPAN
+	draw_line(start_point, end_point, indicator_color, POUNCE_INDICATOR_WIDTH, true)
+	draw_line(tip_base + tip_side, end_point, indicator_color, POUNCE_INDICATOR_WIDTH, true)
+	draw_line(tip_base - tip_side, end_point, indicator_color, POUNCE_INDICATOR_WIDTH, true)
+
+
+func _get_pounce_indicator_direction() -> Vector2:
+	var indicator_direction := pounce_locked_direction.normalized()
+	if indicator_direction != Vector2.ZERO:
+		return indicator_direction
+
+	indicator_direction = _get_direction_to_player()
+	if indicator_direction != Vector2.ZERO:
+		return indicator_direction.normalized()
+
+	return Vector2.LEFT if facing_left else Vector2.RIGHT
+
+
+func _get_pounce_indicator_length() -> float:
+	if pounce_mode == PounceMode.DEFENSIVE:
+		return DEFENSIVE_INDICATOR_LENGTH
+	return HUNT_INDICATOR_LENGTH
+
+
+func _get_pounce_indicator_color() -> Color:
+	var pulse := 0.55 + 0.45 * sin((visual_time + state_elapsed) * 18.0)
+	if pounce_mode == PounceMode.DEFENSIVE:
+		return Color8(244, 230, 188).lerp(Color8(255, 248, 228), pulse)
+	return Color8(255, 126, 116).lerp(Color8(255, 186, 164), pulse)
 
 
 func _get_visual_offset() -> Vector2:

@@ -3,6 +3,9 @@ class_name Charger
 
 const BULLDOZE_DISPLACEMENT_SOURCE := &"charger_bulldoze"
 
+signal charge_started
+signal dash_started
+
 enum State {
 	CHASE,
 	TELEGRAPH,
@@ -145,6 +148,7 @@ func _enter_telegraph_state() -> void:
 	telegraph_direction = _get_direction_to_player()
 	if telegraph_direction == Vector2.ZERO:
 		telegraph_direction = dash_direction
+	charge_started.emit()
 
 
 func _enter_dash_state() -> void:
@@ -154,6 +158,7 @@ func _enter_dash_state() -> void:
 	if dash_direction == Vector2.ZERO:
 		dash_direction = Vector2.RIGHT
 	_clear_bulldoze_targets()
+	dash_started.emit()
 
 
 func _enter_recover_state() -> void:

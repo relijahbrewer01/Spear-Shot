@@ -158,6 +158,8 @@
 | `telegraph_line_length` | `38.0px` | `scripts/charger.gd` | Dash-line readability. |
 | `telegraph_shake_strength` | `1.4px` | `scripts/charger.gd` | Telegraph motion emphasis. |
 | `visible_entry_damage_sync_distance` | `10.0px` | `scripts/charger.gd` | Safety sync between visual body and damage. |
+| `audio/charger_charge.wav` | About `0.30s`, mono, `44.1kHz`, `16-bit PCM` | `audio/charger_charge.wav`, `tools/generate_sfx.py`, `scripts/charger.gd`, `scripts/main.gd` | Telegraphed beast-body wind-up cue that plays once when the Charger enters `TELEGRAPH`. |
+| `audio/charger_dash.wav` | About `0.16s`, mono, `44.1kHz`, `16-bit PCM` | `audio/charger_dash.wav`, `tools/generate_sfx.py`, `scripts/charger.gd`, `scripts/main.gd` | Short rush/thump cue that plays once when the Charger commits into `DASH`. |
 
 ## Shielded
 
@@ -312,6 +314,7 @@
 | One hunting pounce per unarmed cycle | `1` committed attempt between `HELD -> unheld` and the next legitimate recovery | `scripts/prowler_enemy.gd`, `scripts/spear.gd` | Prevents repeated leap spam during one throw/recovery window. |
 | `separation_distance` | `20.0px` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing radius. |
 | `separation_strength` | `50.0` | `ProwlerEnemy.tscn` | Lightweight crowd-spacing force. |
+| Pounce trajectory indicator | Wind-up only, readability-only | `scripts/prowler_enemy.gd` | Shows the locked pounce direction during `DEFENSIVE_WINDUP` and `POUNCE_WINDUP`, then clears on commit, death, reset, or cleanup without changing any pounce gameplay values. |
 | `audio/prowler_alert.wav` | `0.37s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_alert.wav`, `tools/generate_sfx.py` | Live `Bone-Throat Snarl` cue: a deeper territorial jaw-rattle alert that plays once on a real armed-to-unarmed transformation after the small `alert_voice_delay` offset. |
 | `audio/prowler_defensive_attack.wav` | `0.17s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_defensive_attack.wav`, `tools/generate_sfx.py` | Live `Bone-Click Burst` cue: a compact frightened-aggression launch sound that plays once when the armed defensive pass-through pounce commits. |
 | `audio/prowler_pounce_hit.wav` | `0.12s`, mono, `44.1kHz`, `16-bit PCM` | `audio/prowler_pounce_hit.wav`, `tools/generate_sfx.py` | Live `Bone Plate Thud` cue: a physical jaw-and-shoulder impact that plays only after a valid hunting pounce hit. |

@@ -128,6 +128,22 @@ def main() -> int:
     require("unarmed_alert_delay := 0.28" in prowler and "alert_voice_delay := 0.06" in prowler, "Prowler keeps the approved alert timing and post-throw audio offset", failures)
     require("defensive_trigger_radius := 26.0" in prowler and "defensive_windup_duration := 0.16" in prowler and "defensive_pounce_distance := 42.0" in prowler and "defensive_retrigger_cooldown := 1.10" in prowler, "Prowler preserves the approved defensive pounce tuning", failures)
     require("hunt_pounce_trigger_distance := 36.0" in prowler and "hunt_pounce_distance := 48.0" in prowler and "miss_stun_duration := 0.42" in prowler, "Prowler preserves the approved hunting pounce and miss tuning", failures)
+    require(
+        "func _should_draw_pounce_indicator()" in prowler
+        and "ProwlerState.DEFENSIVE_WINDUP" in prowler.split("func _should_draw_pounce_indicator()", 1)[1].split("func ", 1)[0]
+        and "ProwlerState.POUNCE_WINDUP" in prowler.split("func _should_draw_pounce_indicator()", 1)[1].split("func ", 1)[0]
+        and "func _draw_pounce_indicator(" in prowler
+        and "draw_line(" in prowler.split("func _draw_pounce_indicator(", 1)[1].split("func ", 1)[0],
+        "Prowler trajectory indicator stays local to the two wind-up states and uses the lightweight draw path",
+        failures,
+    )
+    require(
+        "debug_is_pounce_indicator_active" in prowler
+        and "debug_get_pounce_indicator_direction" in prowler
+        and "pounce_locked_direction" in prowler,
+        "Prowler exposes narrow runtime indicator helpers without changing its combat state authority",
+        failures,
+    )
     require("new_is_held == tracked_spear_is_held" in prowler and "set_tracked_spear" in prowler and "_connect_spear_state_signal" in prowler, "Prowler still keys behavior off the authoritative spear state seam", failures)
     require("tracked_spear.global_position" not in prowler and "try_throw" not in prowler and "apply_landed_shockwave_nudge" not in prowler, "Prowler still reads spear state only and does not manipulate the spear object", failures)
 
@@ -228,6 +244,7 @@ def main() -> int:
     require("Bonejaw Prowler" in readme and "Bonejaw Prowler" in tuning and "Bonejaw Prowler" in roadmap, "README, ROADMAP, and TUNING document the selected Bonejaw concept", failures)
     require("4x6" in readme and "4x6" in tuning and "20x18" in readme and "20x18" in tuning, "README and TUNING document the live frame size and sheet layout", failures)
     require("audio/prowler_defensive_attack.wav" in readme and "audio/prowler_defensive_attack.wav" in tuning, "README and TUNING document the defensive launch cue", failures)
+    require("quick trajectory indicator" in readme and "trajectory indicator" in tuning, "README and TUNING document the readability-only Prowler trajectory indicator", failures)
     require("audio/dev/prowler_candidates" in readme, "README documents the kept Prowler audio candidate directory for the review pass", failures)
     require("Marsh Hound" not in readme and "Marsh Hound" not in roadmap and "Marsh Hound" not in tuning, "Docs no longer reference the superseded Marsh Hound direction", failures)
     require("does not renumber" in roadmap, "ROADMAP no longer describes Phase 4.5 as the next work item", failures)

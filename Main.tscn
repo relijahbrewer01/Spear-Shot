@@ -18,6 +18,8 @@
 [ext_resource type="Script" uid="uid://b8a480g75weyy" path="res://scripts/encounter_telegraph.gd" id="16"]
 [ext_resource type="AudioStream" uid="uid://xiag6ybl08wq" path="res://audio/wave_warning.wav" id="17"]
 [ext_resource type="AudioStream" uid="uid://cdsjsmw4p143u" path="res://audio/shield_break.wav" id="18"]
+[ext_resource type="AudioStream" path="res://audio/charger_charge.wav" id="34"]
+[ext_resource type="AudioStream" path="res://audio/charger_dash.wav" id="35"]
 [ext_resource type="AudioStream" uid="uid://bqjw7x77atx1b" path="res://audio/blowgun_windup.wav" id="19"]
 [ext_resource type="AudioStream" uid="uid://dalsfx5g5ytyy" path="res://audio/blowgun_fire.wav" id="20"]
 [ext_resource type="AudioStream" uid="uid://drdicc02ciac" path="res://audio/blowgun_shove.wav" id="21"]
@@ -115,6 +117,18 @@ bus = &"SFX"
 stream = ExtResource("18")
 volume_db = -3.0
 max_polyphony = 4
+bus = &"SFX"
+
+[node name="ChargerChargePlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=2097776873]
+stream = ExtResource("34")
+volume_db = -6.5
+max_polyphony = 2
+bus = &"SFX"
+
+[node name="ChargerDashPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=2097776874]
+stream = ExtResource("35")
+volume_db = -5.5
+max_polyphony = 2
 bus = &"SFX"
 
 [node name="BlowgunWindupPlayer" type="AudioStreamPlayer" parent="AudioPlayers" unique_id=1832174538]

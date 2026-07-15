@@ -337,6 +337,61 @@ def generate_shield_break() -> list[float]:
     return samples
 
 
+def generate_charger_charge() -> list[float]:
+    length = int(SAMPLE_RATE * 0.30)
+    samples: list[float] = []
+    body_resonance = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        body_resonance = body_resonance * 0.90 + raw_noise * 0.10
+
+        hoof_frequency = 96.0 - progress * 10.0
+        hoof_thrum = math.sin(2.0 * math.pi * hoof_frequency * index / SAMPLE_RATE)
+        scrape_frequency = 182.0 + progress * 34.0
+        scrape_tone = math.sin(2.0 * math.pi * scrape_frequency * index / SAMPLE_RATE)
+        breath = math.sin(2.0 * math.pi * (248.0 + progress * 62.0) * index / SAMPLE_RATE)
+        build_curve = progress ** 1.4
+        samples.append(
+            (
+                hoof_thrum * 0.36
+                + body_resonance * 0.28
+                + scrape_tone * 0.18 * build_curve
+                + breath * 0.12 * build_curve
+            )
+            * envelope(progress, 0.03, 0.22)
+        )
+    return samples
+
+
+def generate_charger_dash() -> list[float]:
+    length = int(SAMPLE_RATE * 0.16)
+    samples: list[float] = []
+    previous_noise = 0.0
+    low_rumble = 0.0
+    for index in range(length):
+        progress = index / max(length - 1, 1)
+        raw_noise = random.random() * 2.0 - 1.0
+        rush_noise = raw_noise - previous_noise
+        previous_noise = raw_noise
+        low_rumble = low_rumble * 0.84 + raw_noise * 0.16
+
+        thump_curve = math.exp(-((progress - 0.16) / 0.12) ** 2)
+        rush_curve = math.sin(progress * math.pi) * (1.0 - progress * 0.28)
+        thump = math.sin(2.0 * math.pi * (136.0 - progress * 26.0) * index / SAMPLE_RATE)
+        scrape = math.sin(2.0 * math.pi * (318.0 + progress * 112.0) * index / SAMPLE_RATE)
+        samples.append(
+            (
+                rush_noise * 0.34 * rush_curve
+                + low_rumble * 0.20 * rush_curve
+                + thump * 0.34 * thump_curve
+                + scrape * 0.16 * rush_curve
+            )
+            * envelope(progress, 0.01, 0.58)
+        )
+    return samples
+
+
 def generate_blowgun_windup() -> list[float]:
     length = int(SAMPLE_RATE * 0.34)
     samples: list[float] = []
@@ -827,6 +882,8 @@ def main() -> None:
         "dodge.wav": generate_dodge(),
         "wave_warning.wav": generate_wave_warning(),
         "shield_break.wav": generate_shield_break(),
+        "charger_charge.wav": generate_charger_charge(),
+        "charger_dash.wav": generate_charger_dash(),
         "blowgun_windup.wav": generate_blowgun_windup(),
         "blowgun_fire.wav": generate_blowgun_fire(),
         "blowgun_shove.wav": generate_blowgun_shove(),

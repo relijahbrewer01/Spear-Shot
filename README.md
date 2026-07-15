@@ -104,6 +104,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `audio/spear_recover.wav`: single wood/metal handling cue confirming that a legitimately recovered spear is armed again
 - `audio/wave_warning.wav`: restrained local warning cue for authored encounter telegraphs
 - `audio/shield_break.wav`: local physical crack/thud cue for Shielded shield break
+- `audio/charger_charge.wav`: local tense beast-body wind-up cue for the Charger's telegraph start
+- `audio/charger_dash.wav`: local scrape/rush commit cue for the Charger's dash start
 - `audio/blowgun_windup.wav`: local reed/breath cue for Blowgun Shooter aiming
 - `audio/blowgun_fire.wav`: local dry puff/snap cue for Blowgun Shooter dart release
 - `audio/blowgun_shove.wav`: local reed/wood swish-thump cue for Blowgun Shooter shove
@@ -183,6 +185,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - While the spear is `HELD`, it keeps a cautious `72-104` pixel stalking band and uses a short defensive pass-through pounce only when Akedra crowds its personal space
 - While the spear is `FLYING` or `LANDED`, it gives one longer red-eye alert and then commits to a faster direct hunt until the spear is legitimately recovered
 - Each unarmed window grants exactly one committed hunting pounce attempt; a successful hit knocks Akedra back, while a dodge or invulnerability rejection leaves the Prowler in a brief punishable skid/stun recovery
+- Prowler pounces now have a quick trajectory indicator that appears only during the wind-up and does not change pounce gameplay
 - The approved live presentation now uses the selected `Bonejaw Prowler` concept on a `20x18` frame with a `4x6` animation sheet, mapping eight readable animation beats across the six live rows: stalk, defensive wind-up, defensive launch, alert, hunt, hunt leap, impact/recoil, and miss/stun
 - Its three live Prowler cues now come from the kept review-pass candidate set: `Bone-Throat Snarl` for the real armed-to-unarmed alert, `Bone-Click Burst` for the defensive launch, and `Bone Plate Thud` for successful hunting impact
 - It dies to one valid thrown-spear hit, awards `2` points, uses ordinary body contact damage outside its authored attacks, and does not steal, move, hide, or otherwise manipulate the spear
@@ -192,6 +195,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 
 - Normal enemy: slow direct pursuit, worth `1` point
 - Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, can shove eligible ordinary hostiles out of that lane during the dash without damaging them, then recovers, worth `3` points
+- Charger has separate charge-up and dash SFX so the telegraph start and committed rush read as two distinct beats without changing dash timing or behavior
 - Shielded: compact ambient-only armored enemy, first thrown-spear hit breaks the shield and stops the spear for no score, second hit kills for `2` points
 - Shielded starts at `body_radius = 9.0`, `separation_distance = 19.0`, and `stopped_hit_landing_clearance = 4.0` so the stopped spear lands close but outside the reduced body footprint
 - Blowgun Shooter: small ambient-only ranged enemy, tries to hold medium-long distance, can use a nearby intact Shielded as temporary cover, peeks to a readable side lane before aiming, fires a two-dart straight player-only burst, then performs a longer tangential relocation around Akedra, and dies to one spear hit for `2` points
@@ -213,6 +217,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - A Boomer outer shockwave can lightly nudge an already landed spear by `20` pixels, keeping it in `LANDED`/`FETCH`, clamping it inside the arena, and preserving normal retrieval behavior
 - Prowler: ambient-only weapon-state predator that stalks while Akedra is armed, uses a short defensive personal-space pounce when crowded, then turns red-eyed and aggressive after a `0.28s` unarmed alert whenever the spear is not held
 - Each unarmed cycle grants one committed hunting pounce with player knockback on a valid hit and a brief punishable skid/stun on a dodge or invulnerability rejection
+- Its armed defensive pounce and unarmed hunting pounce both show a quick trajectory indicator during wind-up only, then clear on commit or cleanup
 - Recovering the spear returns the Prowler to stalking immediately unless an already-airborne pounce is finishing, so it pressures bad throw timing without making throwing itself universally wrong
 
 ## Opportunity behavior

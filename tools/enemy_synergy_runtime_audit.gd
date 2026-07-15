@@ -31,6 +31,7 @@ func _run_audit() -> void:
 	await _audit_authored_displacement_contract()
 	await _audit_shielded_opt_in_and_pause()
 	await _audit_charger_bulldoze()
+	await _audit_charger_audio_hooks()
 	await _audit_shielded_shooter_cooperation()
 	await _audit_shooter_dart_boomer_interaction()
 
@@ -560,6 +561,64 @@ func _audit_charger_bulldoze() -> void:
 	await get_tree().process_frame
 
 
+func _audit_charger_audio_hooks() -> void:
+	var main := MainScene.instantiate()
+	add_child(main)
+	await get_tree().process_frame
+	_stop_main_runtime(main)
+
+	var charge_player := main.get_node("AudioPlayers/ChargerChargePlayer") as AudioStreamPlayer
+	var dash_player := main.get_node("AudioPlayers/ChargerDashPlayer") as AudioStreamPlayer
+	main.call("_stop_all_audio")
+	main.call("debug_reset_charger_audio_metrics")
+	var startup_metrics := main.call("debug_get_charger_audio_metrics") as Dictionary
+	_require(int(startup_metrics.get("charge", -1)) == 0, "Main startup does not play the Charger charge-up cue.")
+	_require(int(startup_metrics.get("dash", -1)) == 0, "Main startup does not play the Charger dash cue.")
+
+	main.set("survival_time", 30.0)
+	_require(
+		bool(main.call("_try_spawn_enemy", EncounterDirector.EnemyKind.CHARGER, Arena.SpawnEdge.RIGHT, EncounterDirector.INVALID_WAVE_ID, SPAWN_SOURCE_AMBIENT)),
+		"Charger audio audit can spawn a Charger through the ordinary ambient path."
+	)
+	var charger := _find_child_charger(main)
+	var player := main.get_node("Player") as Player
+	_require(charger != null and player != null, "Charger audio audit can access the spawned Charger and player.")
+	if charger != null and player != null:
+		player.global_position = Vector2(240.0, 108.0)
+		charger.global_position = Vector2(120.0, 108.0)
+		main.call("_stop_all_audio")
+		main.call("debug_reset_charger_audio_metrics")
+
+		charger.call("_enter_telegraph_state")
+		await _advance_physics(0.02)
+		var telegraph_metrics := main.call("debug_get_charger_audio_metrics") as Dictionary
+		_require(int(telegraph_metrics.get("charge", 0)) == 1, "Charger charge-up cue fires once when telegraph begins.")
+		_require(int(telegraph_metrics.get("dash", 0)) == 0, "Charger charge-up does not also fire the dash cue.")
+		_require(charge_player != null and charge_player.playing, "Charger charge-up AudioStreamPlayer enters playback on telegraph start.")
+		await _advance_physics(0.18)
+		telegraph_metrics = main.call("debug_get_charger_audio_metrics") as Dictionary
+		_require(int(telegraph_metrics.get("charge", 0)) == 1, "Charger charge-up cue does not spam during telegraph frames.")
+
+		charger.call("_enter_dash_state")
+		await _advance_physics(0.02)
+		var dash_metrics := main.call("debug_get_charger_audio_metrics") as Dictionary
+		_require(int(dash_metrics.get("charge", 0)) == 1, "Dash commit does not replay the charge-up cue.")
+		_require(int(dash_metrics.get("dash", 0)) == 1, "Charger dash cue fires once when dash begins.")
+		_require(dash_player != null and dash_player.playing, "Charger dash AudioStreamPlayer enters playback on dash commit.")
+		await _advance_physics(0.12)
+		dash_metrics = main.call("debug_get_charger_audio_metrics") as Dictionary
+		_require(int(dash_metrics.get("dash", 0)) == 1, "Charger dash cue does not spam across dash physics frames.")
+
+	main.call("_restart_run")
+	await get_tree().process_frame
+	var restart_metrics := main.call("debug_get_charger_audio_metrics") as Dictionary
+	_require(int(restart_metrics.get("charge", -1)) == 0, "Restart resets Charger audio metrics without replaying the charge-up cue.")
+	_require(int(restart_metrics.get("dash", -1)) == 0, "Restart resets Charger audio metrics without replaying the dash cue.")
+	_require(charge_player != null and not charge_player.playing and dash_player != null and not dash_player.playing, "Restart cleanup leaves no Charger SFX playing.")
+	main.queue_free()
+	await get_tree().process_frame
+
+
 func _audit_shielded_shooter_cooperation() -> void:
 	var root := Node2D.new()
 	add_child(root)
@@ -936,6 +995,13 @@ func _get_enemy_children(main: Node) -> Array:
 func _get_last_enemy(main: Node) -> Enemy:
 	var enemy_children := _get_enemy_children(main)
 	return enemy_children[enemy_children.size() - 1] as Enemy
+
+
+func _find_child_charger(main: Node) -> Charger:
+	for enemy in _get_enemy_children(main):
+		if enemy is Charger:
+			return enemy as Charger
+	return null
 
 
 func _bias_name_from_value(bias_value: int) -> String:

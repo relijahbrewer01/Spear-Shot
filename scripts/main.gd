@@ -150,6 +150,8 @@ var last_dodge_sfx_index := -1
 var last_hurt_sfx_index := -1
 var current_music_track_index := 0
 var original_music_stream: AudioStream
+var debug_charger_charge_play_count := 0
+var debug_charger_dash_play_count := 0
 var debug_prowler_alert_play_count := 0
 var debug_prowler_defensive_attack_play_count := 0
 var debug_prowler_hunt_impact_play_count := 0
@@ -189,6 +191,8 @@ var active_heart_pickup: HeartPickup
 @onready var dodge_player: AudioStreamPlayer = $AudioPlayers/DodgePlayer
 @onready var wave_warning_player: AudioStreamPlayer = $AudioPlayers/WaveWarningPlayer
 @onready var shield_break_player: AudioStreamPlayer = $AudioPlayers/ShieldBreakPlayer
+@onready var charger_charge_player: AudioStreamPlayer = $AudioPlayers/ChargerChargePlayer
+@onready var charger_dash_player: AudioStreamPlayer = $AudioPlayers/ChargerDashPlayer
 @onready var blowgun_windup_player: AudioStreamPlayer = $AudioPlayers/BlowgunWindupPlayer
 @onready var blowgun_fire_player: AudioStreamPlayer = $AudioPlayers/BlowgunFirePlayer
 @onready var blowgun_shove_player: AudioStreamPlayer = $AudioPlayers/BlowgunShovePlayer
@@ -272,6 +276,7 @@ func _reset_runtime_state() -> void:
 	shake_duration = 0.0
 	_clear_buffered_spear_throw()
 	_cancel_hit_stop()
+	debug_reset_charger_audio_metrics()
 	debug_reset_prowler_audio_metrics()
 	formation_bias_assignment_index = 0
 	debug_formation_bias_assignment_index = 0
@@ -451,6 +456,10 @@ func _try_spawn_enemy(
 	enemy.tree_exited.connect(_on_enemy_tree_exited.bind(enemy_id, run_generation))
 	if enemy.has_signal("shield_broken"):
 		enemy.connect(&"shield_broken", _on_shielded_enemy_shield_broken)
+	if enemy.has_signal("charge_started"):
+		enemy.connect(&"charge_started", _on_charger_charge_started)
+	if enemy.has_signal("dash_started"):
+		enemy.connect(&"dash_started", _on_charger_dash_started)
 	if enemy.has_signal("aim_started"):
 		enemy.connect(&"aim_started", _on_shooter_enemy_aim_started)
 	if enemy.has_signal("dart_requested"):
@@ -1353,6 +1362,10 @@ func _on_player_died() -> void:
 	_stop_player_action_sfx()
 	if pickup_player != null:
 		pickup_player.stop()
+	if charger_charge_player != null:
+		charger_charge_player.stop()
+	if charger_dash_player != null:
+		charger_dash_player.stop()
 
 	for child in enemy_container.get_children():
 		if child.has_method("set_active"):
@@ -1386,6 +1399,22 @@ func _on_spear_enemy_hit(_hit_position: Vector2) -> void:
 
 func _on_shielded_enemy_shield_broken(_hit_position: Vector2) -> void:
 	_play_sfx(shield_break_player)
+
+
+func _on_charger_charge_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(charger_charge_player)
+	debug_charger_charge_play_count += 1
+
+
+func _on_charger_dash_started() -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	_play_sfx(charger_dash_player)
+	debug_charger_dash_play_count += 1
 
 
 func _on_shooter_enemy_aim_started() -> void:
@@ -1802,6 +1831,18 @@ func debug_get_current_music_stream_path() -> String:
 	return music_player.stream.resource_path
 
 
+func debug_reset_charger_audio_metrics() -> void:
+	debug_charger_charge_play_count = 0
+	debug_charger_dash_play_count = 0
+
+
+func debug_get_charger_audio_metrics() -> Dictionary:
+	return {
+		"charge": debug_charger_charge_play_count,
+		"dash": debug_charger_dash_play_count,
+	}
+
+
 func debug_reset_prowler_audio_metrics() -> void:
 	debug_prowler_alert_play_count = 0
 	debug_prowler_defensive_attack_play_count = 0
@@ -1832,6 +1873,8 @@ func _stop_all_audio() -> void:
 		dodge_player,
 		wave_warning_player,
 		shield_break_player,
+		charger_charge_player,
+		charger_dash_player,
 		blowgun_windup_player,
 		blowgun_fire_player,
 		blowgun_shove_player,
@@ -1864,6 +1907,8 @@ func _stop_gameplay_sfx() -> void:
 		dodge_player,
 		wave_warning_player,
 		shield_break_player,
+		charger_charge_player,
+		charger_dash_player,
 		blowgun_windup_player,
 		blowgun_fire_player,
 		blowgun_shove_player,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,44 @@ def require(condition: bool, message: str, failures: list[str]) -> None:
     failures.append(message)
 
 
+def get_node_block(scene_text: str, node_name: str) -> str:
+    marker = f'[node name="{node_name}"'
+    start = scene_text.find(marker)
+    if start == -1:
+        return ""
+    next_start = scene_text.find("\n[node name=", start + len(marker))
+    if next_start == -1:
+        return scene_text[start:]
+    return scene_text[start:next_start]
+
+
+def require_wav_metadata(
+    relative_path: str,
+    failures: list[str],
+    duration_min: float,
+    duration_max: float,
+) -> None:
+    path = ROOT / relative_path
+    with wave.open(str(path), "rb") as wav_file:
+        sample_rate = wav_file.getframerate()
+        channel_count = wav_file.getnchannels()
+        sample_width = wav_file.getsampwidth()
+        frame_count = wav_file.getnframes()
+        duration = frame_count / float(sample_rate)
+        audio_bytes = wav_file.readframes(frame_count)
+
+    peak = 0
+    for index in range(0, len(audio_bytes), 2):
+        sample = int.from_bytes(audio_bytes[index : index + 2], byteorder="little", signed=True)
+        peak = max(peak, abs(sample))
+
+    require(sample_rate == 44100, f"{relative_path} uses 44.1kHz sample rate", failures)
+    require(channel_count == 1, f"{relative_path} is mono", failures)
+    require(sample_width == 2, f"{relative_path} uses 16-bit PCM", failures)
+    require(duration_min <= duration <= duration_max, f"{relative_path} duration stays within the approved range", failures)
+    require(peak > 6000, f"{relative_path} contains meaningful non-silent audio", failures)
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -28,6 +67,7 @@ def main() -> int:
     boomer = read_text("scripts/boomer_enemy.gd")
     dart = read_text("scripts/dart_projectile.gd")
     main_script = read_text("scripts/main.gd")
+    main_scene = read_text("Main.tscn")
     readme = read_text("README.md")
     roadmap = read_text("ROADMAP.md")
     enemy_scene = read_text("Enemy.tscn")
@@ -38,10 +78,17 @@ def main() -> int:
     prowler_scene = read_text("ProwlerEnemy.tscn")
     director = read_text("scripts/encounter_director.gd")
     project = read_text("project.godot")
+    sfx_generator = read_text("tools/generate_sfx.py")
     tuning = read_text("TUNING.md")
+    charger_charge_import = read_text("audio/charger_charge.wav.import")
+    charger_dash_import = read_text("audio/charger_dash.wav.import")
 
     require((ROOT / "tools" / "EnemySynergyRuntimeAudit.tscn").exists(), "Enemy synergy runtime audit scene exists", failures)
     require((ROOT / "tools" / "enemy_synergy_runtime_audit.gd").exists(), "Enemy synergy runtime audit script exists", failures)
+    require((ROOT / "audio" / "charger_charge.wav").exists(), "Charger charge SFX file exists", failures)
+    require((ROOT / "audio" / "charger_dash.wav").exists(), "Charger dash SFX file exists", failures)
+    require((ROOT / "audio" / "charger_charge.wav.import").exists(), "Charger charge SFX import exists", failures)
+    require((ROOT / "audio" / "charger_dash.wav.import").exists(), "Charger dash SFX import exists", failures)
 
     require(
         "enum FormationBias" in enemy
@@ -197,6 +244,58 @@ def main() -> int:
         "Charger clears bulldoze tracking when a dash starts and when it ends",
         failures,
     )
+    require(
+        "signal charge_started" in charger
+        and "signal dash_started" in charger
+        and "charge_started.emit()" in charger
+        and "dash_started.emit()" in charger,
+        "Charger exposes one-shot telegraph and dash audio seams without changing gameplay timing",
+        failures,
+    )
+    require(
+        'enemy.has_signal("charge_started")' in main_script
+        and 'enemy.has_signal("dash_started")' in main_script
+        and "_on_charger_charge_started" in main_script
+        and "_on_charger_dash_started" in main_script
+        and "debug_get_charger_audio_metrics" in main_script,
+        "Main connects Charger audio hooks and exposes focused runtime metrics",
+        failures,
+    )
+
+    charge_player_block = get_node_block(main_scene, "ChargerChargePlayer")
+    dash_player_block = get_node_block(main_scene, "ChargerDashPlayer")
+    require(
+        'path="res://audio/charger_charge.wav"' in main_scene
+        and 'path="res://audio/charger_dash.wav"' in main_scene,
+        "Main scene references the live Charger charge and dash audio assets",
+        failures,
+    )
+    require(
+        'bus = &"SFX"' in charge_player_block
+        and 'bus = &"SFX"' in dash_player_block
+        and "max_polyphony = 2" in charge_player_block
+        and "max_polyphony = 2" in dash_player_block,
+        "Charger charge and dash players use the SFX bus with modest overlap support",
+        failures,
+    )
+    require(
+        'importer="wav"' in charger_charge_import
+        and 'type="AudioStreamWAV"' in charger_charge_import
+        and 'importer="wav"' in charger_dash_import
+        and 'type="AudioStreamWAV"' in charger_dash_import,
+        "Charger SFX import into Godot as WAV streams",
+        failures,
+    )
+    require(
+        "generate_charger_charge" in sfx_generator
+        and "generate_charger_dash" in sfx_generator
+        and "charger_charge.wav" in sfx_generator
+        and "charger_dash.wav" in sfx_generator,
+        "The local SFX generator reproduces the live Charger charge and dash sounds",
+        failures,
+    )
+    require_wav_metadata("audio/charger_charge.wav", failures, 0.24, 0.36)
+    require_wav_metadata("audio/charger_dash.wav", failures, 0.12, 0.20)
 
     require(
         "COVER_HOLD" in shooter
@@ -257,6 +356,21 @@ def main() -> int:
         and "bulldoze_distance" in tuning
         and "bulldoze_duration" in tuning,
         "README, ROADMAP, and TUNING describe the narrow live Charger bulldozing checkpoint accurately",
+        failures,
+    )
+    require(
+        "audio/charger_charge.wav" in readme
+        and "audio/charger_dash.wav" in readme
+        and "Charger has separate charge-up and dash SFX" in readme
+        and "audio/charger_charge.wav" in tuning
+        and "audio/charger_dash.wav" in tuning,
+        "README and TUNING document the new Charger charge-up and dash SFX without broadening the checkpoint",
+        failures,
+    )
+    require(
+        "Prowler pounces now have a quick trajectory indicator" in readme
+        and "trajectory indicator" in tuning,
+        "README and TUNING document the Prowler pounce indicator as readability-only presentation",
         failures,
     )
 

@@ -100,6 +100,14 @@ func _audit_stalk_and_defensive_pounce() -> void:
 	var starting_health := player.health
 	await _advance_physics(0.02)
 	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.DEFENSIVE_WINDUP, "Crowding the armed Prowler enters DEFENSIVE_WINDUP instead of direct chase.")
+	_require(prowler.debug_is_pounce_indicator_active(), "Defensive windup shows the quick trajectory indicator.")
+	var defensive_indicator_direction := prowler.debug_get_pounce_indicator_direction()
+	var defensive_locked_direction := prowler.debug_get_locked_pounce_direction()
+	if defensive_indicator_direction != Vector2.ZERO and defensive_locked_direction != Vector2.ZERO:
+		_require(
+			defensive_indicator_direction.dot(defensive_locked_direction.normalized()) > 0.98,
+			"Defensive trajectory indicator stays aligned to the locked pounce direction."
+		)
 	var reached_defensive_pounce := await _advance_until(
 		func() -> bool:
 			return prowler.prowler_state == ProwlerEnemy.ProwlerState.POUNCE and prowler.debug_get_current_pounce_mode_name() == "DEFENSIVE",
@@ -107,6 +115,7 @@ func _audit_stalk_and_defensive_pounce() -> void:
 		"defensive pounce start"
 	)
 	_require(reached_defensive_pounce, "Defensive pounce begins after the short windup.")
+	_require(not prowler.debug_is_pounce_indicator_active(), "Defensive trajectory indicator clears once the committed pounce begins.")
 	var reached_retreat := await _advance_until(
 		func() -> bool: return prowler.prowler_state == ProwlerEnemy.ProwlerState.RETREAT,
 		0.40,
@@ -175,7 +184,14 @@ func _audit_hunt_pounce_success_and_limit() -> void:
 		"hunt pounce windup"
 	)
 	_require(reached_windup, "Prowler reaches POUNCE_WINDUP while unarmed and close.")
+	_require(prowler.debug_is_pounce_indicator_active(), "Hunting pounce windup shows the quick trajectory indicator.")
 	var locked_direction := prowler.debug_get_locked_pounce_direction()
+	var hunt_indicator_direction := prowler.debug_get_pounce_indicator_direction()
+	if hunt_indicator_direction != Vector2.ZERO and locked_direction != Vector2.ZERO:
+		_require(
+			hunt_indicator_direction.dot(locked_direction.normalized()) > 0.98,
+			"Hunting trajectory indicator stays aligned to the locked pounce direction."
+		)
 	player.global_position += Vector2(0.0, 6.0)
 	var pounce_start := prowler.global_position
 	var reached_airborne := await _advance_until(
@@ -184,6 +200,7 @@ func _audit_hunt_pounce_success_and_limit() -> void:
 		"hunt pounce start"
 	)
 	_require(reached_airborne, "Prowler begins the committed hunting pounce after its windup.")
+	_require(not prowler.debug_is_pounce_indicator_active(), "Hunting trajectory indicator clears once the committed pounce begins.")
 	await _advance_physics(0.03)
 	var launch_direction := (prowler.global_position - pounce_start).normalized()
 	if launch_direction != Vector2.ZERO and locked_direction != Vector2.ZERO:
@@ -250,7 +267,7 @@ func _audit_death_and_score() -> void:
 	add_child(root)
 	var player := _spawn_player(root, Vector2(192.0, 108.0))
 	var spear := _spawn_spear(root, player)
-	var prowler := _spawn_prowler(root, player, spear, Vector2(220.0, 108.0))
+	var prowler := _spawn_prowler(root, player, spear, Vector2(214.0, 108.0))
 	var kill_tracker := {
 		"count": 0,
 		"score": 0,
@@ -259,9 +276,13 @@ func _audit_death_and_score() -> void:
 		kill_tracker["count"] += 1
 		kill_tracker["score"] = score_value
 	)
+	await _advance_physics(0.02)
+	_require(prowler.prowler_state == ProwlerEnemy.ProwlerState.DEFENSIVE_WINDUP, "Death audit reaches the armed defensive windup state before the kill.")
+	_require(prowler.debug_is_pounce_indicator_active(), "Trajectory indicator is active before a windup death cleanup test.")
 	var response := prowler.receive_combat_hit(Enemy.HIT_SOURCE_SPEAR, prowler.global_position, Vector2.RIGHT)
 	_require(response == Enemy.HitResponse.DAMAGED, "Prowler spear hit uses the ordinary DAMAGED response.")
 	_require(prowler.is_dying, "One valid thrown-spear hit kills the Prowler.")
+	_require(not prowler.debug_is_pounce_indicator_active(), "Trajectory indicator clears immediately when the Prowler dies.")
 	_require(int(kill_tracker["count"]) == 1, "Prowler death emits exactly one killed signal.")
 	_require(int(kill_tracker["score"]) == 2, "Prowler death awards exactly 2 score points.")
 	await _free_test_root(root)

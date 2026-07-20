@@ -5,7 +5,9 @@ signal spawn_requested(
 	request_id: int,
 	enemy_kind: int,
 	spawn_edge: int,
-	wave_id: int
+	wave_id: int,
+	lane_hint: float,
+	formation_bias_hint: int
 )
 signal telegraph_started(wave_name: StringName, edges: Array[int], duration: float)
 signal telegraph_finished
@@ -40,7 +42,10 @@ enum EdgeRole {
 const WAVE_RUSH := &"rush"
 const WAVE_PINCER := &"pincer"
 const WAVE_CHARGER_HUNT := &"charger_hunt"
+const WAVE_BULWARK := &"bulwark"
 const INVALID_WAVE_ID := -1
+const INVALID_LANE_HINT := -1.0
+const INVALID_FORMATION_BIAS_HINT := -1
 
 @export var first_wave_time_min := 28.0
 @export var first_wave_time_max := 34.0
@@ -49,6 +54,7 @@ const INVALID_WAVE_ID := -1
 @export var rush_start_population_threshold := 5
 @export var pincer_start_population_threshold := 3
 @export var charger_hunt_start_population_threshold := 4
+@export var bulwark_start_population_threshold := 4
 @export var total_hostile_cap := 10
 @export var normal_hostile_cap := 9
 @export var charger_hostile_cap := 2
@@ -58,6 +64,7 @@ const INVALID_WAVE_ID := -1
 @export var prowler_hostile_cap := 1
 @export var first_minute_charger_cap := 1
 @export var spawn_retry_interval := 0.3
+@export var bulwark_earliest_time := 58.0
 
 class SpawnStep:
 	extends RefCounted
@@ -65,11 +72,21 @@ class SpawnStep:
 	var time_offset: float
 	var enemy_kind: int
 	var edge_role: int
+	var lane_hint: float
+	var formation_bias_hint: int
 
-	func _init(new_time_offset: float, new_enemy_kind: int, new_edge_role: int) -> void:
+	func _init(
+		new_time_offset: float,
+		new_enemy_kind: int,
+		new_edge_role: int,
+		new_lane_hint: float = -1.0,
+		new_formation_bias_hint: int = -1
+	) -> void:
 		time_offset = new_time_offset
 		enemy_kind = new_enemy_kind
 		edge_role = new_edge_role
+		lane_hint = new_lane_hint
+		formation_bias_hint = new_formation_bias_hint
 
 
 class WaveDefinition:
@@ -81,6 +98,7 @@ class WaveDefinition:
 	var recovery_duration: float
 	var start_population_threshold: int
 	var uses_opposite_edge: bool
+	var requires_cap_fit_preflight: bool
 	var steps: Array[SpawnStep]
 
 	func _init(
@@ -90,6 +108,7 @@ class WaveDefinition:
 		new_recovery_duration: float,
 		new_start_population_threshold: int,
 		new_uses_opposite_edge: bool,
+		new_requires_cap_fit_preflight: bool,
 		new_steps: Array[SpawnStep]
 	) -> void:
 		wave_name = new_wave_name
@@ -98,6 +117,7 @@ class WaveDefinition:
 		recovery_duration = new_recovery_duration
 		start_population_threshold = new_start_population_threshold
 		uses_opposite_edge = new_uses_opposite_edge
+		requires_cap_fit_preflight = new_requires_cap_fit_preflight
 		steps = new_steps
 
 
@@ -107,11 +127,21 @@ class ResolvedSpawnStep:
 	var time_offset: float
 	var enemy_kind: int
 	var spawn_edge: int
+	var lane_hint: float
+	var formation_bias_hint: int
 
-	func _init(new_time_offset: float, new_enemy_kind: int, new_spawn_edge: int) -> void:
+	func _init(
+		new_time_offset: float,
+		new_enemy_kind: int,
+		new_spawn_edge: int,
+		new_lane_hint: float,
+		new_formation_bias_hint: int
+	) -> void:
 		time_offset = new_time_offset
 		enemy_kind = new_enemy_kind
 		spawn_edge = new_spawn_edge
+		lane_hint = new_lane_hint
+		formation_bias_hint = new_formation_bias_hint
 
 
 var current_state: EncounterState = EncounterState.DISABLED
@@ -196,10 +226,7 @@ func can_spawn_enemy(enemy_kind: int, survival_time: float) -> bool:
 		EnemyKind.NORMAL:
 			return get_normal_hostile_count() < normal_hostile_cap
 		EnemyKind.CHARGER:
-			var effective_cap := charger_hostile_cap
-			if survival_time < 60.0:
-				effective_cap = mini(effective_cap, first_minute_charger_cap)
-			return get_charger_hostile_count() < effective_cap
+			return get_charger_hostile_count() < _get_effective_charger_cap(survival_time)
 		EnemyKind.SHIELDED:
 			return get_shielded_hostile_count() < shielded_hostile_cap
 		EnemyKind.SHOOTER:
@@ -344,11 +371,11 @@ func _advance_recovery(delta: float, survival_time: float) -> void:
 	ambient_spawn_policy_changed.emit(true)
 
 
-func _begin_wave_telegraph(wave: WaveDefinition) -> void:
+func _begin_wave_telegraph(wave: WaveDefinition, forced_edges: Array[int] = []) -> void:
 	_current_wave = wave
 	_current_wave_id = _next_wave_id
 	_next_wave_id += 1
-	_current_wave_edges = _choose_wave_edges(wave)
+	_current_wave_edges = _choose_wave_edges(wave, forced_edges)
 	_resolved_steps = _resolve_steps(wave, _current_wave_edges)
 	_scheduled_spawn_index = 0
 	_pending_request_id = 0
@@ -375,7 +402,9 @@ func _request_wave_spawn(step: ResolvedSpawnStep) -> void:
 		_pending_request_id,
 		step.enemy_kind,
 		step.spawn_edge,
-		_current_wave_id
+		_current_wave_id,
+		step.lane_hint,
+		step.formation_bias_hint
 	)
 
 
@@ -385,28 +414,33 @@ func _choose_next_wave(survival_time: float) -> WaveDefinition:
 
 	var living_hostiles := get_total_hostile_count()
 	var preferred_name := WAVE_RUSH
-	match _completed_wave_count % 3:
+	match _completed_wave_count % 4:
 		1:
 			preferred_name = WAVE_PINCER
 		2:
 			preferred_name = WAVE_CHARGER_HUNT
+		3:
+			preferred_name = WAVE_BULWARK
 
 	for wave in _wave_definitions:
-		if (
-			wave.wave_name == preferred_name
-			and survival_time >= wave.earliest_time
-			and living_hostiles <= wave.start_population_threshold
+		if wave.wave_name == preferred_name and _wave_is_currently_eligible(
+			wave,
+			survival_time,
+			living_hostiles
 		):
 			return wave
 
 	for wave in _wave_definitions:
-		if survival_time >= wave.earliest_time and living_hostiles <= wave.start_population_threshold:
+		if _wave_is_currently_eligible(wave, survival_time, living_hostiles):
 			return wave
 
 	return null
 
 
-func _choose_wave_edges(wave: WaveDefinition) -> Array[int]:
+func _choose_wave_edges(wave: WaveDefinition, forced_edges: Array[int] = []) -> Array[int]:
+	if not forced_edges.is_empty():
+		return forced_edges.duplicate()
+
 	var primary_edge := rng.randi_range(Arena.SpawnEdge.TOP, Arena.SpawnEdge.RIGHT)
 	var edges: Array[int] = [primary_edge]
 	if wave.uses_opposite_edge:
@@ -425,9 +459,72 @@ func _resolve_steps(wave: WaveDefinition, edges: Array[int]) -> Array[ResolvedSp
 		var resolved_edge := primary_edge
 		if step.edge_role == EdgeRole.OPPOSITE:
 			resolved_edge = opposite_edge
-		resolved.append(ResolvedSpawnStep.new(step.time_offset, step.enemy_kind, resolved_edge))
+		resolved.append(
+			ResolvedSpawnStep.new(
+				step.time_offset,
+				step.enemy_kind,
+				resolved_edge,
+				step.lane_hint,
+				step.formation_bias_hint
+			)
+		)
 
 	return resolved
+
+
+func _wave_is_currently_eligible(
+	wave: WaveDefinition,
+	survival_time: float,
+	living_hostiles: int
+) -> bool:
+	if survival_time < wave.earliest_time:
+		return false
+	if living_hostiles > wave.start_population_threshold:
+		return false
+	if wave.requires_cap_fit_preflight and not _can_wave_fit_current_caps(wave, survival_time):
+		return false
+	return true
+
+
+func _can_wave_fit_current_caps(wave: WaveDefinition, survival_time: float) -> bool:
+	if get_total_hostile_count() + wave.steps.size() > total_hostile_cap:
+		return false
+
+	var planned_kind_counts := {
+		EnemyKind.NORMAL: 0,
+		EnemyKind.CHARGER: 0,
+		EnemyKind.SHIELDED: 0,
+		EnemyKind.SHOOTER: 0,
+		EnemyKind.BOOMER: 0,
+		EnemyKind.PROWLER: 0,
+	}
+	for step in wave.steps:
+		planned_kind_counts[step.enemy_kind] = int(planned_kind_counts.get(step.enemy_kind, 0)) + 1
+
+	if get_normal_hostile_count() + int(planned_kind_counts.get(EnemyKind.NORMAL, 0)) > normal_hostile_cap:
+		return false
+	if (
+		get_charger_hostile_count() + int(planned_kind_counts.get(EnemyKind.CHARGER, 0))
+		> _get_effective_charger_cap(survival_time)
+	):
+		return false
+	if get_shielded_hostile_count() + int(planned_kind_counts.get(EnemyKind.SHIELDED, 0)) > shielded_hostile_cap:
+		return false
+	if get_shooter_hostile_count() + int(planned_kind_counts.get(EnemyKind.SHOOTER, 0)) > shooter_hostile_cap:
+		return false
+	if get_boomer_hostile_count() + int(planned_kind_counts.get(EnemyKind.BOOMER, 0)) > boomer_hostile_cap:
+		return false
+	if get_prowler_hostile_count() + int(planned_kind_counts.get(EnemyKind.PROWLER, 0)) > prowler_hostile_cap:
+		return false
+
+	return true
+
+
+func _get_effective_charger_cap(survival_time: float) -> int:
+	var effective_cap := charger_hostile_cap
+	if survival_time < 60.0:
+		effective_cap = mini(effective_cap, first_minute_charger_cap)
+	return effective_cap
 
 
 func _get_enemy_kind_count(enemy_kind: int) -> int:
@@ -477,6 +574,7 @@ func _build_wave_definitions() -> Array[WaveDefinition]:
 			3.0,
 			rush_start_population_threshold,
 			false,
+			false,
 			rush_steps
 		)
 	)
@@ -497,6 +595,7 @@ func _build_wave_definitions() -> Array[WaveDefinition]:
 			3.0,
 			pincer_start_population_threshold,
 			true,
+			false,
 			pincer_steps
 		)
 	)
@@ -514,7 +613,27 @@ func _build_wave_definitions() -> Array[WaveDefinition]:
 			3.0,
 			charger_hunt_start_population_threshold,
 			false,
+			false,
 			charger_hunt_steps
+		)
+	)
+
+	var bulwark_steps: Array[SpawnStep] = [
+		SpawnStep.new(0.0, EnemyKind.SHIELDED, EdgeRole.PRIMARY, 0.50, Enemy.FormationBias.DIRECT),
+		SpawnStep.new(0.35, EnemyKind.SHOOTER, EdgeRole.PRIMARY, 0.62),
+		SpawnStep.new(0.85, EnemyKind.NORMAL, EdgeRole.PRIMARY, 0.34, Enemy.FormationBias.LEFT_FLANK),
+		SpawnStep.new(1.2, EnemyKind.NORMAL, EdgeRole.PRIMARY, 0.74, Enemy.FormationBias.RIGHT_FLANK),
+	]
+	definitions.append(
+		WaveDefinition.new(
+			WAVE_BULWARK,
+			bulwark_earliest_time,
+			1.75,
+			3.0,
+			bulwark_start_population_threshold,
+			false,
+			true,
+			bulwark_steps
 		)
 	)
 

@@ -61,6 +61,8 @@
 | `rush_start_population_threshold` | `5` | `scripts/encounter_director.gd` | Max living hostiles for Rush to start. |
 | `pincer_start_population_threshold` | `3` | `scripts/encounter_director.gd` | Max living hostiles for Pincer to start. |
 | `charger_hunt_start_population_threshold` | `4` | `scripts/encounter_director.gd` | Max living hostiles for Charger Hunt to start. |
+| `bulwark_earliest_time` | `58.0s` | `scripts/encounter_director.gd` | Earliest time Bulwark can join the authored-wave selection cycle. |
+| `bulwark_start_population_threshold` | `4` | `scripts/encounter_director.gd` | Max living hostiles for Bulwark to start. |
 | `total_hostile_cap` | `10` | `scripts/encounter_director.gd` | Global hostile population ceiling. |
 | `normal_hostile_cap` | `9` | `scripts/encounter_director.gd` | Dedicated Normal cap. |
 | `charger_hostile_cap` | `2` | `scripts/encounter_director.gd` | Dedicated Charger cap. |
@@ -72,6 +74,9 @@
 | `landed_spear_spawn_safe_radius` | `36.0px` | `scripts/main.gd` | Safe distance from a landed spear for enemy spawns. |
 | `spawn_retry_interval` | `0.3s` | `scripts/encounter_director.gd` | Retry delay for blocked wave spawn steps. |
 | Charger Hunt `earliest_time` | `48.0s` | `scripts/encounter_director.gd` wave definitions | Earliest eligible time for Charger Hunt. |
+| Bulwark composition | Shielded `0.00 @ 0.50 DIRECT`; Shooter `0.35 @ 0.62`; Normal `0.85 @ 0.34 LEFT_FLANK`; Normal `1.20 @ 0.74 RIGHT_FLANK` | `scripts/encounter_director.gd` | One-edge authored formation that showcases existing Shielded cover, Shooter peeks, and stable Normal flanks without adding squad AI. |
+| Bulwark cap-fit preflight | total `+4`, Normal `+2`, Shielded `+1`, Shooter `+1` must fit | `scripts/encounter_director.gd` | Bulwark cannot telegraph unless its full planned composition can fit under the current living hostile caps. |
+| Bulwark lane-hint fallback | deterministic same-edge nearby lane search, then retry | `scripts/arena.gd`, `scripts/main.gd`, `scripts/encounter_director.gd` | Exact hinted lanes stay on the announced edge; blocked lanes search nearby alternating offsets before deferring through the ordinary wave retry path. |
 
 ## Player
 

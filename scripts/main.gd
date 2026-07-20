@@ -430,12 +430,16 @@ func _try_spawn_enemy(
 	enemy_kind: int,
 	spawn_edge: int,
 	wave_id: int,
-	spawn_source: int = SpawnSource.AMBIENT
+	spawn_source: int = SpawnSource.AMBIENT,
+	lane_hint: float = EncounterDirector.INVALID_LANE_HINT,
+	formation_bias_hint: int = EncounterDirector.INVALID_FORMATION_BIAS_HINT
 ) -> bool:
 	if not encounter_director.can_spawn_enemy(enemy_kind, survival_time):
 		return false
 
 	var spawn_position := _find_safe_spawn_position(spawn_edge)
+	if lane_hint != EncounterDirector.INVALID_LANE_HINT:
+		spawn_position = _find_safe_spawn_position_for_lane(spawn_edge, lane_hint)
 	if not spawn_position.is_finite():
 		return false
 
@@ -445,7 +449,7 @@ func _try_spawn_enemy(
 		return false
 
 	enemy.setup(player, arena.get_play_rect(), _get_current_enemy_speed())
-	_assign_enemy_formation_bias(enemy, enemy_kind, spawn_source)
+	_assign_enemy_formation_bias(enemy, enemy_kind, spawn_source, formation_bias_hint)
 	if enemy.has_method("set_tracked_spear"):
 		enemy.call("set_tracked_spear", spear)
 	enemy.global_position = spawn_position
@@ -764,6 +768,21 @@ func _find_safe_spawn_position(spawn_edge: int) -> Vector2:
 	return arena.find_safe_spawn_position(spawn_edge, avoid_positions, avoid_radii)
 
 
+func _find_safe_spawn_position_for_lane(spawn_edge: int, lane_hint: float) -> Vector2:
+	var avoid_positions: Array[Vector2] = [player.global_position]
+	var avoid_radii: Array[float] = [spawn_safe_radius]
+	if spear.is_landed():
+		avoid_positions.append(spear.global_position)
+		avoid_radii.append(landed_spear_spawn_safe_radius)
+
+	return arena.find_safe_spawn_position_along_edge_lane(
+		spawn_edge,
+		lane_hint,
+		avoid_positions,
+		avoid_radii
+	)
+
+
 func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 	if enemy_kind == EncounterDirector.EnemyKind.CHARGER:
 		return ChargerScene
@@ -778,12 +797,22 @@ func _get_enemy_scene(enemy_kind: int) -> PackedScene:
 	return EnemyScene
 
 
-func _assign_enemy_formation_bias(enemy: Enemy, enemy_kind: int, spawn_source: int) -> void:
+func _assign_enemy_formation_bias(
+	enemy: Enemy,
+	enemy_kind: int,
+	spawn_source: int,
+	formation_bias_hint: int = EncounterDirector.INVALID_FORMATION_BIAS_HINT
+) -> void:
 	if enemy == null:
 		return
 
 	var assigned_bias := Enemy.FormationBias.DIRECT
-	if _enemy_kind_uses_formation_bias(enemy_kind):
+	if (
+		formation_bias_hint != EncounterDirector.INVALID_FORMATION_BIAS_HINT
+		and _enemy_kind_uses_formation_bias(enemy_kind)
+	):
+		assigned_bias = formation_bias_hint
+	elif _enemy_kind_uses_formation_bias(enemy_kind):
 		assigned_bias = _get_next_formation_bias(spawn_source == SpawnSource.DEBUG)
 
 	enemy.set_formation_bias(assigned_bias)
@@ -1257,9 +1286,18 @@ func _on_director_spawn_requested(
 	request_id: int,
 	enemy_kind: int,
 	spawn_edge: int,
-	wave_id: int
+	wave_id: int,
+	lane_hint: float,
+	formation_bias_hint: int
 ) -> void:
-	var spawned := _try_spawn_enemy(enemy_kind, spawn_edge, wave_id, SpawnSource.WAVE)
+	var spawned := _try_spawn_enemy(
+		enemy_kind,
+		spawn_edge,
+		wave_id,
+		SpawnSource.WAVE,
+		lane_hint,
+		formation_bias_hint
+	)
 	encounter_director.report_spawn_result(request_id, spawned)
 
 

@@ -205,7 +205,13 @@ def main() -> int:
     require("shooter_hostile_cap := 2" in director, "Shooter cap is 2", failures)
     require("get_shooter_hostile_count() < shooter_hostile_cap" in director, "Shooter has a dedicated cap", failures)
     require("get_total_hostile_count() >= total_hostile_cap" in director, "Shooter still counts under total hostile cap", failures)
-    require("EnemyKind.SHOOTER" not in director.split("func _build_wave_definitions", 1)[1], "Authored waves contain no Shooter steps", failures)
+    build_wave_section = director.split("func _build_wave_definitions", 1)[1]
+    require(
+        "SpawnStep.new(0.35, EnemyKind.SHOOTER, EdgeRole.PRIMARY, 0.62)" in build_wave_section
+        and "WAVE_BULWARK" in build_wave_section,
+        "Shooter only gains the approved Bulwark authored-wave step",
+        failures,
+    )
 
     require("BlowgunWindupPlayer" in main_scene and "BlowgunFirePlayer" in main_scene and "BlowgunShovePlayer" in main_scene, "Main has Shooter SFX players", failures)
     require('path="res://audio/blowgun_windup.wav"' in main_scene, "Wind-up stream is assigned", failures)

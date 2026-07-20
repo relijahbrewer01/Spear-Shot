@@ -82,6 +82,8 @@ def main() -> int:
         "first_wave_time_min/max",
         "inter_wave_interval_min/max",
         "rush_start_population_threshold",
+        "bulwark_earliest_time",
+        "bulwark_start_population_threshold",
         "total_hostile_cap",
         "first_minute_charger_cap",
         "move_speed",
@@ -190,6 +192,8 @@ def main() -> int:
         "`formation_bias_angle_degrees` | `18.0`",
         "`formation_direct_pressure_distance` | `28.0px`",
         "`formation_wall_fallback_padding` | `8.0px`",
+        "`bulwark_earliest_time` | `58.0s`",
+        "`bulwark_start_population_threshold` | `4`",
         "`prowler_unlock_time` | `78.0s`",
         "`unarmed_alert_delay` | `0.28s`",
         "`stalk_speed_scale` | `0.82`",
@@ -228,6 +232,7 @@ def main() -> int:
     require("## Phase 4.6 Enemy Interaction And Formation Pass" in roadmap, "ROADMAP documents Phase 4.6 design direction", failures)
     require("Heart Runner" in readme and "Heart Runner" in roadmap, "Docs mention the implemented Heart Runner opportunity", failures)
     require("Prowler" in readme and "Prowler" in roadmap, "Docs mention the implemented Prowler phase", failures)
+    require("Bulwark" in readme and "Bulwark" in roadmap and "Bulwark composition" in tuning, "Docs mention the implemented Bulwark authored wave", failures)
     require("positioning" in roadmap.lower() and "boomer" in roadmap.lower(), "ROADMAP frames Phase 4.6 around positioning-based cooperation and Boomer interactions", failures)
     require("Shielded-aware cover hold and side-peek behavior" in readme and "temporary positional cover" in roadmap, "README and ROADMAP describe the live Shielded/Shooter cooperation checkpoint", failures)
     require("shielded dart interception" not in readme.lower() and "intercept shooter darts" not in roadmap.lower(), "Docs no longer describe Shielded dart interception as the plan", failures)

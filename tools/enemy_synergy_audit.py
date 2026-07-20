@@ -382,7 +382,7 @@ def main() -> int:
         failures,
     )
     require(
-        "_assign_enemy_formation_bias(enemy, enemy_kind, spawn_source)" in main_script
+        "_assign_enemy_formation_bias(enemy, enemy_kind, spawn_source, formation_bias_hint)" in main_script
         and "_enemy_kind_uses_formation_bias" in main_script
         and "_get_next_formation_bias" in main_script,
         "Main assigns formation bias through the existing spawn seam",
@@ -398,7 +398,15 @@ def main() -> int:
     )
     require("FORMATION_BIAS_SEQUENCE[sequence_index % FORMATION_BIAS_SEQUENCE.size()]" in main_script, "Formation bias assignment is deterministic and repeatable", failures)
 
-    require("FormationBias" not in director and "Bulwark" not in director, "EncounterDirector remains unchanged for this checkpoint", failures)
+    require(
+        "WAVE_BULWARK" in director
+        and "formation_bias_hint" in director
+        and "lane_hint" in director
+        and "multikill" not in director.lower()
+        and "score multiplier" not in director.lower(),
+        "EncounterDirector adds only the narrow Bulwark wave metadata needed for the live synergy checkpoint",
+        failures,
+    )
 
     for documented_value in [
         "formation_bias_angle_degrees",

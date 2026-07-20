@@ -158,7 +158,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/generate_music.py`: local background music generation
 - `tools/bugfix_audit.py`: lightweight static audit for Phase 1 spawn wiring, scaling, minimal HUD, pause support, and audio bus setup
 - `tools/encounter_director_audit.py`: static Phase 3 encounter, safety, and warning-audio audit
-- `tools/EncounterDirectorRuntimeAudit.tscn`: focused runtime audit for Rush, Pincer, and Charger Hunt
+- `tools/EncounterDirectorRuntimeAudit.tscn`: focused runtime audit for Rush, Pincer, Charger Hunt, and Bulwark wave selection
 - `tools/EncounterIntegrationAudit.tscn`: Main-scene telegraph, SFX, spawn, cleanup, recovery, and restart audit
 - `tools/shielded_enemy_audit.py`: static Phase 4.1 Shielded enemy contract audit
 - `tools/ShieldedEnemyRuntimeAudit.tscn`: runtime audit for Shielded hit ordering, STOPPED spear behavior, score, stagger, and ambient cap removal
@@ -245,7 +245,9 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Rush` sends four Normals from one announced edge
 - `Pincer` alternates six Normals between two opposite announced edges
 - `Charger Hunt` sends two Normals followed by one Charger from one announced edge
+- `Bulwark` sends one center-front Shielded, one slightly offset Shooter behind it, and two shallow-flank Normals from one announced edge
 - Each wave has its own start pressure budget: `Rush` at five or fewer hostiles, `Charger Hunt` at four or fewer, and `Pincer` at three or fewer
+- `Bulwark` becomes eligible at `58.0` seconds with a start pressure budget of `4`, uses normalized same-edge lane hints (`0.34`, `0.50`, `0.62`, `0.74`), applies authored `DIRECT` / `LEFT_FLANK` / `RIGHT_FLANK` hints only to the Shielded and the two Normals, and preflights total + per-kind cap fit before it can telegraph
 - Tunable safety caps begin at `10` total hostiles, `9` Normals, and `2` Chargers
 - Shielded enemies count toward total hostile pressure, have a dedicated cap of `1`, and do not count as Normals or Chargers
 - Shooter enemies count toward total hostile pressure, have a dedicated cap of `2`, and do not count as Normals, Chargers, or Shielded
@@ -262,7 +264,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - After each special enemy has appeared once through organic play, it permanently returns to its ordinary long-term weighted selection for that run
 - The first minute uses an effective one-Charger limit so the ceiling of two does not become the design target
 - Wave spawns stay at least `72` pixels from Akedra and `36` pixels from a landed spear
-- If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback
+- If no fair edge point is available, the spawn waits and retries instead of using an unsafe fallback; Bulwark lane hints use a small deterministic same-edge nearby search before deferring
 - A wave completes only after all scheduled spawns occurred and every enemy tagged to that wave died or exited the tree
 
 ## Scoring and high score

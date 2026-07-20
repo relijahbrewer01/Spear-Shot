@@ -64,6 +64,7 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - This remains intentionally narrow rather than universal friendly fire: Shooters still aim at Akedra, darts still ignore other ordinary enemies, and Shielded projectile blocking remains deferred.
 - Phase 4.6.4 adds dash-only Charger bulldozing: during the committed dash, a Charger can shove eligible ordinary hostiles out of its lane through the existing authored displacement seam.
 - Bulldozing deals no damage, awards no score, does not clear enemy ownership, and does not trigger Boomer fuse by body contact; it exists purely to preserve the dash lane and break up piles.
+- Phase 4.6.5 adds one authored Bulwark wave: a center-front Shielded, a slightly offset Shooter behind it, and two shallow-flank Normals on one announced edge, using narrow lane hints and authored formation-bias hints to showcase the already-live cover, peek, and crowd-flow behavior without adding squad AI.
 - Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
 - Final interaction and population tuning should happen after those behaviors exist, not before.
 

@@ -53,6 +53,10 @@ def main() -> int:
     spear = read_text("scripts/Spear.gd")
     scene = read_text("Main.tscn")
     generator = read_text("tools/generate_sfx.py")
+    readme = read_text("README.md")
+    roadmap = read_text("ROADMAP.md")
+    tuning = read_text("TUNING.md")
+    bulwark_section = director.split("var bulwark_steps", 1)[1] if "var bulwark_steps" in director else ""
 
     for state_name in [
         "AMBIENT",
@@ -62,7 +66,7 @@ def main() -> int:
     ]:
         require(state_name in director, f"Director defines {state_name}", failures)
 
-    for wave_name in ["rush", "pincer", "charger_hunt"]:
+    for wave_name in ["rush", "pincer", "charger_hunt", "bulwark"]:
         require(
             f'&"{wave_name}"' in director,
             f"Director defines {wave_name}",
@@ -87,7 +91,7 @@ def main() -> int:
     )
     require(
         "start_population_threshold" in director
-        and "living_hostiles <= wave.start_population_threshold" in director,
+        and "living_hostiles > wave.start_population_threshold" in director,
         "Wave selection uses each wave's own pressure budget",
         failures,
     )
@@ -125,12 +129,98 @@ def main() -> int:
         failures,
     )
     require(
-        "SpawnStep.new" in director
-        and "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1]
-        and "EnemyKind.SHOOTER" not in director.split("func _build_wave_definitions", 1)[1]
-        and "EnemyKind.BOOMER" not in director.split("func _build_wave_definitions", 1)[1]
-        and "EnemyKind.PROWLER" not in director.split("func _build_wave_definitions", 1)[1],
-        "Authored waves contain no Shielded, Shooter, Boomer, or Prowler spawn steps",
+        director.count("WaveDefinition.new(") == 4,
+        "EncounterDirector still defines exactly four authored waves after adding Bulwark",
+        failures,
+    )
+    require(
+        "EnemyKind.BOOMER" not in bulwark_section
+        and "EnemyKind.PROWLER" not in bulwark_section,
+        "No authored Boomer or Prowler wave membership was added with Bulwark",
+        failures,
+    )
+    require(
+        "new_lane_hint: float = -1.0" in director
+        and "new_formation_bias_hint: int = -1" in director
+        and "var lane_hint: float" in director
+        and "var formation_bias_hint: int" in director,
+        "SpawnStep exposes optional lane and formation-bias metadata",
+        failures,
+    )
+    require(
+        "requires_cap_fit_preflight: bool" in director
+        and "wave.requires_cap_fit_preflight" in director,
+        "Wave definitions can opt into narrow cap-fit preflight",
+        failures,
+    )
+    require(
+        "bulwark_start_population_threshold := 4" in director
+        and "bulwark_earliest_time := 58.0" in director,
+        "Bulwark exports the approved earliest time and pressure threshold",
+        failures,
+    )
+    require(
+        "SpawnStep.new(0.0, EnemyKind.SHIELDED, EdgeRole.PRIMARY, 0.50, Enemy.FormationBias.DIRECT)" in director
+        and "SpawnStep.new(0.35, EnemyKind.SHOOTER, EdgeRole.PRIMARY, 0.62)" in director
+        and "SpawnStep.new(0.85, EnemyKind.NORMAL, EdgeRole.PRIMARY, 0.34, Enemy.FormationBias.LEFT_FLANK)" in director
+        and "SpawnStep.new(1.2, EnemyKind.NORMAL, EdgeRole.PRIMARY, 0.74, Enemy.FormationBias.RIGHT_FLANK)" in director,
+        "Bulwark step composition, timing, lane hints, and authored formation-bias hints match the approved definition",
+        failures,
+    )
+    require(
+        "WAVE_BULWARK,\n\t\t\tbulwark_earliest_time,\n\t\t\t1.75,\n\t\t\t3.0,\n\t\t\tbulwark_start_population_threshold,\n\t\t\tfalse,\n\t\t\ttrue," in director,
+        "Bulwark uses one announced edge plus cap-fit preflight while keeping the standard telegraph and recovery",
+        failures,
+    )
+    require(
+        "SpawnStep.new(0.0, EnemyKind.NORMAL, EdgeRole.PRIMARY)," in director
+        and "SpawnStep.new(0.45, EnemyKind.NORMAL, EdgeRole.OPPOSITE)," in director
+        and "SpawnStep.new(1.2, EnemyKind.CHARGER, EdgeRole.PRIMARY)," in director,
+        "Rush, Pincer, and Charger Hunt keep their existing spawn-step definitions without accidental lane/bias metadata",
+        failures,
+    )
+    require(
+        "get_total_hostile_count() + wave.steps.size() > total_hostile_cap" in director
+        and "normal_hostile_cap" in director
+        and "shielded_hostile_cap" in director
+        and "shooter_hostile_cap" in director,
+        "Bulwark cap-fit preflight checks total, Normal, Shielded, and Shooter capacity before telegraph",
+        failures,
+    )
+    require(
+        "formation_bias_hint" in director
+        and "lane_hint" in director
+        and "spawn_requested.emit(" in director,
+        "Resolved wave requests carry optional lane and formation-bias metadata forward to Main",
+        failures,
+    )
+    require(
+        "_find_safe_spawn_position_for_lane" in main_script
+        and "find_safe_spawn_position_along_edge_lane" in arena
+        and "formation_bias_hint != EncounterDirector.INVALID_FORMATION_BIAS_HINT" in main_script,
+        "Main and Arena apply Bulwark lane hints and authored bias hints through the existing spawn seam",
+        failures,
+    )
+    require(
+        "_get_next_formation_bias(spawn_source == SpawnSource.DEBUG)" in main_script
+        and "formation_bias_hint != EncounterDirector.INVALID_FORMATION_BIAS_HINT" in main_script,
+        "Explicit Bulwark formation-bias hints do not consume the ordinary assignment sequence",
+        failures,
+    )
+    require(
+        "get_spawn_position_for_edge_lane" in arena
+        and "lane_offsets.append(offset)" in arena
+        and "lane_offsets.append(-offset)" in arena
+        and "return INVALID_SPAWN_POSITION" in arena,
+        "Lane-hinted spawn fallback stays deterministic, same-edge, and safely retryable",
+        failures,
+    )
+    require(
+        "anchor" not in director.lower()
+        and "cover_hold" not in director.lower()
+        and "side-peek" not in director.lower()
+        and "multikill" not in director.lower(),
+        "EncounterDirector does not hard-code Shooter/Shielded combat behavior or multikill logic for Bulwark",
         failures,
     )
 
@@ -292,6 +382,11 @@ def main() -> int:
         "Charger Hunt earliest time and wave telegraph/recovery remain unchanged",
         failures,
     )
+    require(
+        "WAVE_BULWARK,\n\t\t\tbulwark_earliest_time,\n\t\t\t1.75,\n\t\t\t3.0," in director,
+        "Bulwark earliest time and wave telegraph/recovery use the approved live values",
+        failures,
+    )
 
     require(
         "find_safe_spawn_position" in arena
@@ -315,6 +410,14 @@ def main() -> int:
     require(
         "generate_wave_warning" in generator,
         "Wave warning remains reproducible from the local generator",
+        failures,
+    )
+    require(
+        "Bulwark" in readme
+        and "Bulwark" in roadmap
+        and "bulwark_earliest_time" in tuning
+        and "bulwark_start_population_threshold" in tuning,
+        "README, ROADMAP, and TUNING document the live Bulwark wave",
         failures,
     )
     audit_wave_audio(failures)

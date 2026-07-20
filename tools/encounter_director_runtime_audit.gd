@@ -6,7 +6,12 @@ var spawned_enemies: Array[Node] = []
 var spawned_enemy_ids: Array[int] = []
 var spawned_enemy_kinds: Array[int] = []
 var spawned_wave_ids: Array[int] = []
+var spawned_edges: Array[int] = []
+var spawned_lane_hints: Array[float] = []
+var spawned_bias_hints: Array[int] = []
+var spawn_request_times: Array[float] = []
 var last_telegraph_wave_name := &""
+var last_telegraph_edges: Array[int] = []
 var failures: Array[String] = []
 
 
@@ -108,6 +113,7 @@ func _run_audit() -> void:
 		8
 	)
 	_require(not impossible_position.is_finite(), "Unsafe spawn search returns no position.")
+	await _audit_bulwark_wave_contract()
 	await _audit_wave_specific_threshold_selection()
 
 	for failure in failures:
@@ -121,8 +127,10 @@ func _run_audit() -> void:
 func _on_spawn_requested(
 	request_id: int,
 	enemy_kind: int,
-	_spawn_edge: int,
-	wave_id: int
+	spawn_edge: int,
+	wave_id: int,
+	lane_hint: float,
+	formation_bias_hint: int
 ) -> void:
 	var enemy := Node.new()
 	add_child(enemy)
@@ -131,59 +139,239 @@ func _on_spawn_requested(
 	spawned_enemy_ids.append(enemy.get_instance_id())
 	spawned_enemy_kinds.append(enemy_kind)
 	spawned_wave_ids.append(wave_id)
+	spawned_edges.append(spawn_edge)
+	spawned_lane_hints.append(lane_hint)
+	spawned_bias_hints.append(formation_bias_hint)
+	spawn_request_times.append(float(director.get("_active_wave_time")))
 	director.report_spawn_result(request_id, true)
 
 
-func _on_telegraph_started(wave_name: StringName, _edges: Array[int], _duration: float) -> void:
+func _on_telegraph_started(wave_name: StringName, edges: Array[int], _duration: float) -> void:
 	last_telegraph_wave_name = wave_name
+	last_telegraph_edges = edges.duplicate()
+
+
+func _audit_bulwark_wave_contract() -> void:
+	var bulwark_wave := _find_wave_definition(EncounterDirector.WAVE_BULWARK)
+	_require(bulwark_wave != null, "Bulwark wave definition is available to the runtime audit.")
+	if bulwark_wave == null:
+		return
+
+	var expected_kinds := [
+		EncounterDirector.EnemyKind.SHIELDED,
+		EncounterDirector.EnemyKind.SHOOTER,
+		EncounterDirector.EnemyKind.NORMAL,
+		EncounterDirector.EnemyKind.NORMAL,
+	]
+	var expected_lanes := [0.50, 0.62, 0.34, 0.74]
+	var expected_biases := [
+		Enemy.FormationBias.DIRECT,
+		EncounterDirector.INVALID_FORMATION_BIAS_HINT,
+		Enemy.FormationBias.LEFT_FLANK,
+		Enemy.FormationBias.RIGHT_FLANK,
+	]
+	var expected_offsets := [0.05, 0.35, 0.85, 1.20]
+
+	for edge in [
+		Arena.SpawnEdge.TOP,
+		Arena.SpawnEdge.BOTTOM,
+		Arena.SpawnEdge.LEFT,
+		Arena.SpawnEdge.RIGHT,
+	]:
+		_clear_spawn_tracking()
+		_remove_non_audit_nodes()
+		await get_tree().process_frame
+		director.reset_for_new_run()
+		last_telegraph_wave_name = &""
+		last_telegraph_edges.clear()
+		var forced_edges: Array[int] = [edge]
+		director.call("_begin_wave_telegraph", bulwark_wave, forced_edges)
+		_require(
+			last_telegraph_wave_name == EncounterDirector.WAVE_BULWARK,
+			"Bulwark telegraph can be selected explicitly for focused runtime validation."
+		)
+		_require(
+			last_telegraph_edges.size() == 1 and last_telegraph_edges[0] == edge,
+			"Bulwark telegraphs exactly one resolved edge."
+		)
+		director.advance(1.76, 60.0)
+		var elapsed := 0.0
+		while elapsed < 1.35:
+			director.advance(0.05, 60.0 + elapsed)
+			elapsed += 0.05
+
+		_require(spawned_enemy_kinds.size() == 4, "Bulwark schedules four enemies from its active wave.")
+		_require(_int_array_matches(spawned_enemy_kinds, expected_kinds), "Bulwark spawn order is Shielded, Shooter, Normal, Normal.")
+		_require(
+			spawned_wave_ids.all(func(wave_id: int) -> bool: return wave_id == director.get("_current_wave_id")),
+			"Bulwark spawn requests share one owned wave ID."
+		)
+		_require(
+			spawned_edges.all(func(spawn_edge: int) -> bool: return spawn_edge == edge),
+			"Bulwark keeps every spawn request on the announced edge."
+		)
+		for lane_index in range(mini(spawned_lane_hints.size(), expected_lanes.size())):
+			_require(
+				is_equal_approx(spawned_lane_hints[lane_index], expected_lanes[lane_index]),
+				"Bulwark lane hint %d matches the approved normalized value." % lane_index
+			)
+		_require(_int_array_matches(spawned_bias_hints, expected_biases), "Bulwark formation-bias hints stay explicit and ordered.")
+		for offset_index in range(mini(spawn_request_times.size(), expected_offsets.size())):
+			_require(
+				absf(spawn_request_times[offset_index] - expected_offsets[offset_index]) <= 0.051,
+				"Bulwark spawn offset %d stays near its approved timing." % offset_index
+			)
+		_remove_tracked_enemies()
+		await get_tree().process_frame
 
 
 func _audit_wave_specific_threshold_selection() -> void:
 	_clear_spawn_tracking()
-	await _reset_director_for_threshold_case(1, 3)
+	await _reset_director_for_wave_selection_case(1, [EncounterDirector.EnemyKind.NORMAL, EncounterDirector.EnemyKind.NORMAL, EncounterDirector.EnemyKind.NORMAL])
 	director.advance(0.01, 50.0)
 	_require(
 		last_telegraph_wave_name == EncounterDirector.WAVE_PINCER,
 		"Pincer starts when its preferred turn has three living hostiles."
 	)
 
-	await _reset_director_for_threshold_case(1, 4)
+	await _reset_director_for_wave_selection_case(
+		1,
+		[
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+		]
+	)
 	director.advance(0.01, 50.0)
 	_require(
 		last_telegraph_wave_name == EncounterDirector.WAVE_RUSH,
 		"Pincer is skipped at four hostiles and Rush can still start."
 	)
 
-	await _reset_director_for_threshold_case(2, 4)
+	await _reset_director_for_wave_selection_case(
+		2,
+		[
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+		]
+	)
 	director.advance(0.01, 50.0)
 	_require(
 		last_telegraph_wave_name == EncounterDirector.WAVE_CHARGER_HUNT,
 		"Charger Hunt starts when its preferred turn has four living hostiles."
 	)
 
-	await _reset_director_for_threshold_case(2, 5)
+	await _reset_director_for_wave_selection_case(
+		2,
+		[
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+		]
+	)
 	director.advance(0.01, 50.0)
 	_require(
 		last_telegraph_wave_name == EncounterDirector.WAVE_RUSH,
 		"Charger Hunt is skipped at five hostiles and Rush can still start."
 	)
 
+	await _reset_director_for_wave_selection_case(3, [])
+	director.advance(0.01, 57.9)
+	_require(
+		last_telegraph_wave_name != EncounterDirector.WAVE_BULWARK,
+		"Bulwark does not begin before 58 seconds."
+	)
 
-func _reset_director_for_threshold_case(completed_wave_count: int, living_hostile_count: int) -> void:
-	for child in get_children():
-		if child != director and child != arena:
-			child.queue_free()
+	await _reset_director_for_wave_selection_case(
+		3,
+		[
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+		]
+	)
+	director.advance(0.01, 60.0)
+	_require(
+		last_telegraph_wave_name == EncounterDirector.WAVE_BULWARK,
+		"Bulwark becomes the preferred fourth authored wave after its earliest time."
+	)
+
+	await _reset_director_for_wave_selection_case(3, [EncounterDirector.EnemyKind.SHIELDED])
+	director.advance(0.01, 60.0)
+	_require(
+		last_telegraph_wave_name != EncounterDirector.WAVE_BULWARK,
+		"An active capped Shielded blocks Bulwark before telegraph."
+	)
+
+	await _reset_director_for_wave_selection_case(
+		3,
+		[
+			EncounterDirector.EnemyKind.SHOOTER,
+			EncounterDirector.EnemyKind.SHOOTER,
+		]
+	)
+	director.advance(0.01, 60.0)
+	_require(
+		last_telegraph_wave_name != EncounterDirector.WAVE_BULWARK,
+		"Full Shooter cap blocks Bulwark before telegraph."
+	)
+
+	director.normal_hostile_cap = 5
+	await _reset_director_for_wave_selection_case(
+		3,
+		[
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+		]
+	)
+	director.advance(0.01, 60.0)
+	_require(
+		last_telegraph_wave_name != EncounterDirector.WAVE_BULWARK,
+		"Insufficient Normal capacity blocks Bulwark before telegraph."
+	)
+	director.normal_hostile_cap = 9
+
+	director.total_hostile_cap = 7
+	await _reset_director_for_wave_selection_case(
+		3,
+		[
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+			EncounterDirector.EnemyKind.NORMAL,
+		]
+	)
+	director.advance(0.01, 60.0)
+	_require(
+		last_telegraph_wave_name != EncounterDirector.WAVE_BULWARK,
+		"Insufficient total-hostile capacity blocks Bulwark before telegraph."
+	)
+	director.total_hostile_cap = 10
+
+
+func _reset_director_for_wave_selection_case(completed_wave_count: int, enemy_kinds: Array[int]) -> void:
+	_remove_non_audit_nodes()
 	await get_tree().process_frame
 	director.reset_for_new_run()
 	director.set("_completed_wave_count", completed_wave_count)
 	last_telegraph_wave_name = &""
+	last_telegraph_edges.clear()
+	_clear_spawn_tracking()
 
-	for _index in range(living_hostile_count):
+	for enemy_kind in enemy_kinds:
 		var ambient_enemy := Node.new()
 		add_child(ambient_enemy)
 		director.register_enemy(
 			ambient_enemy,
-			EncounterDirector.EnemyKind.NORMAL,
+			enemy_kind,
 			EncounterDirector.INVALID_WAVE_ID
 		)
 
@@ -201,6 +389,34 @@ func _clear_spawn_tracking() -> void:
 	spawned_enemy_ids.clear()
 	spawned_enemy_kinds.clear()
 	spawned_wave_ids.clear()
+	spawned_edges.clear()
+	spawned_lane_hints.clear()
+	spawned_bias_hints.clear()
+	spawn_request_times.clear()
+
+
+func _remove_non_audit_nodes() -> void:
+	for child in get_children():
+		if child != director and child != arena:
+			child.queue_free()
+
+
+func _find_wave_definition(wave_name: StringName) -> EncounterDirector.WaveDefinition:
+	var wave_definitions := director.get("_wave_definitions") as Array
+	for wave_variant in wave_definitions:
+		var wave := wave_variant as EncounterDirector.WaveDefinition
+		if wave != null and wave.wave_name == wave_name:
+			return wave
+	return null
+
+
+func _int_array_matches(actual: Array, expected: Array) -> bool:
+	if actual.size() != expected.size():
+		return false
+	for index in range(actual.size()):
+		if int(actual[index]) != int(expected[index]):
+			return false
+	return true
 
 
 func _require(condition: bool, message: String) -> void:

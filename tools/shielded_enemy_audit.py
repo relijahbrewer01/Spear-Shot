@@ -150,9 +150,14 @@ def main() -> int:
     require("shielded_hostile_cap := 1" in director, "Shielded cap starts at 1", failures)
     require("get_total_hostile_count() >= total_hostile_cap" in director, "Shielded counts under total hostile cap", failures)
     require("get_shielded_hostile_count() < shielded_hostile_cap" in director, "Shielded has a dedicated cap", failures)
+    build_wave_section = director.split("func _build_wave_definitions", 1)[1]
     require(
-        "EnemyKind.SHIELDED" not in director.split("func _build_wave_definitions", 1)[1],
-        "Rush, Pincer, and Charger Hunt contain no Shielded steps",
+        'WAVE_BULWARK' in build_wave_section
+        and "SpawnStep.new(0.0, EnemyKind.SHIELDED, EdgeRole.PRIMARY, 0.50, Enemy.FormationBias.DIRECT)" in build_wave_section
+        and "WAVE_RUSH" in build_wave_section
+        and "WAVE_PINCER" in build_wave_section
+        and "WAVE_CHARGER_HUNT" in build_wave_section,
+        "Shielded only gains the approved Bulwark authored-wave step while Rush, Pincer, and Charger Hunt remain intact",
         failures,
     )
     require("shielded_unlock_time := 25.0" in main_script, "Shielded unlocks around 25 seconds", failures)

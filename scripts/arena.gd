@@ -3,6 +3,7 @@ class_name Arena
 
 const FLOOR_TEXTURE := preload("res://art/arena/arena_floor.png")
 const INVALID_SPAWN_POSITION := Vector2(INF, INF)
+const EDGE_PADDING := 8.0
 
 enum SpawnEdge {
 	TOP,
@@ -85,28 +86,88 @@ func find_safe_spawn_position(
 	return INVALID_SPAWN_POSITION
 
 
+func find_safe_spawn_position_along_edge_lane(
+	spawn_edge: int,
+	lane_hint: float,
+	avoid_positions: Array[Vector2],
+	avoid_radii: Array[float],
+	lane_offset_step: float = 0.08,
+	max_offset_steps: int = 4
+) -> Vector2:
+	if avoid_positions.size() != avoid_radii.size():
+		push_warning("Spawn avoidance positions and radii must have matching sizes.")
+		return INVALID_SPAWN_POSITION
+
+	var play_rect := get_play_rect()
+	var requested_lane := clampf(lane_hint, 0.0, 1.0)
+	var lane_offsets: Array[float] = [0.0]
+	for step_index in range(1, maxi(max_offset_steps, 1) + 1):
+		var offset := lane_offset_step * float(step_index)
+		lane_offsets.append(offset)
+		lane_offsets.append(-offset)
+
+	for lane_offset in lane_offsets:
+		var spawn_position := get_spawn_position_for_edge_lane(
+			spawn_edge,
+			requested_lane + lane_offset,
+			play_rect
+		)
+		if _is_spawn_position_safe(spawn_position, avoid_positions, avoid_radii):
+			return spawn_position
+
+	return INVALID_SPAWN_POSITION
+
+
 func _pick_position_for_edge(play_rect: Rect2, spawn_edge: int) -> Vector2:
-	var edge_padding := 8.0
 	match spawn_edge:
 		SpawnEdge.TOP:
 			return Vector2(
-				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
-				play_rect.position.y + edge_padding
+				rng.randf_range(play_rect.position.x + EDGE_PADDING, play_rect.end.x - EDGE_PADDING),
+				play_rect.position.y + EDGE_PADDING
 			)
 		SpawnEdge.BOTTOM:
 			return Vector2(
-				rng.randf_range(play_rect.position.x + edge_padding, play_rect.end.x - edge_padding),
-				play_rect.end.y - edge_padding
+				rng.randf_range(play_rect.position.x + EDGE_PADDING, play_rect.end.x - EDGE_PADDING),
+				play_rect.end.y - EDGE_PADDING
 			)
 		SpawnEdge.LEFT:
 			return Vector2(
-				play_rect.position.x + edge_padding,
-				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
+				play_rect.position.x + EDGE_PADDING,
+				rng.randf_range(play_rect.position.y + EDGE_PADDING, play_rect.end.y - EDGE_PADDING)
 			)
 		_:
 			return Vector2(
-				play_rect.end.x - edge_padding,
-				rng.randf_range(play_rect.position.y + edge_padding, play_rect.end.y - edge_padding)
+				play_rect.end.x - EDGE_PADDING,
+				rng.randf_range(play_rect.position.y + EDGE_PADDING, play_rect.end.y - EDGE_PADDING)
+			)
+
+
+func get_spawn_position_for_edge_lane(
+	spawn_edge: int,
+	lane_hint: float,
+	play_rect: Rect2 = get_play_rect()
+) -> Vector2:
+	var clamped_lane := clampf(lane_hint, 0.0, 1.0)
+	match spawn_edge:
+		SpawnEdge.TOP:
+			return Vector2(
+				lerpf(play_rect.position.x + EDGE_PADDING, play_rect.end.x - EDGE_PADDING, clamped_lane),
+				play_rect.position.y + EDGE_PADDING
+			)
+		SpawnEdge.BOTTOM:
+			return Vector2(
+				lerpf(play_rect.position.x + EDGE_PADDING, play_rect.end.x - EDGE_PADDING, clamped_lane),
+				play_rect.end.y - EDGE_PADDING
+			)
+		SpawnEdge.LEFT:
+			return Vector2(
+				play_rect.position.x + EDGE_PADDING,
+				lerpf(play_rect.position.y + EDGE_PADDING, play_rect.end.y - EDGE_PADDING, clamped_lane)
+			)
+		_:
+			return Vector2(
+				play_rect.end.x - EDGE_PADDING,
+				lerpf(play_rect.position.y + EDGE_PADDING, play_rect.end.y - EDGE_PADDING, clamped_lane)
 			)
 
 

@@ -6,6 +6,7 @@ const ACCENT_COLOR := Color8(255, 241, 186)
 const COUNTDOWN_STEP_COUNT := 3
 
 @export var resume_countdown_step_duration := 0.7
+@export var multikill_feedback_duration := 0.75
 
 signal restart_requested
 signal pause_toggle_requested
@@ -14,6 +15,7 @@ signal resume_countdown_finished
 
 @onready var score_label: Label = $ScoreLabel
 @onready var time_label: Label = $TimeLabel
+@onready var multikill_label: Label = $MultikillLabel
 @onready var pause_backdrop: ColorRect = $PauseBackdrop
 @onready var pause_label: Label = $PauseLabel
 @onready var game_over_backdrop: ColorRect = $GameOverBackdrop
@@ -29,17 +31,21 @@ var countdown_active := false
 var countdown_left := 0.0
 var countdown_started_msec := 0
 var countdown_end_time_msec := 0
+var multikill_feedback_time_left := 0.0
 
 
 func _ready() -> void:
 	_configure_mouse_filters()
 	_apply_static_colors()
 	restart_button.pressed.connect(_on_restart_button_pressed)
+	clear_multikill_feedback()
 	hide_pause()
 	hide_game_over()
 
 
 func _process(_delta: float) -> void:
+	_update_multikill_feedback(_delta)
+
 	if not countdown_active:
 		return
 
@@ -89,6 +95,27 @@ func set_survival_time(survival_time: float) -> void:
 
 func set_high_score(_high_score: int) -> void:
 	pass
+
+
+func show_multikill_feedback(message: String) -> void:
+	if multikill_label == null:
+		return
+
+	multikill_label.text = message
+	multikill_feedback_time_left = multikill_feedback_duration
+	multikill_label.visible = true
+	multikill_label.scale = Vector2(1.16, 1.16)
+	multikill_label.modulate = ACCENT_COLOR
+
+
+func clear_multikill_feedback() -> void:
+	multikill_feedback_time_left = 0.0
+	if multikill_label == null:
+		return
+
+	multikill_label.visible = false
+	multikill_label.scale = Vector2.ONE
+	multikill_label.modulate = ACCENT_COLOR
 
 
 func show_game_over(final_score: int, final_time: float, high_score: int, is_new_high_score: bool) -> void:
@@ -158,9 +185,30 @@ func _update_countdown_label() -> void:
 	pause_label.text = str(countdown_value)
 
 
+func _update_multikill_feedback(delta: float) -> void:
+	if multikill_feedback_time_left <= 0.0 or multikill_label == null:
+		return
+	if get_tree().paused:
+		return
+
+	multikill_feedback_time_left = maxf(multikill_feedback_time_left - delta, 0.0)
+	if multikill_feedback_time_left == 0.0:
+		clear_multikill_feedback()
+		return
+
+	var elapsed := multikill_feedback_duration - multikill_feedback_time_left
+	var entrance := clampf(elapsed / 0.10, 0.0, 1.0)
+	var fade := clampf(multikill_feedback_time_left / 0.18, 0.0, 1.0)
+	multikill_label.scale = Vector2.ONE * lerpf(1.16, 1.0, entrance)
+	var feedback_color := ACCENT_COLOR
+	feedback_color.a = fade
+	multikill_label.modulate = feedback_color
+
+
 func _apply_static_colors() -> void:
 	time_label.add_theme_color_override("font_color", TEXT_COLOR)
 	score_label.add_theme_color_override("font_color", TEXT_COLOR)
+	multikill_label.add_theme_color_override("font_color", ACCENT_COLOR)
 	pause_label.add_theme_color_override("font_color", ACCENT_COLOR)
 	title_label.add_theme_color_override("font_color", ACCENT_COLOR)
 	final_score_label.add_theme_color_override("font_color", TEXT_COLOR)
@@ -174,6 +222,7 @@ func _configure_mouse_filters() -> void:
 	for control in [
 		time_label,
 		score_label,
+		multikill_label,
 		pause_backdrop,
 		pause_label,
 		game_over_backdrop,

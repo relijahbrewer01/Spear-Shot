@@ -11,6 +11,9 @@ signal enemy_hit(hit_position: Vector2)
 signal picked_up
 signal thrown
 signal landed
+signal throw_context_started(throw_id: int)
+signal direct_hostile_killed(throw_id: int, enemy_id: int)
+signal throw_context_resolved(throw_id: int)
 
 enum State {
 	HELD,
@@ -45,6 +48,8 @@ var pickup_flash_left := 0.0
 var pickup_in_progress := false
 var debug_launch_sweep_left := 0.0
 var debug_launch_sweep_direction := Vector2.RIGHT
+var next_throw_id := 0
+var active_throw_id := 0
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var trail: SpearTrailScript = $Trail
@@ -87,6 +92,7 @@ func reset_for_new_run(player_ref: Player, new_arena_rect: Rect2) -> void:
 	trail_points.clear()
 	pickup_flash_left = 0.0
 	pickup_in_progress = false
+	active_throw_id = 0
 	_set_state(State.HELD)
 	_clear_trail()
 	_move_to_held_position()
@@ -94,6 +100,8 @@ func reset_for_new_run(player_ref: Player, new_arena_rect: Rect2) -> void:
 
 func set_active(is_active: bool) -> void:
 	active = is_active
+	if not active:
+		active_throw_id = 0
 	_apply_collision_activity()
 
 
@@ -129,11 +137,14 @@ func try_throw(target_position: Vector2) -> bool:
 	travelled_distance = 0.0
 	hit_enemy_ids.clear()
 	_clear_trail()
+	next_throw_id += 1
+	active_throw_id = next_throw_id
 
 	global_position = _clamp_to_arena(owner_player.global_position + throw_direction * held_distance)
 	_set_rotation_from_direction(throw_direction)
 	_push_trail_point()
 	_set_state(State.FLYING)
+	throw_context_started.emit(active_throw_id)
 	thrown.emit()
 	_hit_enemies_in_launch_sweep()
 	return true
@@ -251,9 +262,14 @@ func _push_trail_point() -> void:
 
 
 func _set_state(new_state: State) -> void:
+	var previous_state := state
 	state = new_state
 	_apply_collision_activity()
 	state_changed.emit(state)
+	if previous_state == State.FLYING and state != State.FLYING and active_throw_id > 0:
+		var resolved_throw_id := active_throw_id
+		active_throw_id = 0
+		throw_context_resolved.emit(resolved_throw_id)
 	queue_redraw()
 
 
@@ -450,6 +466,10 @@ func _hit_enemy_if_needed(enemy_body: Node) -> int:
 	if hit_response != Enemy.HitResponse.IGNORED and enemy_body is Node2D:
 		var enemy_node := enemy_body as Node2D
 		enemy_hit.emit(enemy_node.global_position)
+	if hit_response == Enemy.HitResponse.DAMAGED and active_throw_id > 0 and enemy_body is Enemy:
+		var enemy := enemy_body as Enemy
+		if enemy.is_dying:
+			direct_hostile_killed.emit(active_throw_id, enemy_id)
 
 	if hit_response == Enemy.HitResponse.STOPPED:
 		_land(stopped_landing_position)

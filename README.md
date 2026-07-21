@@ -135,7 +135,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `Player.tscn` and `scripts/player.gd`: movement, aiming, health, invulnerability, upright facing, dodge readability visuals, and narrow authored forced movement with shove-specific temporary damage protection
 - `scripts/player_dodge_trail.gd`: fixed-pool dodge afterimages sampled from Akedra's body visual
 - `scripts/player_dodge_cooldown_indicator.gd`: world-space exertion wisp and brief ready glint driven by the shared dodge cooldown
-- `Spear.tscn` and `scripts/spear.gd`: the single spear state loop (`HELD`, `FLYING`, `LANDED`)
+- `Spear.tscn` and `scripts/spear.gd`: the single spear state loop (`HELD`, `FLYING`, `LANDED`) plus narrow per-flight direct-hostile kill attribution for feedback only
 - `scripts/spear_trail.gd`: non-rotating deterministic spear trail renderer
 - `Enemy.tscn` and `scripts/enemy.gd`: the normal enemy, shared enemy helpers, contact damage, separation, scoring, and death feedback
 - `Charger.tscn` and `scripts/charger.gd`: Charger telegraph, locked dash, dash-only bulldozing of eligible hostiles, recovery, and distinct visuals
@@ -147,7 +147,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `HeartRunner.tscn` and `scripts/heart_runner.gd`: non-hostile opportunity runner with visible calm entry, limited wandering, proximity-triggered panic, locked casual-or-panic exit routing, explicit spear-hit handling, authored displacement support, and currently locked route exit-plane cleanup
 - `HeartPickup.tscn` and `scripts/heart_pickup.gd`: temporary pickup spawned by a defeated Runner, including final warning pulse/flicker and overlap-safe collection
 - `DartProjectile.tscn` and `scripts/dart_projectile.gd`: straight-line dart projectile with burst-aware player damage context, a dedicated Boomer-only fuse-trigger target, invulnerability-safe contact, and cleanup
-- `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, and game-over UI
+- `HUD.tscn` and `scripts/hud.gd`: minimal score, pause, game-over, and pause-aware same-throw multikill feedback UI
 - `scripts/player_health_pips.gd`: world-space health pip display attached under the player
 - `scripts/destination_marker.gd`: brief right-click destination feedback marker
 - `scripts/encounter_director.gd`: authored wave scheduling, population caps, state transitions, and strict cleanup
@@ -177,6 +177,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - `tools/player_action_audio_audit.py`: static PCM, import, loudness, generator, and dedicated audio-RNG audit for the three player-action pools
 - `tools/music_cycling_audit.py`: static loop format, import, loudness, generation, fallback, and run-cycling audit
 - `tools/spear_recovery_audio_audit.py`: static recovery-state, PCM, import, generator, cleanup, RNG-isolation, and documentation audit
+- `tools/multikill_feedback_audit.py`: static audit for per-throw direct-kill attribution, feedback-only score preservation, HUD mapping, and deferred scoring-system boundaries
+- `tools/MultikillFeedbackRuntimeAudit.tscn`: runtime audit for direct same-throw kill counts, exclusions, score preservation, HUD lifetime, pause, restart, and death cleanup
 - `tools/tuning_audit.py`: lightweight static audit for the root gameplay tuning index
 
 ## Phase 4.5 - Prowler
@@ -192,6 +194,8 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 - It remains ambient-only in Phase 4.5 with a dedicated cap of `1`, its own first-introduction guarantee, and no authored wave membership
 
 ## Enemy behavior
+
+- Direct same-throw hostile kills from one flying spear flight can display one transient `DOUBLE`, `TRIPLE`, or `QUAD` message when that flight ends. It changes no base score, high-score rule, multiplier, or combo timer; Shielded breaks, Boomer collateral, Heart Runner defeats, cleanup, and indirect deaths do not count.
 
 - Normal enemy: slow direct pursuit, worth `1` point
 - Charger: unlocks early but starts uncommon, chases briefly, telegraphs with a visible dash line, commits to one dash direction, can shove eligible ordinary hostiles out of that lane during the dash without damaging them, then recovers, worth `3` points

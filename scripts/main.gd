@@ -164,6 +164,8 @@ var heart_runner_one_health_active_time := 0.0
 var heart_runner_one_health_grace_due := false
 var formation_bias_assignment_index := 0
 var debug_formation_bias_assignment_index := 0
+var active_spear_throw_id := 0
+var active_spear_throw_kill_ids: Dictionary = {}
 var active_heart_runner: HeartRunner
 var active_heart_pickup: HeartPickup
 
@@ -236,6 +238,9 @@ func _ready() -> void:
 	spear.picked_up.connect(_on_spear_picked_up)
 	spear.thrown.connect(_on_spear_thrown)
 	spear.state_changed.connect(_on_spear_state_changed)
+	spear.throw_context_started.connect(_on_spear_throw_context_started)
+	spear.direct_hostile_killed.connect(_on_spear_direct_hostile_killed)
+	spear.throw_context_resolved.connect(_on_spear_throw_context_resolved)
 	spawn_timer.timeout.connect(_on_spawn_timer_timeout)
 	opportunity_timer.timeout.connect(_on_opportunity_timer_timeout)
 	encounter_director.spawn_requested.connect(_on_director_spawn_requested)
@@ -257,6 +262,7 @@ func _exit_tree() -> void:
 	if get_tree() != null:
 		get_tree().paused = false
 	_clear_buffered_spear_throw()
+	_clear_spear_throw_context()
 	_cancel_hit_stop()
 	_stop_all_audio()
 
@@ -275,6 +281,7 @@ func _reset_runtime_state() -> void:
 	shake_strength = 0.0
 	shake_duration = 0.0
 	_clear_buffered_spear_throw()
+	_clear_spear_throw_context()
 	_cancel_hit_stop()
 	debug_reset_charger_audio_metrics()
 	debug_reset_prowler_audio_metrics()
@@ -1390,6 +1397,7 @@ func _on_player_died() -> void:
 
 	_cancel_hit_stop()
 	_reset_heart_runner_one_health_grace()
+	_clear_spear_throw_context()
 	run_state = RunState.GAME_OVER
 	spawn_timer.stop()
 	opportunity_timer.stop()
@@ -1428,6 +1436,47 @@ func _on_player_died() -> void:
 
 func _on_spear_thrown() -> void:
 	_play_player_action_sfx(PLAYER_ACTION_THROW)
+
+
+func _on_spear_throw_context_started(throw_id: int) -> void:
+	if run_state != RunState.RUNNING:
+		return
+
+	active_spear_throw_id = throw_id
+	active_spear_throw_kill_ids.clear()
+	hud.clear_multikill_feedback()
+
+
+func _on_spear_direct_hostile_killed(throw_id: int, enemy_id: int) -> void:
+	if run_state != RunState.RUNNING or throw_id != active_spear_throw_id:
+		return
+
+	active_spear_throw_kill_ids[enemy_id] = true
+
+
+func _on_spear_throw_context_resolved(throw_id: int) -> void:
+	if throw_id != active_spear_throw_id:
+		return
+
+	var eligible_kill_count := active_spear_throw_kill_ids.size()
+	active_spear_throw_id = 0
+	active_spear_throw_kill_ids.clear()
+	if run_state != RunState.RUNNING or eligible_kill_count < 2:
+		return
+
+	if eligible_kill_count == 2:
+		hud.show_multikill_feedback("DOUBLE")
+	elif eligible_kill_count == 3:
+		hud.show_multikill_feedback("TRIPLE")
+	else:
+		hud.show_multikill_feedback("QUAD")
+
+
+func _clear_spear_throw_context() -> void:
+	active_spear_throw_id = 0
+	active_spear_throw_kill_ids.clear()
+	if hud != null:
+		hud.clear_multikill_feedback()
 
 
 func _on_spear_enemy_hit(_hit_position: Vector2) -> void:

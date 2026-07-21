@@ -65,6 +65,7 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Phase 4.6.4 adds dash-only Charger bulldozing: during the committed dash, a Charger can shove eligible ordinary hostiles out of its lane through the existing authored displacement seam.
 - Bulldozing deals no damage, awards no score, does not clear enemy ownership, and does not trigger Boomer fuse by body contact; it exists purely to preserve the dash lane and break up piles.
 - Phase 4.6.5 adds one authored Bulwark wave: a center-front Shielded, a slightly offset Shooter behind it, and two shallow-flank Normals on one announced edge, using narrow lane hints and authored formation-bias hints to showcase the already-live cover, peek, and crowd-flow behavior without adding squad AI.
+- Phase 4.6.6 adds feedback only for direct same-throw hostile kills: one resolved flight can display `DOUBLE`, `TRIPLE`, or `QUAD` without changing any score value, multiplier, or combo rule.
 - Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
 - Final interaction and population tuning should happen after those behaviors exist, not before.
 
@@ -75,5 +76,5 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Dodges can later add a slightly longer disturbed-earth streak or two quick displaced prints.
 - Future footprint work should fade naturally, stay pooled/limited, have no gameplay effect, and be removable through accessibility settings.
 - A final visual-art overhaul and overall style review should happen during late-stage polish after gameplay systems are stable.
-- Same-throw multikill scoring remains planned as a later chain-bonus system that preserves base enemy values, resolves when one throw fully ends, and can eventually surface feedback such as DOUBLE or TRIPLE.
+- A later progression/scoring pass remains responsible for multikill bonus points, score multipliers, timed combos or chains, per-run records, career statistics, achievements, and the attribution policy for indirect kills, Boomer chains, opportunity targets, and other special cases. Phase 4.6.6 intentionally supplies no part of those score or statistics systems.
 - Longer-term progression notes include per-run records, career statistics, achievements, unlockable techniques, restrained between-run progression, and later social/platform hooks such as leaderboards, friend score comparisons, or fixed-seed challenge variants.

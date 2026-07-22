@@ -750,6 +750,13 @@ func _audit_encounter_integration(main_scene: PackedScene) -> void:
 
 
 func _audit_bulwark_integration(main_scene: PackedScene) -> void:
+	for edge in [
+		Arena.SpawnEdge.BOTTOM,
+		Arena.SpawnEdge.LEFT,
+		Arena.SpawnEdge.RIGHT,
+	]:
+		await _audit_bulwark_edge_integration(main_scene, edge)
+
 	var main := main_scene.instantiate()
 	add_child(main)
 	await get_tree().process_frame
@@ -979,6 +986,186 @@ func _audit_bulwark_integration(main_scene: PackedScene) -> void:
 	main.call("_stop_all_audio")
 	main.queue_free()
 	await get_tree().process_frame
+
+
+func _audit_bulwark_edge_integration(main_scene: PackedScene, spawn_edge: int) -> void:
+	var edge_name := _spawn_edge_name(spawn_edge)
+	var main := main_scene.instantiate()
+	add_child(main)
+	await get_tree().process_frame
+	main.set_process(false)
+
+	var director := main.get_node("EncounterDirector") as EncounterDirector
+	var arena := main.get_node("Arena") as Arena
+	var telegraph := main.get_node("EncounterTelegraph") as EncounterTelegraph
+	var spawn_timer := main.get_node("SpawnTimer") as Timer
+	var opportunity_timer := main.get_node("OpportunityTimer") as Timer
+	var enemy_container := main.get_node("EnemyContainer") as Node2D
+	var play_rect := arena.get_play_rect()
+	var bulwark_wave := _get_wave_definition(director, EncounterDirector.WAVE_BULWARK)
+
+	_require(bulwark_wave != null, "Bulwark %s-edge integration finds the live wave definition." % edge_name)
+	if bulwark_wave == null:
+		main.call("_stop_all_audio")
+		main.queue_free()
+		await get_tree().process_frame
+		return
+
+	director.reset_for_new_run()
+	main.set("survival_time", 60.0)
+	spawn_timer.start(10.0)
+	opportunity_timer.stop()
+	var forced_edges: Array[int] = [spawn_edge]
+	director.call("_begin_wave_telegraph", bulwark_wave, forced_edges)
+	_require(
+		telegraph.active
+		and telegraph.warning_edges.size() == 1
+		and telegraph.warning_edges[0] == spawn_edge,
+		"Bulwark %s edge uses one matching world-space telegraph." % edge_name
+	)
+	_require(
+		(director.get("_current_wave_edges") as Array).size() == 1
+		and int((director.get("_current_wave_edges") as Array)[0]) == spawn_edge,
+		"Bulwark %s edge remains the resolved wave edge." % edge_name
+	)
+	_require(spawn_timer.is_stopped(), "Bulwark %s telegraph pauses ambient spawning." % edge_name)
+
+	director.advance(1.76, 60.0)
+	var spawned_positions: Array[Vector2] = []
+	var spawned_times: Array[float] = []
+	var observed_count := 0
+	var elapsed := 0.0
+	while elapsed < 1.35:
+		director.advance(0.05, 60.0 + elapsed)
+		elapsed += 0.05
+		while enemy_container.get_child_count() > observed_count:
+			var spawned_enemy := enemy_container.get_child(observed_count) as Enemy
+			if spawned_enemy != null:
+				spawned_positions.append(spawned_enemy.global_position)
+				spawned_times.append(elapsed)
+			observed_count += 1
+
+	_require(enemy_container.get_child_count() == 4, "Bulwark %s edge spawns all four members." % edge_name)
+	if enemy_container.get_child_count() != 4:
+		main.call("_stop_all_audio")
+		main.queue_free()
+		await get_tree().process_frame
+		return
+
+	var shielded := enemy_container.get_child(0) as ShieldedEnemy
+	var shooter := enemy_container.get_child(1) as ShooterEnemy
+	var left_normal := enemy_container.get_child(2) as Enemy
+	var right_normal := enemy_container.get_child(3) as Enemy
+	_require(shielded != null, "Bulwark %s edge spawns Shielded first." % edge_name)
+	_require(shooter != null, "Bulwark %s edge spawns Shooter second." % edge_name)
+	_require(
+		left_normal != null and not (left_normal is ShooterEnemy) and not (left_normal is ShieldedEnemy),
+		"Bulwark %s edge spawns the first Normal third." % edge_name
+	)
+	_require(
+		right_normal != null and not (right_normal is ShooterEnemy) and not (right_normal is ShieldedEnemy),
+		"Bulwark %s edge spawns the second Normal fourth." % edge_name
+	)
+
+	var expected_offsets := [0.05, 0.35, 0.85, 1.20]
+	for offset_index in range(mini(spawned_times.size(), expected_offsets.size())):
+		_require(
+			absf(spawned_times[offset_index] - expected_offsets[offset_index]) <= 0.051,
+			"Bulwark %s spawn timing %d remains near its authored offset." % [edge_name, offset_index]
+		)
+
+	var expected_lanes := [0.50, 0.62, 0.34, 0.74]
+	for lane_index in range(mini(spawned_positions.size(), expected_lanes.size())):
+		var spawn_position := spawned_positions[lane_index]
+		var normalized_lane := _normalized_lane_for_edge(spawn_edge, spawn_position, play_rect)
+		_require(
+			absf(normalized_lane - expected_lanes[lane_index]) <= 0.02,
+			"Bulwark %s spawn lane %d preserves its geometric ordering." % [edge_name, lane_index]
+		)
+		_require(
+			play_rect.has_point(spawn_position),
+			"Bulwark %s spawn %d begins inside the playable arena." % [edge_name, lane_index]
+		)
+
+	_require(
+		shielded.get_formation_bias() == Enemy.FormationBias.DIRECT,
+		"Bulwark %s Shielded receives DIRECT." % edge_name
+	)
+	_require(
+		left_normal.get_formation_bias() == Enemy.FormationBias.LEFT_FLANK,
+		"Bulwark %s first Normal receives LEFT_FLANK." % edge_name
+	)
+	_require(
+		right_normal.get_formation_bias() == Enemy.FormationBias.RIGHT_FLANK,
+		"Bulwark %s second Normal receives RIGHT_FLANK." % edge_name
+	)
+	_require(
+		not shooter.uses_formation_bias and int(main.get("formation_bias_assignment_index")) == 0,
+		"Bulwark %s Shooter receives no shared bias and authored hints preserve the ordinary sequence." % edge_name
+	)
+	_require(
+		(director.get("_wave_enemy_ids") as Dictionary).size() == 4,
+		"Bulwark %s edge owns all four spawned members." % edge_name
+	)
+
+	var saw_anchor := false
+	for step_index in range(180):
+		await get_tree().process_frame
+		director.advance(0.05, 62.0 + float(step_index) * 0.05)
+		if shooter.anchor_shielded == shielded:
+			saw_anchor = true
+			break
+	_require(saw_anchor, "Bulwark %s Shooter naturally acquires its Shielded anchor." % edge_name)
+
+	left_normal.queue_free()
+	right_normal.queue_free()
+	shooter.queue_free()
+	await get_tree().process_frame
+	director.advance(0.01, 71.1)
+	_require(
+		director.current_state == EncounterDirector.EncounterState.WAVE_ACTIVE,
+		"Bulwark %s edge stays active while its Shielded remains." % edge_name
+	)
+
+	shielded.queue_free()
+	await get_tree().process_frame
+	director.advance(0.01, 71.2)
+	_require(
+		director.current_state == EncounterDirector.EncounterState.WAVE_RECOVERY,
+		"Bulwark %s edge enters recovery after all four members resolve." % edge_name
+	)
+	director.advance(3.1, 74.3)
+	_require(
+		director.current_state == EncounterDirector.EncounterState.AMBIENT and not spawn_timer.is_stopped(),
+		"Bulwark %s edge completes recovery and resumes ambient spawning." % edge_name
+	)
+
+	main.call("_reset_runtime_state")
+	await get_tree().process_frame
+	_require(
+		enemy_container.get_child_count() == 0
+		and (director.get("_wave_enemy_ids") as Dictionary).is_empty()
+		and director.current_state == EncounterDirector.EncounterState.AMBIENT,
+		"Bulwark %s restart cleanup removes owned nodes and pending wave state." % edge_name
+	)
+
+	main.call("_stop_all_audio")
+	main.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
+func _spawn_edge_name(spawn_edge: int) -> String:
+	match spawn_edge:
+		Arena.SpawnEdge.TOP:
+			return "top"
+		Arena.SpawnEdge.BOTTOM:
+			return "bottom"
+		Arena.SpawnEdge.LEFT:
+			return "left"
+		Arena.SpawnEdge.RIGHT:
+			return "right"
+	return "unknown"
 
 
 func _assert_spawn_interval(main: Node, survival_time: float, expected_interval: float, message: String) -> void:

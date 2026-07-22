@@ -195,6 +195,7 @@ For a human-readable snapshot of gameplay timers, distances, speeds, probabiliti
 
 ## Enemy behavior
 
+- Phase 4.6 currently combines deterministic Normal/Shielded crowd-flow bias, positioning-based Shielded/Shooter cooperation, the narrow Shooter-dart/Boomer fuse interaction, Charger bulldozing, the authored Bulwark wave, and direct same-throw multikill feedback.
 - Direct same-throw hostile kills from one flying spear flight can display one transient `DOUBLE`, `TRIPLE`, or `QUAD` message when that flight ends. It changes no base score, high-score rule, multiplier, or combo timer; Shielded breaks, Boomer collateral, Heart Runner defeats, cleanup, and indirect deaths do not count.
 
 - Normal enemy: slow direct pursuit, worth `1` point
@@ -540,7 +541,7 @@ See [`TUNING.md`](TUNING.md) for current values and tuning intent. This list is 
 ## Features intentionally left for later
 
 - More enemy types
-- Further Phase 4.6 enemy interaction work focused on broader formation follow-through beyond the live Shielded/Shooter cover behavior, Boomer lane-trap interaction, and Charger bulldozing
+- Broader squad AI, ring formations, projectile interception, indirect multikill attribution, bonus scoring, multipliers, combo systems, statistics, achievements, and progression remain deferred beyond the bounded Phase 4.6 interaction pass
 - Ring encounter formations
 - Wave reward selection driven by encounter completion signals
 - Upgrades or progression systems

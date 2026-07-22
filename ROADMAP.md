@@ -66,8 +66,8 @@ For the current numeric tuning reference, see [`TUNING.md`](TUNING.md). Runtime 
 - Bulldozing deals no damage, awards no score, does not clear enemy ownership, and does not trigger Boomer fuse by body contact; it exists purely to preserve the dash lane and break up piles.
 - Phase 4.6.5 adds one authored Bulwark wave: a center-front Shielded, a slightly offset Shooter behind it, and two shallow-flank Normals on one announced edge, using narrow lane hints and authored formation-bias hints to showcase the already-live cover, peek, and crowd-flow behavior without adding squad AI.
 - Phase 4.6.6 adds feedback only for direct same-throw hostile kills: one resolved flight can display `DOUBLE`, `TRIPLE`, or `QUAD` without changing any score value, multiplier, or combo rule.
-- Enemy formations should eventually become more coordinated, with cleaner spacing and role interaction, without turning the project into a full squad AI system.
-- Final interaction and population tuning should happen after those behaviors exist, not before.
+- Phase 4.6.7 is the bounded final acceptance checkpoint for clean audit output, four-edge Main-backed Bulwark integration coverage, multikill lifecycle regression, documentation consolidation, and the final automated/manual review.
+- Broader squad AI, ring formations, projectile interception, indirect-kill attribution, and progression remain deferred rather than expanding this interaction pass.
 
 ## Future Polish
 

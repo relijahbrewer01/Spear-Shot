@@ -54,7 +54,7 @@ const SCENE_SPRITES := {
 	"res://Spear.tscn": "Sprite2D",
 }
 
-const REPORT_PATH := "res://tools/presentation_audit_report.txt"
+const REPORT_PATH := "user://presentation_audit_report.txt"
 
 
 func _initialize() -> void:
@@ -233,3 +233,4 @@ func _write_report(report_lines: Array[String]) -> void:
 
 	for line in report_lines:
 		file.store_line(line)
+		print(line)

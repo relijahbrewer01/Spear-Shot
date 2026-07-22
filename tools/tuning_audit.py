@@ -50,6 +50,12 @@ def main() -> int:
     ]:
         require(section in tuning, f"TUNING.md includes {section}", failures)
 
+    require(
+        tuning.count("## HUD And Feedback") == 1,
+        "TUNING.md contains exactly one HUD And Feedback section",
+        failures,
+    )
+
     for variable_name in [
         "base_spawn_interval",
         "minimum_spawn_interval",

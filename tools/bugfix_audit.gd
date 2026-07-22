@@ -1,6 +1,6 @@
 extends Node
 
-const REPORT_PATH := "C:/Users/Elijah/Documents/Spear Shot/tools/bugfix_audit_report.txt"
+const REPORT_PATH := "user://bugfix_audit_report.txt"
 
 var report_lines: Array[String] = []
 var spawn_timeout_count := 0
@@ -176,3 +176,4 @@ func _write_report() -> void:
 
 	for line in report_lines:
 		file.store_line(line)
+		print(line)

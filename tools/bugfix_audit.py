@@ -65,6 +65,11 @@ def parse_bus_values(layout_text: str) -> dict[str, dict[str, str]]:
     return buses
 
 
+def parse_report_path(script_text: str) -> str:
+    match = re.search(r'const REPORT_PATH := "([^"]+)"', script_text)
+    return match.group(1) if match else ""
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -95,6 +100,41 @@ def main() -> int:
     enemy_nodes = parse_node_blocks(enemy_scene)
     charger_nodes = parse_node_blocks(charger_scene)
     buses = parse_bus_values(bus_layout)
+
+    report_writing_audits: list[Path] = []
+    for audit_path in sorted((ROOT / "tools").glob("*audit*.gd")):
+        audit_script = audit_path.read_text(encoding="utf-8")
+        if "FileAccess.WRITE" not in audit_script:
+            continue
+        report_writing_audits.append(audit_path)
+        report_path = parse_report_path(audit_script)
+        require(
+            report_path.startswith("user://"),
+            f"{audit_path.name} writes generated reports under user://",
+            failures,
+        )
+        require(
+            not report_path.startswith("res://")
+            and re.match(r"^[A-Za-z]:[/\\]", report_path) is None,
+            f"{audit_path.name} does not write reports into the repository or a machine-specific path",
+            failures,
+        )
+
+    require(
+        bool(report_writing_audits),
+        "Static safety audit discovers the runtime report writers",
+        failures,
+    )
+
+    for generated_report in [
+        ROOT / "tools" / "presentation_audit_report.txt",
+        ROOT / "tools" / "bugfix_audit_report.txt",
+    ]:
+        require(
+            not generated_report.exists(),
+            f"Tracked generated report is removed: {generated_report.name}",
+            failures,
+        )
 
     require("SpawnTimer" in main_nodes, "Main scene has SpawnTimer node", failures)
     if "SpawnTimer" in main_nodes:

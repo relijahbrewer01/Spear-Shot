@@ -391,6 +391,7 @@
 | `edge_inset` | `5.0px` | `scripts/encounter_telegraph.gd` | Wave marker inset from arena edge. |
 | `marker_half_length` | `17.0px` | `scripts/encounter_telegraph.gd` | Wave marker length. |
 | `pulse_speed` | `9.0` | `scripts/encounter_telegraph.gd` | Wave warning pulse speed. |
+| `multikill_feedback_duration` | `0.75s` | `scripts/hud.gd` | Pause-aware transient lifetime for one resolved same-throw `DOUBLE`, `TRIPLE`, or `QUAD` message. This is feedback only and does not add bonus score, a multiplier, or a combo timer. |
 
 ## Input And Audio Polish
 
@@ -405,12 +406,6 @@
 | Music bus mix | `-13.0dB` | `default_bus_layout.tres` | Both calm loops retain the existing background-music level. |
 | Music run cycle | `track 1, track 2, repeat` | `scripts/main.gd` | Launch starts on the original; each in-place restart advances once and starts the selected loop from the beginning. |
 | Music loop format | `44.1kHz`, `16-bit`, stereo | `tools/generate_music.py` | Both locally generated tracks share format, duration, loop configuration, and similar loudness. |
-
-## HUD And Feedback
-
-| Setting | Current value | Source | Purpose / tuning effect |
-| --- | --- | --- | --- |
-| `multikill_feedback_duration` | `0.75s` | `scripts/hud.gd` | Pause-aware transient lifetime for one resolved same-throw `DOUBLE`, `TRIPLE`, or `QUAD` message. This is feedback only and does not add bonus score, a multiplier, or a combo timer. |
 
 ## Common Tuning Requests
 
